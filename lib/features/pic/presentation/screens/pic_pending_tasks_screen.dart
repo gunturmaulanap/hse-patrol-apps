@@ -8,197 +8,184 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
-import '../providers/active_area_filter_provider.dart';
 
-class PicFindingScreen extends ConsumerWidget {
-  const PicFindingScreen({super.key});
+class PicPendingTasksScreen extends ConsumerWidget {
+  const PicPendingTasksScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(mockDatabaseProvider);
-    final activeArea = ref.watch(activeAreaFilterProvider);
+    final user = ref.watch(currentUserProvider);
 
-    // Ambil data task khusus untuk area yang dipilih.
-    // Sembunyikan task yang sudah di Canceled oleh petugas.
-    final tasksInArea = db.reports.where((r) {
-      final isAreaMatch = r['area'] == activeArea;
-      final isNotCanceled = r['status'] != 'Canceled';
-      return isAreaMatch && isNotCanceled;
+    // FIX: Redirect ke login jika user null
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final areaAccess = user.areaAccess;
+
+    // Filter Task:
+    // 1. Hanya Area yang dimiliki PIC
+    // 2. Status Pending (Termasuk Rejected yang revert ke Pending)
+    final pendingTasks = db.reports.where((r) {
+      final isMyArea = areaAccess.contains(r['area']);
+      final isPending = r['status'] == 'Pending';
+      return isMyArea && isPending;
     }).toList()
       ..sort((a, b) => DateTime.parse(b['date'] as String).compareTo(DateTime.parse(a['date'] as String)));
 
-    // Hitung status untuk insight
-    final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
+    // Pisahkan mana yang benar-benar baru, mana yang Rejected (urgent)
+    final rejectedTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Rejected').toList();
+    final newTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Pending').toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
+        automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
           onPressed: () => context.goNamed(RouteNames.picHome),
         ),
-        title: Text('Area Findings', style: AppTypography.h3),
+        title: Text('Action Required', style: AppTypography.h3),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Area Info
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill), color: AppColors.textPrimary, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Selected Area', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                            Text(activeArea ?? 'Unknown Area', style: AppTypography.h2, maxLines: 2),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Insight Banner
-                  if (pendingCount > 0)
+        child: pendingTasks.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(AppRadius.large),
-                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 24),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Ada $pendingCount tugas yang membutuhkan tindak lanjut Anda.',
-                              style: AppTypography.body1.copyWith(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 64, color: Colors.green),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('All Caught Up!', style: AppTypography.h2),
+                    const SizedBox(height: 8),
+                    Text('Tidak ada tugas pending saat ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  // Alert Banner Jika Ada Task Rejected (Sangat Urgent)
+                  if (rejectedTasks.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD4D4), // Merah Muda Card Rejected
                         borderRadius: BorderRadius.circular(AppRadius.large),
-                        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                        border: Border.all(color: Colors.redAccent, width: 1.5),
                       ),
                       child: Row(
                         children: [
-                          Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green, size: 24),
-                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                            child: Icon(PhosphorIcons.warning(PhosphorIconsStyle.fill), color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 16),
                           Expanded(
-                            child: Text(
-                              'Area ini aman. Tidak ada tugas pending.',
-                              style: AppTypography.body1.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Urgent Revision Needed', style: AppTypography.body1.copyWith(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Text('Terdapat ${rejectedTasks.length} tindak lanjut yang ditolak oleh petugas.', style: AppTypography.caption.copyWith(color: AppColors.textPrimary)),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 32),
+                    Text('Ditolak (Perlu Revisi)', style: AppTypography.h3),
+                    const SizedBox(height: 16),
+                    ...rejectedTasks.map((task) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildExactTaskCard(
+                        context,
+                        title: _getMockTitle(task),
+                        area: task['area']?.toString() ?? '-',
+                        dateString: task['date']?.toString(),
+                        tag: 'Rejected',
+                        reportId: task['id'].toString(),
+                      ),
+                    )),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Daftar Tugas Baru (Pending)
+                  if (newTasks.isNotEmpty) ...[
+                    Text('Tugas Baru', style: AppTypography.h3),
+                    const SizedBox(height: 16),
+                    ...newTasks.map((task) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildExactTaskCard(
+                        context,
+                        title: _getMockTitle(task),
+                        area: task['area']?.toString() ?? '-',
+                        dateString: task['date']?.toString(),
+                        tag: 'Pending',
+                        reportId: task['id'].toString(),
+                      ),
+                    )),
+                  ],
+                  const SizedBox(height: 100), // Spacing bawah untuk bottom nav dan FAB
                 ],
               ),
-            ),
-            
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Divider(height: 1, color: AppColors.surfaceLight),
-            ),
-            
-            // List of Tasks
-            Expanded(
-              child: tasksInArea.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 64, color: AppColors.surfaceLight),
-                          const SizedBox(height: 16),
-                          Text('Tidak ada temuan di area ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(24),
-                      itemCount: tasksInArea.length,
-                      itemBuilder: (context, index) {
-                        final task = tasksInArea[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildExactTaskCard(
-                            context,
-                            title: _getMockTitle(task),
-                            dateString: task['date']?.toString(),
-                            rawStatus: task['status']?.toString() ?? 'Pending',
-                            tag: _getPicStatusTag(task),
-                            reportId: task['id'].toString(),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.goNamed(RouteNames.picHome),
+        backgroundColor: AppColors.primary,
+        icon: Icon(PhosphorIcons.house(PhosphorIconsStyle.fill), color: AppColors.textInverse),
+        label: Text('Back to Home', style: AppTypography.body1.copyWith(
+          color: AppColors.textInverse,
+          fontWeight: FontWeight.bold
+        )),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
-  // --- REUSABLE UI COMPONENT ---
-
-  Color _getColorByPicStatus(String statusTag) {
-    switch (statusTag.toLowerCase()) {
-      case 'pending': return const Color(0xFFD4D8FF); // Ungu Muda
-      case 'follow up done': return const Color(0xFFFAFF9F); // Kuning Muda
-      case 'approved': return const Color(0xFFC1F0D0); // Hijau Muda (Completed)
-      case 'rejected': return const Color(0xFFFFD4D4); // Merah Muda
-      default: return const Color(0xFFFFFFFF);
-    }
-  }
-
+  // --- Helpers ---
   String _getPicStatusTag(Map<String, dynamic> report) {
     final status = report['status']?.toString() ?? 'Pending';
-    
-    // Logika POV PIC: Jika status Pending tapi ada history rejected, tampilkan Rejected
     if (status == 'Pending') {
       final followUps = report['followUps'] as List<dynamic>? ?? [];
       final isRejected = followUps.any((f) => f['action'] == 'Rejected');
       if (isRejected) return 'Rejected';
-      return 'Pending';
-    } else if (status == 'Completed') {
-      return 'Approved'; // POV PIC melihatnya sebagai Approved
     }
-    return status; // Follow Up Done
+    return 'Pending';
+  }
+
+  Color _getColorByPicStatus(String statusTag) {
+    if (statusTag == 'Rejected') return const Color(0xFFFFD4D4); // Merah Muda
+    return const Color(0xFFD4D8FF); // Ungu Muda (Pending biasa)
   }
 
   Widget _buildExactTaskCard(
     BuildContext context, {
     required String title,
+    required String area,
     required String? dateString,
-    required String rawStatus,
     required String tag,
     required String reportId,
   }) {
@@ -250,7 +237,15 @@ class PicFindingScreen extends ConsumerWidget {
                       )
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill), size: 14, color: textColor.withValues(alpha: 0.6)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(area, style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(

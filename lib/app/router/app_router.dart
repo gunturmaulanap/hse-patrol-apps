@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'route_names.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/shell/presentation/screens/petugas_shell_screen.dart';
 import '../../features/shell/presentation/screens/pic_shell_screen.dart';
 import '../../features/reports/presentation/screens/patrol_list_screen.dart';
@@ -11,6 +12,8 @@ import '../../features/reports/presentation/screens/petugas_home_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/pic/presentation/screens/pic_home_screen.dart';
 import '../../features/pic/presentation/screens/pic_finding_screen.dart';
+import '../../features/pic/presentation/screens/pic_all_tasks_screen.dart';
+import '../../features/pic/presentation/screens/pic_pending_tasks_screen.dart';
 import '../../features/reports/presentation/screens/create_report_building_type_screen.dart';
 import '../../features/reports/presentation/screens/create_report_location_screen.dart';
 import '../../features/reports/presentation/screens/create_report_risk_level_screen.dart';
@@ -27,9 +30,14 @@ import '../../features/reports/presentation/screens/petugas_calendar_screen.dart
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/petugas/calendar',
+    initialLocation: '/splash',
     debugLogDiagnostics: true,
     routes: [
+      GoRoute(
+        path: '/splash',
+        name: RouteNames.splash,
+        builder: (context, state) => const SplashPage(),
+      ),
       GoRoute(
         path: '/login',
         name: RouteNames.login,
@@ -154,22 +162,30 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/pic/finding',
-                name: RouteNames.picFinding,
-                builder: (context, state) => const PicFindingScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/pic/profile',
-                name: RouteNames.picProfile,
-                builder: (context, state) => const ProfileScreen(),
+                path: '/pic/tasks',
+                name: RouteNames.picTasks,
+                builder: (context, state) => const PicAllTasksScreen(),
               ),
             ],
           ),
         ],
+      ),
+
+      // Additional PIC Routes (Finding & Profile - accessed via push)
+      GoRoute(
+        path: '/pic/finding',
+        name: RouteNames.picFinding,
+        builder: (context, state) => const PicFindingScreen(),
+      ),
+      GoRoute(
+        path: '/pic/pending-tasks',
+        name: RouteNames.picCreateReport,
+        builder: (context, state) => const PicPendingTasksScreen(),
+      ),
+      GoRoute(
+        path: '/pic/profile',
+        name: RouteNames.picProfile,
+        builder: (context, state) => const ProfileScreen(),
       ),
     ],
   );

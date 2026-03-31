@@ -18,13 +18,43 @@ class PicHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final db = ref.watch(mockDatabaseProvider);
 
+    // FIX: Redirect ke login jika user null (setelah hot restart)
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // FIX: Redirect ke login jika role bukan PIC
+    if (user.role != 'pic') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     // Debug: Cek user dan areaAccess
-    print('DEBUG PIC Home: Username = ${user?.username}, Role = ${user?.role}');
-    print('DEBUG PIC Home: areaAccess length = ${user?.areaAccess.length ?? 0}');
-    print('DEBUG PIC Home: areaAccess = ${user?.areaAccess}');
+    print('DEBUG PIC Home: Username = ${user.username}, Role = ${user.role}');
+    print('DEBUG PIC Home: areaAccess length = ${user.areaAccess.length}');
+    print('DEBUG PIC Home: areaAccess = ${user.areaAccess}');
 
     // Ambil daftar area yang bisa diakses oleh PIC
-    final areas = user?.areaAccess ?? [];
+    final areas = user.areaAccess;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -56,7 +86,7 @@ class PicHomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: () => context.pushNamed('profile'), 
+                      onTap: () => context.pushNamed(RouteNames.picProfile),
                       child: Container(
                         width: 48,
                         height: 48,

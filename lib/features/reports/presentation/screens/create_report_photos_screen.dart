@@ -8,6 +8,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/create_report_form_provider.dart';
 
@@ -53,13 +54,11 @@ class _CreateReportPhotosScreenState extends ConsumerState<CreateReportPhotosScr
             : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
             
         ref.read(createReportFormProvider.notifier).setNotes(newNotes);
-        
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Teks pada foto berhasil dideteksi dan dimasukkan ke Catatan!'),
-              backgroundColor: AppColors.statusApproved,
-            ),
+          AppSnackBar.success(
+            context,
+            message: 'Teks pada foto berhasil dideteksi dan dimasukkan ke Catatan!',
           );
         }
       }

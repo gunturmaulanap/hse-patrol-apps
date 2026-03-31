@@ -5,6 +5,7 @@ import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
 
@@ -80,7 +81,10 @@ class _PicFollowUpNotesScreenState extends ConsumerState<PicFollowUpNotesScreen>
                     text: 'Lanjutkan',
                     onPressed: () {
                       if (_notesController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Catatan tidak boleh kosong!')));
+                        AppSnackBar.warning(
+                          context,
+                          message: 'Catatan tidak boleh kosong!',
+                        );
                         return;
                       }
                       ref.read(picFollowUpFormProvider.notifier).setNotes(_notesController.text.trim());

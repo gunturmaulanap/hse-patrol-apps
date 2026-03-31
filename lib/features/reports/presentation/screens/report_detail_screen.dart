@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/mock_api/mock_database.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../pic/presentation/providers/pic_follow_up_provider.dart';
@@ -55,7 +56,7 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
                 ),
                 onPressed: () {
                   if (controller.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Alasan wajib diisi!')));
+                    AppSnackBar.warning(ctx, message: 'Alasan wajib diisi!');
                     return;
                   }
                   Navigator.pop(ctx, controller.text.trim());
@@ -87,9 +88,16 @@ class _ReportDetailScreenState extends ConsumerState<ReportDetailScreen> {
 
     db.updateReportStatus(widget.reportId, action, rejectedReason: reason);
     setState(() {});
-    
+
     final snackBarMsg = action == 'Approved' ? 'Tugas Selesai!' : (action == 'Rejected' ? 'Perbaikan ditolak!' : 'Laporan Dibatalkan!');
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(snackBarMsg)));
+
+    if (action == 'Approved') {
+      AppSnackBar.success(context, message: snackBarMsg);
+    } else if (action == 'Rejected') {
+      AppSnackBar.error(context, message: snackBarMsg);
+    } else {
+      AppSnackBar.warning(context, message: snackBarMsg);
+    }
   }
 
   @override

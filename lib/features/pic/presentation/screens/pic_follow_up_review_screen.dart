@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
 import '../../../../core/mock_api/mock_database.dart';
@@ -45,9 +46,10 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
 
       // Return to PIC Home explicitly (popping off the wizard + detail screen)
       context.goNamed(RouteNames.picHome);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tindak Lanjut Anda berhasil disubmit untuk direview oleh Petugas.')),
+
+      AppSnackBar.success(
+        context,
+        message: 'Tindak Lanjut Anda berhasil disubmit untuk direview oleh Petugas.',
       );
     }
   }

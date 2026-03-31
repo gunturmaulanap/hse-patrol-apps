@@ -33,10 +33,19 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     final role = await sessionManager.getRole();
     if (!mounted) return;
 
+    // FIX: Jika role null atau kosong, kembali ke login
+    if (role == null || role.isEmpty) {
+      if (mounted) context.goNamed(RouteNames.login);
+      return;
+    }
+
     if (role == 'pic') {
       context.goNamed(RouteNames.picHome);
-    } else {
+    } else if (role == 'petugas') {
       context.goNamed(RouteNames.petugasHome);
+    } else {
+      // Role tidak dikenali, kembali ke login
+      if (mounted) context.goNamed(RouteNames.login);
     }
   }
 
