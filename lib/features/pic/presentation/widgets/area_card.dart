@@ -1,81 +1,184 @@
 import 'package:flutter/material.dart';
-import 'package:hugeicons/hugeicons.dart';
-import '../../../../core/widgets/app_card.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/app_spacing.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../../../app/theme/app_typography.dart';
 
 class AreaCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final int count;
+  final String areaName;
+  final int pendingCount;
+  final int totalTasks;
+  final int index;
   final VoidCallback onTap;
 
   const AreaCard({
     super.key,
-    required this.title,
-    required this.subtitle,
-    this.count = 0,
+    required this.areaName,
+    required this.pendingCount,
+    required this.totalTasks,
+    required this.index,
     required this.onTap,
   });
 
+  Color _getColorByIndex(int index) {
+    final colors = [
+      const Color(0xFFD4D8FF), // Soft Purple
+      const Color(0xFFFAFF9F), // Soft Yellow
+      const Color(0xFFC1F0D0), // Soft Mint Green
+      const Color(0xFFFFD4D4), // Soft Pink
+      const Color(0xFFD4F0FF), // Soft Blue
+      const Color(0xFFFFE4B5), // Soft Peach
+      const Color(0xFFE5E5E5), // Soft Gray
+    ];
+    return colors[index % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final bgColor = _getColorByIndex(index);
+    final stripeColor = Colors.black.withOpacity(0.05); // Garis hitam transparan
+    final textColor = const Color(0xFF1E1E1E);
+
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const HugeIcon(
-                  icon: HugeIcons.strokeRoundedBuilding01,
-                  color: AppColors.primary,
-                  size: 24,
-                ),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Layer Corak Garis
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _AreaCardStripedPainter(color: stripeColor),
               ),
-              if (count > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.riskCritical.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$count Findings',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.riskCritical,
-                          fontWeight: FontWeight.bold,
+            ),
+            
+            // Layer Konten (Dioptimalkan agar berisi dan proporsional)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Row: Ikon Area & Ikon Arah (Arrow)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.5),
+                          shape: BoxShape.circle,
                         ),
+                        child: Icon(PhosphorIcons.buildings(PhosphorIconsStyle.fill), size: 20, color: textColor),
+                      ),
+                      Icon(PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold), size: 20, color: textColor.withOpacity(0.5)),
+                    ],
                   ),
-                ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+                  
+                  const Spacer(),
+                  
+                  // Middle: Informasi Area
+                  Text(
+                    areaName,
+                    style: AppTypography.h2.copyWith(
+                      color: textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                    maxLines: 2, 
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$totalTasks Total Inspections',
+                    style: AppTypography.caption.copyWith(
+                      color: textColor.withOpacity(0.7),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Bottom: Badge Dinamis berdasarkan Action
+                  if (pendingCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$pendingCount Action Needed',
+                            style: AppTypography.caption.copyWith(
+                              color: const Color(0xFF1E1E1E),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green[700], size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            'All Clear',
+                            style: AppTypography.caption.copyWith(
+                              color: const Color(0xFF1E1E1E),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+// Custom Painter untuk corak background
+class _AreaCardStripedPainter extends CustomPainter {
+  final Color color;
+  _AreaCardStripedPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke;
+
+    const double space = 8.0;
+    for (double i = -size.height; i < size.width; i += space) {
+      canvas.drawLine(Offset(i, size.height), Offset(i + size.height, 0), paint);
+    }
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

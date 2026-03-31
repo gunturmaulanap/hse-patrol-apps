@@ -21,6 +21,8 @@ class RouteNames {
   static const String picHome = 'pic_home';
   static const String picFinding = 'pic_finding';
   static const String picProfile = 'pic_profile';
+  static const String picTasks = 'pic_tasks';
+  static const String picCreateReport = 'pic_create_report';
   static const String picFollowUpPhotos = 'pic_follow_up_photos';
   static const String picFollowUpNotes = 'pic_follow_up_notes';
   static const String picFollowUpReview = 'pic_follow_up_review';

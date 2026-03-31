@@ -35,9 +35,13 @@ class AppButton extends StatelessWidget {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
-              color: type == AppButtonType.outlined || type == AppButtonType.text
-                  ? AppColors.primary
-                  : AppColors.textInverted,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                type == AppButtonType.primary
+                    ? AppColors.textInverse
+                    : type == AppButtonType.secondary
+                        ? AppColors.textInverse
+                        : AppColors.primary,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -55,10 +59,28 @@ class AppButton extends StatelessWidget {
         button = ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.textInverted,
+            foregroundColor: AppColors.textInverse,
+            disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
+            disabledForegroundColor: AppColors.textInverse.withOpacity(0.7),
+            elevation: 2,
+            shadowColor: AppColors.primary.withOpacity(0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          ).copyWith(
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return AppColors.primaryDark.withOpacity(0.8);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return AppColors.primaryLight.withOpacity(0.5);
+              }
+              if (states.contains(WidgetState.focused)) {
+                return AppColors.primaryLight.withOpacity(0.3);
+              }
+              return null;
+            }),
           ),
           onPressed: isLoading ? null : onPressed,
           child: buttonChild,
@@ -68,10 +90,28 @@ class AppButton extends StatelessWidget {
         button = ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary,
-            foregroundColor: AppColors.textInverted,
+            foregroundColor: AppColors.textInverse,
+            disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
+            disabledForegroundColor: AppColors.textInverse.withOpacity(0.7),
+            elevation: 2,
+            shadowColor: AppColors.secondary.withOpacity(0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          ).copyWith(
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return AppColors.secondaryDark.withOpacity(0.8);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return AppColors.secondary.withOpacity(0.8);
+              }
+              if (states.contains(WidgetState.focused)) {
+                return AppColors.secondary.withOpacity(0.85);
+              }
+              return null;
+            }),
           ),
           onPressed: isLoading ? null : onPressed,
           child: buttonChild,
@@ -80,9 +120,29 @@ class AppButton extends StatelessWidget {
       case AppButtonType.outlined:
         button = OutlinedButton(
           style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: BorderSide(color: AppColors.primary, width: 2),
+            disabledForegroundColor: AppColors.primary.withOpacity(0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          ).copyWith(
+            side: WidgetStateProperty.resolveWith<BorderSide?>((states) {
+              if (states.contains(WidgetState.disabled)) {
+                return BorderSide(color: AppColors.primary.withOpacity(0.3), width: 2);
+              }
+              return BorderSide(color: AppColors.primary, width: 2);
+            }),
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return AppColors.primary.withOpacity(0.1);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return AppColors.primary.withOpacity(0.05);
+              }
+              return null;
+            }),
           ),
           onPressed: isLoading ? null : onPressed,
           child: buttonChild,
@@ -91,9 +151,22 @@ class AppButton extends StatelessWidget {
       case AppButtonType.text:
         button = TextButton(
           style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            disabledForegroundColor: AppColors.primary.withOpacity(0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          ).copyWith(
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return AppColors.primary.withOpacity(0.1);
+              }
+              if (states.contains(WidgetState.hovered)) {
+                return AppColors.primary.withOpacity(0.05);
+              }
+              return null;
+            }),
           ),
           onPressed: isLoading ? null : onPressed,
           child: buttonChild,

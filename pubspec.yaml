@@ -50,3 +50,5 @@ flutter:
     - lib/assets/add_icon_solid.svg
     - lib/assets/calendar.svg
     - lib/assets/tasks.svg
+    - lib/assets/home.svg
+    - lib/assets/aksamala-logo.png

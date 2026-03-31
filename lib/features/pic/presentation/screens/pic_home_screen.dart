@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hugeicons/hugeicons.dart';
-import '../../../../app/theme/app_spacing.dart';
-import '../widgets/area_card.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../../../app/router/route_names.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_radius.dart';
+import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
 import '../providers/active_area_filter_provider.dart';
+import '../widgets/area_card.dart';
 
 class PicHomeScreen extends ConsumerWidget {
   const PicHomeScreen({super.key});
@@ -15,81 +18,131 @@ class PicHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final db = ref.watch(mockDatabaseProvider);
 
-    final areaList = user?.areaAccess ?? [];
+    // Debug: Cek user dan areaAccess
+    print('DEBUG PIC Home: Username = ${user?.username}, Role = ${user?.role}');
+    print('DEBUG PIC Home: areaAccess length = ${user?.areaAccess.length ?? 0}');
+    print('DEBUG PIC Home: areaAccess = ${user?.areaAccess}');
+
+    // Ambil daftar area yang bisa diakses oleh PIC
+    final areas = user?.areaAccess ?? [];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home PIC'),
-        actions: [
-          IconButton(
-            icon: const HugeIcon(
-              icon: HugeIcons.strokeRoundedNotification01,
-              color: Colors.white,
-              size: 24,
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          // HEADER: Good Morning & Profile 
+          SliverToBoxAdapter(
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Good Morning,', style: AppTypography.h2),
+                          Text(
+                            '${user?.username ?? 'PIC'}!',
+                            style: AppTypography.h1,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () => context.pushNamed('profile'), 
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.surface, width: 2),
+                        ),
+                        child: Icon(
+                          PhosphorIcons.user(),
+                          color: AppColors.textPrimary,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
+          ),
+
+          // SUB-HEADER: Keterangan
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Halo, ${user?.username.toUpperCase() ?? "PIC"}',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    'Your Work Areas',
+                    style: AppTypography.h1.copyWith(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: 4),
                   Text(
-                    'Berikut adalah daftar area di bawah pengawasan Anda.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    'Select an area to view and follow up tasks',
+                    style: AppTypography.h3.copyWith(
+                      color: AppColors.textSecondary.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
-            if (areaList.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.all(AppSpacing.md), child: Text('Belum ada area ditugaskan.')))
-            else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: AppSpacing.md,
-                  mainAxisSpacing: AppSpacing.md,
-                  childAspectRatio: 0.9,
-                ),
-                itemCount: areaList.length,
-                itemBuilder: (context, index) {
-                  final areaName = areaList[index];
+          ),
+
+          // GRID AREA: Menampilkan 2 kolom grid
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,           // 2 Kotak per baris
+                crossAxisSpacing: 16,        // Jarak horizontal
+                mainAxisSpacing: 16,         // Jarak vertikal
+                childAspectRatio: 0.85,      // Rasio agar agak memanjang ke bawah
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final area = areas[index];
                   
-                  // Hitung temuan yang butuh aksi PIC (Pending dan Rejected)
-                  final pendingCount = db.reports.where(
-                    (r) => r['area'] == areaName && (r['status'] == 'Pending' || r['status'] == 'Rejected')
-                  ).length;
-                  
+                  // Hitung jumlah task Pending atau Follow Up Done
+                  final tasksInArea = db.reports.where((r) => r['area'] == area).toList();
+                  final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending' || r['status'] == 'Follow Up Done').length;
+                  final totalTasks = tasksInArea.length; // Hitung total task di area ini
+
                   return AreaCard(
-                    title: areaName,
-                    subtitle: 'Pemantauan Aktif',
-                    count: pendingCount,
+                    areaName: area,
+                    pendingCount: pendingCount,
+                    totalTasks: totalTasks, // Pass data baru
+                    index: index, 
                     onTap: () {
-                      // Set filter state
-                      ref.read(activeAreaFilterProvider.notifier).state = areaName;
-                      // Move to second tab branch
-                      StatefulNavigationShell.of(context).goBranch(1);
+                      ref.read(activeAreaFilterProvider.notifier).state = area;
+                      context.pushNamed(RouteNames.picFinding);
                     },
                   );
                 },
+                childCount: areas.length,
               ),
-            const SizedBox(height: AppSpacing.xl),
-          ],
-        ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
       ),
     );
   }

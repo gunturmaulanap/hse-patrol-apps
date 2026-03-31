@@ -19,16 +19,29 @@ class MockUser {
 class MockDatabase {
   final List<MockUser> users = [
     MockUser(id: '1', username: 'petugas', password: '123', role: 'petugas'),
-    MockUser(id: '2', username: 'pic', password: '123', role: 'pic', areaAccess: ['Area Produksi 1 - Mesin Bubut', 'Koridor Evakuasi Barat']),
+    MockUser(id: '2', username: 'pic', password: '123', role: 'pic', areaAccess: [
+      'Area Produksi 1 - Mesin Bubut',
+      'Koridor Evakuasi Barat',
+      'Gudang Penyimpanan B',
+      'Area Parkir Timur',
+      'Ruang Rapat Utama',
+      'Kantin Karyawan',
+      'Area Loading Dock',
+    ]),
   ];
 
   late List<Map<String, dynamic>> reports;
 
   MockDatabase() {
+    // Debug: Cek user PIC
+    final picUser = users.firstWhere((u) => u.role == 'pic');
+    print('DEBUG MockDatabase: PIC user found = ${picUser.username}');
+    print('DEBUG MockDatabase: PIC areaAccess count = ${picUser.areaAccess.length}');
+    print('DEBUG MockDatabase: PIC areaAccess = ${picUser.areaAccess}');
+
     final now = DateTime.now();
-    
+
     reports = [
-      // --- HARI INI ---
       {
         'id': 'rpt_today_1',
         'buildingType': 'Fasilitas Produksi',
@@ -62,12 +75,11 @@ class MockDatabase {
         'buildingType': 'Gudang',
         'area': 'Gudang Penyimpanan B',
         'riskLevel': 'Kritis',
-        'notes': 'Pengecekan tumpukan palet.',
+        'notes': 'Pengecekan tumpukan palet. Potensi bahaya jatuh tinggi.',
         'rootCause': 'Inspeksi Keamanan',
         'date': DateTime(now.year, now.month, now.day, 14, 0).toIso8601String(),
         'status': 'Pending',
       },
-      // IMPROVISASI: Menambahkan task status CANCELED hari ini
       {
         'id': 'rpt_today_4',
         'buildingType': 'Luar Ruangan',
@@ -78,7 +90,26 @@ class MockDatabase {
         'date': DateTime(now.year, now.month, now.day, 16, 0).toIso8601String(),
         'status': 'Canceled',
       },
-      // --- BESOK ---
+      {
+        'id': 'rpt_today_5',
+        'buildingType': 'Fasilitas Umum',
+        'area': 'Kantin Karyawan',
+        'riskLevel': 'Menengah',
+        'notes': 'Wastafel area barat mampet dan air menggenang.',
+        'rootCause': 'Saluran Pembuangan',
+        'date': DateTime(now.year, now.month, now.day, 12, 15).toIso8601String(),
+        'status': 'Pending',
+      },
+      {
+        'id': 'rpt_today_6',
+        'buildingType': 'Gudang',
+        'area': 'Area Loading Dock',
+        'riskLevel': 'Berat',
+        'notes': 'Pintu hidrolik loading dock nomor 3 macet.',
+        'rootCause': 'Kerusakan Mekanis',
+        'date': DateTime(now.year, now.month, now.day, 15, 30).toIso8601String(),
+        'status': 'Pending',
+      },
       {
         'id': 'rpt_tmrw_1',
         'buildingType': 'Fasilitas Produksi',
@@ -89,7 +120,6 @@ class MockDatabase {
         'date': DateTime(now.year, now.month, now.day + 1, 8, 30).toIso8601String(),
         'status': 'Pending',
       },
-      // --- LUSA ---
       {
         'id': 'rpt_day_after_1',
         'buildingType': 'Perkantoran',
@@ -100,7 +130,6 @@ class MockDatabase {
         'date': DateTime(now.year, now.month, now.day + 2, 10, 0).toIso8601String(),
         'status': 'Pending',
       },
-      // --- KEMARIN (Riwayat) ---
       {
         'id': 'rpt_yest_1',
         'buildingType': 'Gudang',
@@ -114,6 +143,7 @@ class MockDatabase {
     ];
   }
 
+  // FIX ERROR: Method addReport ditambahkan kembali
   void addReport(Map<String, dynamic> report) {
     reports.insert(0, report);
   }
