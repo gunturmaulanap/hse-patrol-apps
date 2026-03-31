@@ -5,6 +5,7 @@ import '../../../../app/theme/app_typography.dart';
 class AreaCard extends StatelessWidget {
   final String areaName;
   final int pendingCount;
+  final int waitingResponseCount;
   final int totalTasks;
   final int index;
   final VoidCallback onTap;
@@ -13,6 +14,7 @@ class AreaCard extends StatelessWidget {
     super.key,
     required this.areaName,
     required this.pendingCount,
+    required this.waitingResponseCount,
     required this.totalTasks,
     required this.index,
     required this.onTap,
@@ -34,7 +36,7 @@ class AreaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = _getColorByIndex(index);
-    final stripeColor = Colors.black.withOpacity(0.05); // Garis hitam transparan
+    final stripeColor = Colors.black.withOpacity(0.05);
     final textColor = const Color(0xFF1E1E1E);
 
     return InkWell(
@@ -49,20 +51,17 @@ class AreaCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Layer Corak Garis
             Positioned.fill(
               child: CustomPaint(
                 painter: _AreaCardStripedPainter(color: stripeColor),
               ),
             ),
             
-            // Layer Konten (Dioptimalkan agar berisi dan proporsional)
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Row: Ikon Area & Ikon Arah (Arrow)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -80,7 +79,6 @@ class AreaCard extends StatelessWidget {
                   
                   const Spacer(),
                   
-                  // Middle: Informasi Area
                   Text(
                     areaName,
                     style: AppTypography.h2.copyWith(
@@ -102,55 +100,10 @@ class AreaCard extends StatelessWidget {
                     ),
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   
-                  // Bottom: Badge Dinamis berdasarkan Action
-                  if (pendingCount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$pendingCount Action Needed',
-                            style: AppTypography.caption.copyWith(
-                              color: const Color(0xFF1E1E1E),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green[700], size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            'All Clear',
-                            style: AppTypography.caption.copyWith(
-                              color: const Color(0xFF1E1E1E),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  // Kumpulan Badge Status
+                  _buildStatusBadges(),
                 ],
               ),
             ),
@@ -159,9 +112,98 @@ class AreaCard extends StatelessWidget {
       ),
     );
   }
+
+  // Fungsi khusus untuk merender kombinasi badge
+  Widget _buildStatusBadges() {
+    if (pendingCount == 0 && waitingResponseCount == 0) {
+      // Kondisi ALL CLEAR
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green[700], size: 14),
+            const SizedBox(width: 4),
+            Text(
+              'All Clear',
+              style: AppTypography.caption.copyWith(
+                color: const Color(0xFF1E1E1E),
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Kondisi memiliki Pending atau Waiting atau keduanya
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Badge Action Needed
+        if (pendingCount > 0)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '$pendingCount Action Needed',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFF1E1E1E),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          
+        // Badge Waiting Response
+        if (waitingResponseCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(PhosphorIcons.clock(PhosphorIconsStyle.fill), color: Colors.orange, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '$waitingResponseCount Waiting Resp...',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFF1E1E1E),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
-// Custom Painter untuk corak background
 class _AreaCardStripedPainter extends CustomPainter {
   final Color color;
   _AreaCardStripedPainter({required this.color});

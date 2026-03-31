@@ -33,117 +33,173 @@ class MockDatabase {
   late List<Map<String, dynamic>> reports;
 
   MockDatabase() {
-    // Debug: Cek user PIC
-    final picUser = users.firstWhere((u) => u.role == 'pic');
-    print('DEBUG MockDatabase: PIC user found = ${picUser.username}');
-    print('DEBUG MockDatabase: PIC areaAccess count = ${picUser.areaAccess.length}');
-    print('DEBUG MockDatabase: PIC areaAccess = ${picUser.areaAccess}');
-
     final now = DateTime.now();
-
+    
     reports = [
+      // ==========================================
+      // AREA: Area Produksi 1 - Mesin Bubut
+      // ==========================================
       {
-        'id': 'rpt_today_1',
+        'id': 'rpt_prod1_1',
         'buildingType': 'Fasilitas Produksi',
         'area': 'Area Produksi 1 - Mesin Bubut',
         'riskLevel': 'Berat',
         'notes': 'Pengecekan rutin harian mesin bubut.',
         'rootCause': 'Inspeksi Pagi',
         'date': DateTime(now.year, now.month, now.day, 9, 0).toIso8601String(),
-        'status': 'Completed',
+        'status': 'Completed', // Sudah selesai
       },
       {
-        'id': 'rpt_today_2',
-        'buildingType': 'Fasilitas Non-Produksi',
-        'area': 'Koridor Evakuasi Barat',
+        'id': 'rpt_prod1_2',
+        'buildingType': 'Fasilitas Produksi',
+        'area': 'Area Produksi 1 - Mesin Bubut',
+        'riskLevel': 'Menengah',
+        'notes': 'Pelumas mesin tercecer di lantai.',
+        'rootCause': 'Kebocoran Oli',
+        'date': DateTime(now.year, now.month, now.day, 10, 0).toIso8601String(),
+        'status': 'Pending', // Baru dibuat petugas, Action Needed
+      },
+      {
+        'id': 'rpt_prod1_3',
+        'buildingType': 'Fasilitas Produksi',
+        'area': 'Area Produksi 1 - Mesin Bubut',
+        'riskLevel': 'Kritis',
+        'notes': 'Kabel utama terkelupas.',
+        'rootCause': 'Bahaya Listrik',
+        'date': DateTime(now.year, now.month, now.day, 11, 30).toIso8601String(),
+        'status': 'Pending', 
+        'followUps': [
+          {
+            'type': 'PIC_FOLLOW_UP',
+            'notes': 'Kabel sudah diisolasi sementara.',
+            'photos': [],
+            'date': DateTime(now.year, now.month, now.day, 12, 0).toIso8601String(),
+          },
+          {
+            'type': 'PETUGAS_REVIEW',
+            'action': 'Rejected',
+            'notes': 'Isolasi sementara tidak cukup, harus diganti kabel baru standar SNI.',
+            'date': DateTime(now.year, now.month, now.day, 12, 30).toIso8601String(),
+          }
+        ] // REJECTED -> Kembali ke Pending, Action Needed (Urgent)
+      },
+      {
+        'id': 'rpt_prod1_4',
+        'buildingType': 'Fasilitas Produksi',
+        'area': 'Area Produksi 1 - Mesin Bubut',
         'riskLevel': 'Ringan',
-        'notes': 'Pengecekan lampu neon dan jalur evakuasi.',
-        'rootCause': 'Inspeksi Rutin',
-        'date': DateTime(now.year, now.month, now.day, 10, 30).toIso8601String(),
+        'notes': 'Lampu penerangan mesin redup.',
+        'rootCause': 'Lampu Rusak',
+        'date': DateTime(now.year, now.month, now.day, 13, 0).toIso8601String(),
         'status': 'Follow Up Done',
         'followUps': [
           {
             'type': 'PIC_FOLLOW_UP',
-            'notes': 'Lampu sudah diganti.',
+            'notes': 'Lampu telah diganti dengan LED baru.',
             'photos': [],
-            'date': DateTime(now.year, now.month, now.day, 11, 0).toIso8601String(),
+            'date': DateTime(now.year, now.month, now.day, 14, 0).toIso8601String(),
           }
-        ]
+        ] // Sudah difollowup, Waiting Response Petugas
+      },
+
+      // ==========================================
+      // AREA: Koridor Evakuasi Barat
+      // ==========================================
+      {
+        'id': 'rpt_kor_1',
+        'buildingType': 'Fasilitas Non-Produksi',
+        'area': 'Koridor Evakuasi Barat',
+        'riskLevel': 'Ringan',
+        'notes': 'Jalur evakuasi terhalang troli barang.',
+        'rootCause': 'Penempatan Barang',
+        'date': DateTime(now.year, now.month, now.day - 1, 10, 30).toIso8601String(),
+        'status': 'Follow Up Done',
+        'followUps': [
+          {
+            'type': 'PIC_FOLLOW_UP',
+            'notes': 'Troli sudah dipindahkan ke gudang.',
+            'photos': [],
+            'date': DateTime(now.year, now.month, now.day, 8, 0).toIso8601String(),
+          }
+        ] // Waiting Response
       },
       {
-        'id': 'rpt_today_3',
+        'id': 'rpt_kor_2',
+        'buildingType': 'Fasilitas Non-Produksi',
+        'area': 'Koridor Evakuasi Barat',
+        'riskLevel': 'Menengah',
+        'notes': 'Tanda EXIT pudar.',
+        'rootCause': 'Perawatan Fasilitas',
+        'date': DateTime(now.year, now.month, now.day, 15, 0).toIso8601String(),
+        'status': 'Pending', // Action Needed
+      },
+
+      // ==========================================
+      // AREA: Gudang Penyimpanan B
+      // ==========================================
+      {
+        'id': 'rpt_gudB_1',
         'buildingType': 'Gudang',
         'area': 'Gudang Penyimpanan B',
         'riskLevel': 'Kritis',
-        'notes': 'Pengecekan tumpukan palet. Potensi bahaya jatuh tinggi.',
+        'notes': 'Tumpukan palet miring.',
         'rootCause': 'Inspeksi Keamanan',
         'date': DateTime(now.year, now.month, now.day, 14, 0).toIso8601String(),
-        'status': 'Pending',
+        'status': 'Pending', // Action Needed
       },
+
+      // ==========================================
+      // AREA: Area Parkir Timur (Semua Canceled/Completed - All Clear)
+      // ==========================================
       {
-        'id': 'rpt_today_4',
+        'id': 'rpt_park_1',
         'buildingType': 'Luar Ruangan',
         'area': 'Area Parkir Timur',
         'riskLevel': 'Ringan',
-        'notes': 'Patroli dibatalkan karena cuaca sangat buruk/hujan badai.',
+        'notes': 'Patroli dibatalkan karena badai.',
         'rootCause': 'Cuaca Buruk',
         'date': DateTime(now.year, now.month, now.day, 16, 0).toIso8601String(),
-        'status': 'Canceled',
+        'status': 'Canceled', // Tidak dihitung Action/Waiting
       },
+
+      // ==========================================
+      // AREA: Kantin Karyawan (Semua Waiting Response)
+      // ==========================================
       {
-        'id': 'rpt_today_5',
+        'id': 'rpt_kantin_1',
         'buildingType': 'Fasilitas Umum',
         'area': 'Kantin Karyawan',
         'riskLevel': 'Menengah',
-        'notes': 'Wastafel area barat mampet dan air menggenang.',
+        'notes': 'Wastafel mampet.',
         'rootCause': 'Saluran Pembuangan',
         'date': DateTime(now.year, now.month, now.day, 12, 15).toIso8601String(),
-        'status': 'Pending',
+        'status': 'Follow Up Done',
+        'followUps': [
+          {
+            'type': 'PIC_FOLLOW_UP',
+            'notes': 'Sudah dipompa dan dibersihkan.',
+            'photos': [],
+            'date': DateTime(now.year, now.month, now.day, 13, 0).toIso8601String(),
+          }
+        ] // Waiting Response
       },
+      
+      // ==========================================
+      // AREA: Area Loading Dock
+      // ==========================================
       {
-        'id': 'rpt_today_6',
+        'id': 'rpt_load_1',
         'buildingType': 'Gudang',
         'area': 'Area Loading Dock',
         'riskLevel': 'Berat',
-        'notes': 'Pintu hidrolik loading dock nomor 3 macet.',
+        'notes': 'Pintu hidrolik macet.',
         'rootCause': 'Kerusakan Mekanis',
         'date': DateTime(now.year, now.month, now.day, 15, 30).toIso8601String(),
-        'status': 'Pending',
+        'status': 'Pending', // Action Needed
       },
-      {
-        'id': 'rpt_tmrw_1',
-        'buildingType': 'Fasilitas Produksi',
-        'area': 'Area Produksi 2 - Mesin CNC',
-        'riskLevel': 'Menengah',
-        'notes': 'Jadwal inspeksi mesin CNC.',
-        'rootCause': 'Inspeksi Rutin',
-        'date': DateTime(now.year, now.month, now.day + 1, 8, 30).toIso8601String(),
-        'status': 'Pending',
-      },
-      {
-        'id': 'rpt_day_after_1',
-        'buildingType': 'Perkantoran',
-        'area': 'Ruang Rapat Utama',
-        'riskLevel': 'Ringan',
-        'notes': 'Pengecekan APAR dan Smoke Detector.',
-        'rootCause': 'Inspeksi Bulanan',
-        'date': DateTime(now.year, now.month, now.day + 2, 10, 0).toIso8601String(),
-        'status': 'Pending',
-      },
-      {
-        'id': 'rpt_yest_1',
-        'buildingType': 'Gudang',
-        'area': 'Gudang Bahan Kimia',
-        'riskLevel': 'Berat',
-        'notes': 'Bocor sedikit di atap.',
-        'rootCause': 'Genteng geser',
-        'date': DateTime(now.year, now.month, now.day - 1, 15, 0).toIso8601String(),
-        'status': 'Canceled',
-      }
     ];
   }
 
-  // FIX ERROR: Method addReport ditambahkan kembali
   void addReport(Map<String, dynamic> report) {
     reports.insert(0, report);
   }

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../core/storage/session_manager.dart';
+import '../../../../app/theme/app_colors.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -20,39 +20,19 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   }
 
   Future<void> _init() async {
+    // Splash delay untuk branding
     await Future.delayed(const Duration(seconds: 1));
     if (!mounted) return;
 
-    final sessionManager = const SessionManager();
-    final isLoggedIn = await sessionManager.isLoggedIn();
-    if (!isLoggedIn) {
-      if (mounted) context.goNamed(RouteNames.login);
-      return;
-    }
-
-    final role = await sessionManager.getRole();
-    if (!mounted) return;
-
-    // FIX: Jika role null atau kosong, kembali ke login
-    if (role == null || role.isEmpty) {
-      if (mounted) context.goNamed(RouteNames.login);
-      return;
-    }
-
-    if (role == 'pic') {
-      context.goNamed(RouteNames.picHome);
-    } else if (role == 'petugas') {
-      context.goNamed(RouteNames.petugasHome);
-    } else {
-      // Role tidak dikenali, kembali ke login
-      if (mounted) context.goNamed(RouteNames.login);
-    }
+    // Mock API mode: selalu arahkan ke login
+    context.goNamed(RouteNames.login);
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: const Center(
         child: Text('HSE Aksamala'),
       ),
     );

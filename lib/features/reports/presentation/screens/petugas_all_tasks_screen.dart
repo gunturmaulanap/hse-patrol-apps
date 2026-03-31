@@ -31,6 +31,36 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     final user = ref.watch(currentUserProvider);
     final db = ref.watch(mockDatabaseProvider);
 
+    // FIX: Redirect ke login jika user null (setelah hot restart)
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // FIX: Redirect ke login jika role bukan petugas
+    if (user.role != 'petugas') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 5,
       child: Scaffold(
@@ -50,14 +80,17 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
                   children: [
-                    Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: AppColors.surface, width: 2),
+                    GestureDetector(
+                      onTap: () => context.pushNamed(RouteNames.petugasProfile),
+                      child: Container(
+                        width: 56, height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.surface, width: 2),
+                        ),
+                        child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
                       ),
-                      child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -65,7 +98,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Tasks Dashboard', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                          Text(user?.username ?? 'Tisha', style: AppTypography.h1, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(user.username, style: AppTypography.h1, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),

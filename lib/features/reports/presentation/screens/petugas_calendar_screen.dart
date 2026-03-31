@@ -75,6 +75,37 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(mockDatabaseProvider);
+    final user = ref.watch(currentUserProvider);
+
+    // FIX: Redirect ke login jika user null (setelah hot restart)
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: const Color(0xFF111111),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // FIX: Redirect ke login jika role bukan petugas
+    if (user.role != 'petugas') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: const Color(0xFF111111),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     final tasksForSelectedDate = db.reports.where((rpt) {
       if (rpt['date'] == null) return false;

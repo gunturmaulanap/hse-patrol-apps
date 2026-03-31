@@ -17,6 +17,36 @@ class PetugasHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final db = ref.watch(mockDatabaseProvider);
 
+    // FIX: Redirect ke login jika user null (setelah hot restart)
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // FIX: Redirect ke login jika role bukan petugas
+    if (user.role != 'petugas') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final reports = [...db.reports]
       ..sort((a, b) => DateTime.parse(b['date'] as String)
           .compareTo(DateTime.parse(a['date'] as String)));

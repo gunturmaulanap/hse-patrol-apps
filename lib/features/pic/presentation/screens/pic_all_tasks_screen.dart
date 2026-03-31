@@ -67,14 +67,17 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                 child: Row(
                   children: [
-                    Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: AppColors.surface, width: 2),
+                    GestureDetector(
+                      onTap: () => context.pushNamed(RouteNames.petugasProfile),
+                      child: Container(
+                        width: 56, height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.surface, width: 2),
+                        ),
+                        child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
                       ),
-                      child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -82,7 +85,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('PIC Dashboard', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                          Text(user?.username ?? 'PIC', style: AppTypography.h1, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(user.username, style: AppTypography.h1, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),

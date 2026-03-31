@@ -132,16 +132,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/petugas/profile',
-                name: RouteNames.petugasProfile,
-                builder: (context, state) => const ProfileScreen(),
-              ),
-            ],
-          ),
         ],
+      ),
+
+      // Petugas Additional Routes (Profile, Tasks, Create - accessed via push, outside shell)
+      GoRoute(
+        path: '/petugas/profile',
+        name: RouteNames.petugasProfile,
+        builder: (context, state) => const ProfileScreen(),
       ),
 
       // PIC Routes (Shell)

@@ -18,43 +18,8 @@ class PicHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final db = ref.watch(mockDatabaseProvider);
 
-    // FIX: Redirect ke login jika user null (setelah hot restart)
-    if (user == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          context.goNamed(RouteNames.login);
-        }
-      });
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // FIX: Redirect ke login jika role bukan PIC
-    if (user.role != 'pic') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          context.goNamed(RouteNames.login);
-        }
-      });
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Debug: Cek user dan areaAccess
-    print('DEBUG PIC Home: Username = ${user.username}, Role = ${user.role}');
-    print('DEBUG PIC Home: areaAccess length = ${user.areaAccess.length}');
-    print('DEBUG PIC Home: areaAccess = ${user.areaAccess}');
-
     // Ambil daftar area yang bisa diakses oleh PIC
-    final areas = user.areaAccess;
+    final areas = user?.areaAccess ?? [];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -86,7 +51,7 @@ class PicHomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: () => context.pushNamed(RouteNames.picProfile),
+                      onTap: () => context.pushNamed(RouteNames.petugasProfile),
                       child: Container(
                         width: 48,
                         height: 48,
@@ -142,24 +107,31 @@ class PicHomeScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,           // 2 Kotak per baris
-                crossAxisSpacing: 16,        // Jarak horizontal
-                mainAxisSpacing: 16,         // Jarak vertikal
-                childAspectRatio: 0.85,      // Rasio agar agak memanjang ke bawah
+                crossAxisCount: 2,           
+                crossAxisSpacing: 16,        
+                mainAxisSpacing: 16,         
+                childAspectRatio: 0.70, // Disesuaikan agar muat 2 badge vertikal jika perlu
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final area = areas[index];
                   
-                  // Hitung jumlah task Pending atau Follow Up Done
+                  // Hitung jumlah task Pending dan Follow Up Done secara terpisah
                   final tasksInArea = db.reports.where((r) => r['area'] == area).toList();
-                  final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending' || r['status'] == 'Follow Up Done').length;
-                  final totalTasks = tasksInArea.length; // Hitung total task di area ini
+                  
+                  // 1. Task Pending (Termasuk Rejected yang revert ke Pending) membutuhkan aksi PIC
+                  final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
+                  
+                  // 2. Task Follow Up Done yang sedang menunggu respon/approval Petugas
+                  final waitingCount = tasksInArea.where((r) => r['status'] == 'Follow Up Done').length;
+                  
+                  final totalTasks = tasksInArea.where((r) => r['status'] != 'Canceled').length; // Abaikan yang dicancel petugas
 
                   return AreaCard(
                     areaName: area,
                     pendingCount: pendingCount,
-                    totalTasks: totalTasks, // Pass data baru
+                    waitingResponseCount: waitingCount, // Pass data waiting
+                    totalTasks: totalTasks, 
                     index: index, 
                     onTap: () {
                       ref.read(activeAreaFilterProvider.notifier).state = area;

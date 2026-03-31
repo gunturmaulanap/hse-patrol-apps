@@ -9,7 +9,6 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/mock_api/mock_auth_service.dart';
 import '../../../../core/mock_api/mock_database.dart';
-import '../../../../core/storage/session_manager.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -52,14 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
 
       if (user != null) {
-        // Simpan ke memory provider
         ref.read(currentUserProvider.notifier).state = user;
-
-        // Simpan ke secure storage agar persist setelah hot restart
-        final sessionManager = const SessionManager();
-        await sessionManager.saveToken('mock_token_${user.id}');
-        await sessionManager.saveRole(user.role);
-
+        
         if (user.role == 'petugas') {
           context.goNamed(RouteNames.petugasHome);
         } else if (user.role == 'pic') {

@@ -15,7 +15,23 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Mengambil data user yang sedang aktif
     final user = ref.watch(currentUserProvider);
-    final isPetugas = user?.role == 'petugas';
+
+    // FIX: Redirect ke login jika user null (setelah hot restart)
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final isPetugas = user.role == 'petugas';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -25,11 +41,8 @@ class ProfileScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
           onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed(isPetugas ? RouteNames.petugasHome : RouteNames.picHome);
-            }
+            // Kembali ke home yang sesuai dengan role
+            context.goNamed(isPetugas ? RouteNames.petugasHome : RouteNames.picHome);
           },
         ),
         title: Text('My Profile', style: AppTypography.h3),
@@ -79,11 +92,11 @@ class ProfileScreen extends ConsumerWidget {
               
               // Nama User
               Text(
-                user?.username.toUpperCase() ?? 'GUEST ACCOUNT',
+                user.username.toUpperCase(),
                 style: AppTypography.h1.copyWith(fontSize: 26, letterSpacing: -0.5),
               ),
               const SizedBox(height: 12),
-              
+
               // Badge Role (Warna berbeda untuk PIC dan Petugas)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -93,7 +106,7 @@ class ProfileScreen extends ConsumerWidget {
                   border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
                 ),
                 child: Text(
-                  user?.role.toUpperCase() ?? 'ROLE',
+                  user.role.toUpperCase(),
                   style: AppTypography.caption.copyWith(
                     color: const Color(0xFF1E1E1E),
                     fontWeight: FontWeight.bold,
@@ -143,10 +156,15 @@ class ProfileScreen extends ConsumerWidget {
                       side: const BorderSide(color: Colors.redAccent, width: 1.5),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     // Membersihkan state user saat logout
                     ref.read(currentUserProvider.notifier).state = null;
-                    // Kembali ke halaman Login
+
+                    // Membersihkan secure storage
+                    // Note: Untuk mock API, kita hanya clear in-memory
+                    // Di production, gunakan: await SessionManager().clearToken();
+
+                    // Kembali ke halaman Login dengan mengganti stack
                     context.goNamed(RouteNames.login);
                   },
                   child: Row(
