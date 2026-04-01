@@ -65,7 +65,7 @@ class PetugasShellScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: () => context.pushNamed(RouteNames.petugasCreateReport),
+                      onTap: () => context.pushNamed(RouteNames.petugasCreateTask),
                       child: Container(
                         width: 46,
                         height: 46,

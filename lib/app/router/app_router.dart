@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,26 +6,30 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 import '../../features/shell/presentation/screens/petugas_shell_screen.dart';
 import '../../features/shell/presentation/screens/pic_shell_screen.dart';
-import '../../features/reports/presentation/screens/patrol_list_screen.dart';
-import '../../features/reports/presentation/screens/petugas_home_screen.dart';
+import '../../features/shell/presentation/screens/supervisor_shell_screen.dart';
+import '../../features/tasks/presentation/screens/petugas_home_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/pic/presentation/screens/pic_home_screen.dart';
 import '../../features/pic/presentation/screens/pic_finding_screen.dart';
 import '../../features/pic/presentation/screens/pic_all_tasks_screen.dart';
 import '../../features/pic/presentation/screens/pic_pending_tasks_screen.dart';
-import '../../features/reports/presentation/screens/create_report_building_type_screen.dart';
-import '../../features/reports/presentation/screens/create_report_location_screen.dart';
-import '../../features/reports/presentation/screens/create_report_risk_level_screen.dart';
-import '../../features/reports/presentation/screens/create_report_photos_screen.dart';
-import '../../features/reports/presentation/screens/create_report_notes_screen.dart';
-import '../../features/reports/presentation/screens/create_report_root_cause_screen.dart';
-import '../../features/reports/presentation/screens/create_report_review_screen.dart';
-import '../../features/reports/presentation/screens/report_detail_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_building_type_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_location_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_risk_level_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_photos_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_notes_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_root_cause_screen.dart';
+import '../../features/tasks/presentation/screens/create_task_review_screen.dart';
+import '../../features/tasks/presentation/screens/task_detail_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_photos_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_notes_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_review_screen.dart';
-import '../../features/reports/presentation/screens/petugas_all_tasks_screen.dart';
-import '../../features/reports/presentation/screens/petugas_calendar_screen.dart';
+import '../../features/tasks/presentation/screens/petugas_all_tasks_screen.dart';
+import '../../features/tasks/presentation/screens/petugas_calendar_screen.dart';
+import '../../features/tasks/presentation/screens/supervisor_home_screen.dart';
+import '../../features/tasks/presentation/screens/supervisor_calendar_screen.dart';
+import '../../features/tasks/presentation/screens/supervisor_all_tasks_screen.dart';
+import '../../features/tasks/presentation/screens/supervisor_dashboard_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -44,11 +47,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/report/:id',
-        name: RouteNames.reportDetail,
+        path: '/task/:id',
+        name: RouteNames.taskDetail,
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return ReportDetailScreen(reportId: id);
+          return TaskDetailScreen(taskId: id);
         },
       ),
       GoRoute(
@@ -68,44 +71,54 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       GoRoute(
-        path: '/petugas/create-report',
-        name: RouteNames.petugasCreateReport,
-        builder: (context, state) => const CreateReportBuildingTypeScreen(),
+        path: '/petugas/create-task',
+        name: RouteNames.petugasCreateTask,
+        builder: (context, state) => const CreateTaskBuildingTypeScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/location',
-        name: RouteNames.petugasCreateReportLocation,
-        builder: (context, state) => const CreateReportLocationScreen(),
+        path: '/petugas/create-task/location',
+        name: RouteNames.petugasCreateTaskLocation,
+        builder: (context, state) => const CreateTaskLocationScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/risk',
-        name: RouteNames.petugasCreateReportRisk,
-        builder: (context, state) => const CreateReportRiskLevelScreen(),
+        path: '/petugas/create-task/risk',
+        name: RouteNames.petugasCreateTaskRisk,
+        builder: (context, state) => const CreateTaskRiskLevelScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/photos',
-        name: RouteNames.petugasCreateReportPhotos,
-        builder: (context, state) => const CreateReportPhotosScreen(),
+        path: '/petugas/create-task/photos',
+        name: RouteNames.petugasCreateTaskPhotos,
+        builder: (context, state) => const CreateTaskPhotosScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/notes',
-        name: RouteNames.petugasCreateReportNotes,
-        builder: (context, state) => const CreateReportNotesScreen(),
+        path: '/petugas/create-task/notes',
+        name: RouteNames.petugasCreateTaskNotes,
+        builder: (context, state) => const CreateTaskNotesScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/root-cause',
-        name: RouteNames.petugasCreateReportRootCause,
-        builder: (context, state) => const CreateReportRootCauseScreen(),
+        path: '/petugas/create-task/root-cause',
+        name: RouteNames.petugasCreateTaskRootCause,
+        builder: (context, state) => const CreateTaskRootCauseScreen(),
       ),
       GoRoute(
-        path: '/petugas/create-report/review',
-        name: RouteNames.petugasCreateReportReview,
-        builder: (context, state) => const CreateReportReviewScreen(),
+        path: '/petugas/create-task/review',
+        name: RouteNames.petugasCreateTaskReview,
+        builder: (context, state) => const CreateTaskReviewScreen(),
       ),
       GoRoute(
         path: '/petugas/all-tasks',
         name: RouteNames.petugasAllTasks,
         builder: (context, state) => const PetugasAllTasksScreen(),
+      ),
+      GoRoute(
+        path: '/supervisor/all-tasks',
+        name: RouteNames.supervisorAllTasks,
+        builder: (context, state) => const SupervisorAllTasksScreen(),
+      ),
+      GoRoute(
+        path: '/supervisor/dashboard',
+        name: RouteNames.supervisorDashboard,
+        builder: (context, state) => const SupervisorDashboardScreen(),
       ),
 
       // Petugas Routes (Shell)
@@ -140,6 +153,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/petugas/profile',
         name: RouteNames.petugasProfile,
         builder: (context, state) => const ProfileScreen(),
+      ),
+
+      // Supervisor Routes (Shell)
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return SupervisorShellScreen(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/supervisor/calendar',
+                name: RouteNames.supervisorCalendar,
+                builder: (context, state) => const SupervisorCalendarScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/supervisor/home',
+                name: RouteNames.supervisorHome,
+                builder: (context, state) => const SupervisorHomeScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
 
       // PIC Routes (Shell)
@@ -177,7 +217,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/pic/pending-tasks',
-        name: RouteNames.picCreateReport,
+        name: RouteNames.picCreateTask,
         builder: (context, state) => const PicPendingTasksScreen(),
       ),
       GoRoute(

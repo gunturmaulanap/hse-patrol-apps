@@ -3,9 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/router/app_router.dart';
 import 'app/theme/app_theme.dart';
+import 'core/network/dio_client.dart';
+import 'core/storage/secure_storage_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await SecureStorageService.init();
+  await DioClient.initInterceptors();
+
   runApp(
     const ProviderScope(
       child: MyApp(),

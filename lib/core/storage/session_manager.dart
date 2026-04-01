@@ -1,7 +1,7 @@
 import 'secure_storage_service.dart';
 
 class SessionManager {
-  const SessionManager();
+  SessionManager();
 
   Future<void> saveToken(String token) async {
     await SecureStorageService.instance.write(
@@ -11,7 +11,7 @@ class SessionManager {
   }
 
   Future<String?> getToken() async {
-    return SecureStorageService.instance.read(
+    return await SecureStorageService.instance.read(
       key: SecureStorageService.accessTokenKey,
     );
   }
@@ -30,7 +30,7 @@ class SessionManager {
   }
 
   Future<String?> getRole() async {
-    return SecureStorageService.instance.read(
+    return await SecureStorageService.instance.read(
       key: SecureStorageService.userRoleKey,
     );
   }

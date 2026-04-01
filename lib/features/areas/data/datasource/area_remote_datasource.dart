@@ -1,25 +1,44 @@
+import 'package:dio/dio.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/area_model.dart';
 
 abstract class AreaRemoteDataSource {
   Future<List<AreaModel>> fetchAreas();
+  Future<List<AreaModel>> fetchAreasByUser();
 }
 
 class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
+  final Dio _dio = DioClient.instance;
+
   @override
   Future<List<AreaModel>> fetchAreas() async {
-    // === MOCK API IMPLEMENTATION FOR TESTING UI ===
-    await Future.delayed(const Duration(seconds: 1));
-    return const [
-      AreaModel(id: 1, code: 'GUT-01', name: 'Gudang Utama', buildingType: 'Warehouse'),
-      AreaModel(id: 2, code: 'PROD-A', name: 'Area Produksi A', buildingType: 'Factory'),
-      AreaModel(id: 3, code: 'OFF-01', name: 'Kantor Administrasi', buildingType: 'Office'),
-    ];
+    try {
+      final response = await _dio.get('/areas');
 
-    /* ACTUAL IMPLEMENTATION
-    final response = await DioClient.instance.get('/api/areas');
-    final List<dynamic> data = response.data['data'];
-    return data.map((json) => AreaModel.fromJson(json)).toList();
-    */
+      // Handle response format
+      final List<dynamic> data = response.data is Map
+          ? (response.data['data'] as List<dynamic>? ?? [])
+          : (response.data as List<dynamic>? ?? []);
+
+      return data.map((json) => AreaModel.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil data areas: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<List<AreaModel>> fetchAreasByUser() async {
+    try {
+      final response = await _dio.get('/areas/by-user');
+
+      // Handle response format
+      final List<dynamic> data = response.data is Map
+          ? (response.data['data'] as List<dynamic>? ?? [])
+          : (response.data as List<dynamic>? ?? []);
+
+      return data.map((json) => AreaModel.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil data areas by user: ${e.toString()}');
+    }
   }
 }

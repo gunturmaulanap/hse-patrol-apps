@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/storage/session_manager.dart';
 import '../../data/datasource/auth_remote_datasource.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 final sessionManagerProvider = Provider<SessionManager>((ref) {
-  return const SessionManager();
+  return SessionManager();
 });
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
@@ -22,31 +24,50 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 class AuthState {
   final bool isLoading;
   final String? error;
-  
-  AuthState({this.isLoading = false, this.error});
+  final UserModel? user;
+
+  const AuthState({
+    this.isLoading = false,
+    this.error,
+    this.user,
+  });
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
 
-  AuthNotifier(this._repository) : super(AuthState());
+  AuthNotifier(this._repository) : super(const AuthState());
 
   Future<bool> login(String username, String password) async {
-    state = AuthState(isLoading: true);
+    debugPrint('[AuthNotifier] before update auth state -> loading true');
+    state = AuthState(isLoading: true, user: state.user);
+
     try {
-      await _repository.login(username, password);
-      state = AuthState(isLoading: false);
+      final user = await _repository.login(username, password);
+
+      debugPrint('[AuthNotifier] before update auth state -> login success');
+      state = AuthState(isLoading: false, user: user);
+
       return true;
-    } catch (e) {
-      state = AuthState(isLoading: false, error: e.toString());
+    } catch (e, st) {
+      debugPrint('[AuthNotifier] login error: $e');
+      debugPrint('[AuthNotifier] login stacktrace: $st');
+
+      debugPrint('[AuthNotifier] before update auth state -> login failed');
+      state = AuthState(isLoading: false, error: e.toString(), user: state.user);
+
       return false;
     }
   }
 
   Future<void> logout() async {
-    state = AuthState(isLoading: true);
+    debugPrint('[AuthNotifier] before update auth state -> logout loading true');
+    state = AuthState(isLoading: true, user: state.user);
+
     await _repository.logout();
-    state = AuthState(isLoading: false);
+
+    debugPrint('[AuthNotifier] before update auth state -> logout success');
+    state = const AuthState(isLoading: false, user: null);
   }
 }
 

@@ -64,7 +64,7 @@ class PicShellScreen extends StatelessWidget {
                     const SizedBox(width: 16),
                     // Tengah: Add Button
                     GestureDetector(
-                      onTap: () => context.pushNamed(RouteNames.picCreateReport),
+                      onTap: () => context.pushNamed(RouteNames.picCreateTask),
                       child: Container(
                         width: 46,
                         height: 46,

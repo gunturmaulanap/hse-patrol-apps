@@ -7,8 +7,10 @@ import '../../../../app/theme/app_radius.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/mock_api/mock_auth_service.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../providers/auth_provider.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../data/models/user_model.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -20,7 +22,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
   String? _errorMessage;
 
   @override
@@ -32,35 +33,104 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _handleLogin() async {
     setState(() {
-      _isLoading = true;
       _errorMessage = null;
     });
 
-    // Simulasi loading API
-    await Future.delayed(const Duration(seconds: 1));
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    final email = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
 
-    final authService = ref.read(mockAuthServiceProvider);
-    final user = authService.login(
-      username: _usernameController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-
-    if (mounted) {
+    if (email.isEmpty || password.isEmpty) {
       setState(() {
-        _isLoading = false;
+        _errorMessage = 'Email dan password harus diisi.';
       });
+      return;
+    }
 
-      if (user != null) {
-        ref.read(currentUserProvider.notifier).state = user;
-        
-        if (user.role == 'petugas') {
-          context.goNamed(RouteNames.petugasHome);
-        } else if (user.role == 'pic') {
-          context.goNamed(RouteNames.picHome);
+    try {
+      debugPrint('[LoginScreen] submit login for email: $email');
+      final success = await authNotifier.login(email, password);
+
+      if (mounted) {
+        if (success) {
+          // Fetch user data to determine role and navigate
+          UserModel? user;
+          try {
+            debugPrint('[LoginScreen] before call /me');
+            final authRepository = ref.read(authRepositoryProvider);
+            user = await authRepository.getMe();
+            debugPrint('[LoginScreen] /me result: ${user.toJson()}');
+          } catch (e, st) {
+            debugPrint('[LoginScreen] /me failed: $e');
+            debugPrint('[LoginScreen] /me stacktrace: $st');
+
+            user = ref.read(authNotifierProvider).user;
+            debugPrint('[LoginScreen] fallback user from auth state: ${user?.toJson()}');
+          }
+
+          if (user == null) {
+            setState(() {
+              _errorMessage = 'Login berhasil, tetapi data user tidak tersedia.';
+            });
+            return;
+          }
+
+          // Set mock user for compatibility with existing UI
+          final mockUser = MockUser(
+            id: user.id.toString(),
+            username: user.name,
+            email: user.email,
+            password: '', // Not needed from backend
+            role: user.role == UserRole.pic
+                ? 'pic'
+                : user.role == UserRole.hseSupervisor
+                    ? 'supervisor'
+                    : 'petugas',
+            areaAccess: user.areaAccess,
+          );
+          ref.read(currentUserProvider.notifier).state = mockUser;
+
+          // Navigate based on role
+          final targetRoute = user.role == UserRole.pic
+              ? RouteNames.picHome
+              : user.role == UserRole.hseSupervisor
+                  ? RouteNames.supervisorHome
+                  : RouteNames.petugasHome;
+          debugPrint('[LoginScreen] before redirect/router decision -> go $targetRoute');
+          if (!mounted) return;
+          context.goNamed(targetRoute);
+        } else {
+          final db = ref.read(mockDatabaseProvider);
+          final mockUser = db.findUserByEmailAndPassword(email, password);
+
+          if (mockUser != null) {
+            debugPrint('[LoginScreen] backend login failed, use mock role testing for: ${mockUser.email} (${mockUser.role})');
+            ref.read(currentUserProvider.notifier).state = mockUser;
+
+            final targetRoute = mockUser.role == 'pic'
+                ? RouteNames.picHome
+                : mockUser.role == 'supervisor'
+                    ? RouteNames.supervisorHome
+                    : RouteNames.petugasHome;
+
+            if (!mounted) return;
+            context.goNamed(targetRoute);
+            return;
+          }
+
+          final errorState = ref.read(authNotifierProvider);
+          setState(() {
+            _errorMessage = errorState.error ??
+                'Login gagal. Gunakan akun backend, atau akun mock email untuk testing role.';
+          });
         }
-      } else {
+      }
+    } catch (e, st) {
+      debugPrint('[LoginScreen] login error: $e');
+      debugPrint('[LoginScreen] login stacktrace: $st');
+      if (mounted) {
         setState(() {
-          _errorMessage = 'Username atau password salah.';
+          _errorMessage = 'Terjadi kesalahan: ${e.toString()}';
         });
       }
     }
@@ -68,6 +138,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authNotifierProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -80,20 +152,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 // Logo or Icon Placeholder
                 Image.asset(
-                  'lib/assets/aksamala-logo.png',
-                  width: 80,
-                  height: 80,
+                  'lib/assets/logos/hse-aksamala.png',
+                  width: 160,
+                  height: 160,
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                // Text(
-                //   'HSE Aksamala',
-                //   textAlign: TextAlign.center,
-                //   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                //         color: AppColors.primary,
-                //         fontWeight: FontWeight.bold,
-                //         letterSpacing: -1,
-                //       ),
-                // ),
                 Text(
                   'Sistem Pelaporan Kerusakan Bangunan',
                   textAlign: TextAlign.center,
@@ -114,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
-                  'Gunakan akun Petugas atau PIC untuk melanjutkan.',
+                  'Gunakan email backend. Untuk fallback mock testing role: staff/supervisor/pic.',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -128,7 +192,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       border: Border.all(color: AppColors.statusRejected),
                     ),
                     child: Text(
-                      _errorMessage!,
+                      _errorMessage ?? '',
                       style: const TextStyle(color: AppColors.statusRejected, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -136,8 +200,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
 
                 AppTextField(
-                  label: 'Username',
-                  hint: 'Masukkan username',
+                  label: 'Email / Username',
+                  hint: 'Masukkan email atau username',
                   controller: _usernameController,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -151,25 +215,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(
                   text: 'Login',
-                  isLoading: _isLoading,
-                  onPressed: _handleLogin,
+                  isLoading: authState.isLoading,
+                  onPressed: authState.isLoading ? null : _handleLogin,
                 ),
                 const SizedBox(height: AppSpacing.xxl),
 
-                // Petunjuk Master User (Border only style)
+                // Info akun
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.surfaceVariant),
                     borderRadius: BorderRadius.circular(AppRadius.borderMd),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('AKUN SIMULASI:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.primary, letterSpacing: 1.5)),
-                      SizedBox(height: 8),
-                      Text('Petugas: petugas / 123', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                      Text('PIC: pic / 123', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                      const Text('INFORMASI:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.primary, letterSpacing: 1.5)),
+                      const SizedBox(height: 8),
+                       Text(
+                         'Mock login (sementara):\n'
+                         '- hse_staff@aksamala.test / 123456\n'
+                         '- hse_supervisor@aksamala.test / 123456\n'
+                         '- pic_area@aksamala.test / 123456',
+                         style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                       ),
                     ],
                   ),
                 )

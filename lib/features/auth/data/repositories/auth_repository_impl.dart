@@ -1,4 +1,5 @@
 import '../../domain/repositories/auth_repository.dart';
+import 'package:flutter/foundation.dart';
 import '../datasource/auth_remote_datasource.dart';
 import '../models/login_request.dart';
 import '../models/user_model.dart';
@@ -12,11 +13,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserModel> login(String emailOrUsername, String password) async {
+    debugPrint('[AuthRepository] login() start for: ${emailOrUsername.trim()}');
+
     final response = await _remoteDataSource.login(
       LoginRequest(emailOrUsername: emailOrUsername, password: password),
     );
+
+    debugPrint('[AuthRepository] parsed login response: ${response.toJson()}');
+    debugPrint('[AuthRepository] before save token');
     await _sessionManager.saveToken(response.token);
+
+    debugPrint('[AuthRepository] before save role: ${response.user.role.name}');
     await _sessionManager.saveRole(response.user.role.name);
+
     return response.user;
   }
 
@@ -34,6 +43,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserModel> getMe() async {
+    debugPrint('[AuthRepository] before call getMe()');
     return _remoteDataSource.getMe();
   }
 }

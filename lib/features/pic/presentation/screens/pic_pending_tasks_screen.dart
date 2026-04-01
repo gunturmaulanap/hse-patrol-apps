@@ -194,7 +194,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
     final Color stripeColor = Colors.black.withValues(alpha: 0.05);
 
     return InkWell(
-      onTap: () => context.pushNamed(RouteNames.reportDetail, pathParameters: {'id': reportId}),
+      onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,

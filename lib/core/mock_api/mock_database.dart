@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class MockUser {
   final String id;
   final String username;
+  final String email;
   final String password;
   final String role; 
   final List<String> areaAccess;
@@ -10,6 +11,7 @@ class MockUser {
   MockUser({
     required this.id, 
     required this.username, 
+    required this.email,
     required this.password, 
     required this.role,
     this.areaAccess = const [],
@@ -18,8 +20,34 @@ class MockUser {
 
 class MockDatabase {
   final List<MockUser> users = [
-    MockUser(id: '1', username: 'petugas', password: '123', role: 'petugas'),
-    MockUser(id: '2', username: 'pic', password: '123', role: 'pic', areaAccess: [
+    MockUser(
+      id: '101',
+      username: 'HSE Staff Demo',
+      email: 'hse_staff@aksamala.test',
+      password: '123456',
+      role: 'petugas',
+    ),
+    MockUser(
+      id: '102',
+      username: 'HSE Supervisor Demo',
+      email: 'hse_supervisor@aksamala.test',
+      password: '123456',
+      role: 'supervisor',
+    ),
+    MockUser(
+      id: '104',
+      username: 'HSE Staff Demo 2',
+      email: 'hse_staff2@aksamala.test',
+      password: '123456',
+      role: 'petugas',
+    ),
+    MockUser(
+      id: '103',
+      username: 'PIC Area Demo',
+      email: 'pic_area@aksamala.test',
+      password: '123456',
+      role: 'pic',
+      areaAccess: [
       'Area Produksi 1 - Mesin Bubut',
       'Koridor Evakuasi Barat',
       'Gudang Penyimpanan B',
@@ -27,7 +55,8 @@ class MockDatabase {
       'Ruang Rapat Utama',
       'Kantin Karyawan',
       'Area Loading Dock',
-    ]),
+      ],
+    ),
   ];
 
   late List<Map<String, dynamic>> reports;
@@ -198,6 +227,47 @@ class MockDatabase {
         'status': 'Pending', // Action Needed
       },
     ];
+
+    _assignTaskOwnersForMockTesting();
+  }
+
+  MockUser? findUserByEmailAndPassword(String email, String password) {
+    final normalizedEmail = email.trim().toLowerCase();
+    return users.where((u) => u.email.trim().toLowerCase() == normalizedEmail && u.password == password).firstOrNull;
+  }
+
+  void _assignTaskOwnersForMockTesting() {
+    // Supervisor gets a subset of tasks, staff gets the rest.
+    // Staff intentionally has mixed status: Pending, Follow Up Done, Completed, Canceled.
+    const supervisorTaskIds = <String>{
+      'rpt_prod1_3',
+      'rpt_kor_2',
+      'rpt_gudB_1',
+    };
+
+    const primaryStaffTaskIds = <String>{
+      'rpt_prod1_1',
+      'rpt_prod1_2',
+      'rpt_park_1',
+      'rpt_load_1',
+    };
+
+    for (final task in reports) {
+      final id = task['id']?.toString() ?? '';
+      final isSupervisorTask = supervisorTaskIds.contains(id);
+      final isPrimaryStaffTask = primaryStaffTaskIds.contains(id);
+
+      if (isSupervisorTask) {
+        task['userId'] = 102;
+        task['staffName'] = 'HSE Supervisor Demo';
+      } else if (isPrimaryStaffTask) {
+        task['userId'] = 101;
+        task['staffName'] = 'HSE Staff Demo';
+      } else {
+        task['userId'] = 104;
+        task['staffName'] = 'HSE Staff Demo 2';
+      }
+    }
   }
 
   void addReport(Map<String, dynamic> report) {
@@ -256,3 +326,7 @@ final mockDatabaseProvider = Provider<MockDatabase>((ref) {
 });
 
 final currentUserProvider = StateProvider<MockUser?>((ref) => null);
+
+extension _FirstOrNullX<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}

@@ -1,14 +1,35 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class LoginRequest {
+  final String emailOrUsername;
+  final String password;
 
-part 'login_request.freezed.dart';
-part 'login_request.g.dart';
+  const LoginRequest({
+    this.emailOrUsername = '',
+    this.password = '',
+  });
 
-@freezed
-class LoginRequest with _$LoginRequest {
-  const factory LoginRequest({
-    required String emailOrUsername,
-    required String password,
-  }) = _LoginRequest;
+  factory LoginRequest.fromJson(Map<String, dynamic> json) {
+    return LoginRequest(
+      emailOrUsername: (json['emailOrUsername'] ?? json['email'] ?? '')
+          .toString()
+          .trim(),
+      password: (json['password'] ?? '').toString(),
+    );
+  }
 
-  factory LoginRequest.fromJson(Map<String, dynamic> json) => _$LoginRequestFromJson(json);
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'emailOrUsername': emailOrUsername,
+      'password': password,
+    };
+  }
+
+  LoginRequest copyWith({
+    String? emailOrUsername,
+    String? password,
+  }) {
+    return LoginRequest(
+      emailOrUsername: emailOrUsername ?? this.emailOrUsername,
+      password: password ?? this.password,
+    );
+  }
 }

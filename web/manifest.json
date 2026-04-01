@@ -1,11 +1,11 @@
 {
-    "name": "hse_aksamala",
-    "short_name": "hse_aksamala",
+    "name": "HSE Aksamala",
+    "short_name": "HSE Patrol",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#000000",
+    "theme_color": "#E8FA61",
+    "description": "Sistem Pelaporan Kerusakan Bangunan HSE Aksamala",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

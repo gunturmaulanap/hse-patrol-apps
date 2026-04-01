@@ -9,6 +9,8 @@ import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../follow_up/presentation/providers/follow_up_provider.dart';
+import '../../../follow_up/data/models/create_follow_up_request.dart';
 
 class PicFollowUpReviewScreen extends ConsumerStatefulWidget {
   const PicFollowUpReviewScreen({super.key});
@@ -22,35 +24,63 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
 
   void _submitFollowUp() async {
     setState(() => _isSaving = true);
-    
-    // Simulate loading
-    await Future.delayed(const Duration(seconds: 2));
 
     final draft = ref.read(picFollowUpFormProvider);
     final db = ref.read(mockDatabaseProvider);
 
-    if (draft.reportId != null) {
-      db.updateReportStatus(
-        draft.reportId!, 
-        'Follow Up Done', 
-        picNotes: draft.notes,
-        picPhotos: draft.photos,
-      );
-    }
-    
-    if (mounted) {
-      setState(() => _isSaving = false);
-      
-      // Clear draft
-      ref.read(picFollowUpFormProvider.notifier).reset();
+    try {
+      if (draft.reportId != null) {
+        // Submit to backend API
+        final followUpRepo = ref.read(followUpRepositoryProvider);
+        final reportId = int.parse(draft.reportId!);
 
-      // Return to PIC Home explicitly (popping off the wizard + detail screen)
-      context.goNamed(RouteNames.picHome);
+        // Convert photo paths to File objects
+        final photoFiles = draft.photos.map((path) => File(path)).toList();
 
-      AppSnackBar.success(
-        context,
-        message: 'Tindak Lanjut Anda berhasil disubmit untuk direview oleh Petugas.',
-      );
+        // Create request
+        final request = CreateFollowUpRequest(
+          action: draft.action ?? 'perbaikan',
+          notesPic: draft.notes ?? '',
+        );
+
+        // Call backend API
+        await followUpRepo.createFollowUp(
+          reportId,
+          request,
+          photoFiles,
+        );
+
+        // Update local mock database for UI consistency
+        db.updateReportStatus(
+          draft.reportId!,
+          'Follow Up Done',
+          picNotes: draft.notes,
+          picPhotos: draft.photos,
+        );
+      }
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+
+        // Clear draft
+        ref.read(picFollowUpFormProvider.notifier).reset();
+
+        // Return to PIC Home explicitly (popping off the wizard + detail screen)
+        context.goNamed(RouteNames.picHome);
+
+        AppSnackBar.success(
+          context,
+          message: 'Tindak Lanjut Anda berhasil disubmit untuk direview oleh Petugas.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        AppSnackBar.error(
+          context,
+          message: 'Gagal submit follow-up: ${e.toString()}',
+        );
+      }
     }
   }
 

@@ -26,7 +26,14 @@ class AppColors {
   static const Color statusPending = Color(0xFFC5C6FA);
   static const Color statusApproved = Color(0xFFE8FA61);
   static const Color statusRejected = Color(0xFFFF453A);
-  
+
+  // Risk Level Colors (New: Time-based)
+  static const Color riskLevel1 = Color(0xFF2196F3); // Biru - < 1 jam
+  static const Color riskLevel2 = Color(0xFFFFEB3B); // Kuning - < 24 jam
+  static const Color riskLevel3 = Color(0xFFFF9800); // Orange - < 3 hari
+  static const Color riskLevel4 = Color(0xFFF44336); // Merah - < 2 minggu
+
+  // Legacy risk colors (untuk backward compatibility)
   static const Color riskCritical = Color(0xFFFF453A);
   static const Color riskHigh = Color(0xFFFF9F0A);
   static const Color riskMedium = Color(0xFFFFD60A);

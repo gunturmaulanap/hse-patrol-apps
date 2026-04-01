@@ -7,16 +7,40 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  // Controller untuk form password
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  // State untuk toggle hide/show password
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Mengambil data user yang sedang aktif
     final user = ref.watch(currentUserProvider);
 
-    // FIX: Redirect ke login jika user null (setelah hot restart)
+    // Redirect ke login jika user null (setelah hot restart)
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
@@ -32,6 +56,7 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final isPetugas = user.role == 'petugas';
+    final isSupervisor = user.role == 'supervisor';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -41,8 +66,22 @@ class ProfileScreen extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
           onPressed: () {
-            // Kembali ke home yang sesuai dengan role
-            context.goNamed(isPetugas ? RouteNames.petugasHome : RouteNames.picHome);
+            if (context.canPop()) {
+              context.pop();
+              return;
+            }
+
+            if (isPetugas) {
+              context.goNamed(RouteNames.petugasHome);
+              return;
+            }
+
+            if (isSupervisor) {
+              context.goNamed(RouteNames.supervisorHome);
+              return;
+            }
+
+            context.goNamed(RouteNames.picHome);
           },
         ),
         title: Text('My Profile', style: AppTypography.h3),
@@ -55,40 +94,26 @@ class ProfileScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // --- 1. SECTION: AVATAR & INFO ---
-              const SizedBox(height: 24),
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFD4D8FF), // Pastel Purple
-                      border: Border.all(color: AppColors.surface, width: 4),
-                      image: DecorationImage(
-                        image: NetworkImage(
-                          isPetugas 
-                              ? 'https://i.pravatar.cc/150?img=11' 
-                              : 'https://i.pravatar.cc/150?img=12'
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+              // --- 1. SECTION: ICON USER & INFO ---
+              const SizedBox(height: 16),
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  // Warna background disesuaikan dengan role
+                  color: isPetugas ? const Color(0xFFFAFF9F) : const Color(0xFFC1F0D0),
+                  border: Border.all(color: AppColors.surface, width: 4),
+                ),
+                child: Center(
+                  child: Icon(
+                    PhosphorIcons.user(PhosphorIconsStyle.bold), 
+                    color: const Color(0xFF1E1E1E), 
+                    size: 48,
                   ),
-                  // Icon Pensil kecil (Edit Photo)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(PhosphorIcons.pencilSimple(PhosphorIconsStyle.bold), color: Colors.white, size: 18),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               
               // Nama User
               Text(
@@ -97,7 +122,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
 
-              // Badge Role (Warna berbeda untuk PIC dan Petugas)
+              // Badge Role
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 decoration: BoxDecoration(
@@ -115,29 +140,71 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 48),
 
-              // --- 2. SECTION: MENU OPTIONS ---
-              _buildMenuItem(
-                icon: PhosphorIcons.userCircle(),
-                title: 'Personal Details',
-                subtitle: 'Update your personal info',
-                color: const Color(0xFFD4D8FF), // Soft Purple
-                onTap: () {},
+              // --- 2. SECTION: CHANGE PASSWORD FORM ---
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Change Password',
+                  style: AppTypography.h3.copyWith(fontSize: 18),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              _buildPasswordField(
+                label: 'Current Password',
+                controller: _currentPasswordController,
+                obscureText: _obscureCurrent,
+                onToggleVisibility: () {
+                  setState(() => _obscureCurrent = !_obscureCurrent);
+                },
               ),
               const SizedBox(height: 16),
-              _buildMenuItem(
-                icon: PhosphorIcons.bellRinging(),
-                title: 'Notifications',
-                subtitle: 'Manage your alerts',
-                color: const Color(0xFFFAFF9F), // Soft Yellow
-                onTap: () {},
+              
+              _buildPasswordField(
+                label: 'New Password',
+                controller: _newPasswordController,
+                obscureText: _obscureNew,
+                onToggleVisibility: () {
+                  setState(() => _obscureNew = !_obscureNew);
+                },
               ),
               const SizedBox(height: 16),
-              _buildMenuItem(
-                icon: PhosphorIcons.shieldCheck(),
-                title: 'Privacy & Security',
-                subtitle: 'Password and access',
-                color: const Color(0xFFC1F0D0), // Soft Mint
-                onTap: () {},
+              
+              _buildPasswordField(
+                label: 'Confirm New Password',
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirm,
+                onToggleVisibility: () {
+                  setState(() => _obscureConfirm = !_obscureConfirm);
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // Tombol Update Password
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1E1E), // Bisa diganti AppColors.primary
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                  ),
+                  onPressed: () {
+                    // TODO: Tambahkan logic untuk memvalidasi dan update password ke API
+                    // Contoh baca text: _newPasswordController.text
+                  },
+                  child: Text(
+                    'Update Password',
+                    style: AppTypography.body1.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
               
               const SizedBox(height: 48),
@@ -147,7 +214,7 @@ class ProfileScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD4D4), // Pastel Red Background
+                    backgroundColor: Colors.white,
                     foregroundColor: Colors.redAccent,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 18),
@@ -157,15 +224,24 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                   onPressed: () async {
-                    // Membersihkan state user saat logout
-                    ref.read(currentUserProvider.notifier).state = null;
+                    try {
+                      final authNotifier = ref.read(authNotifierProvider.notifier);
+                      await authNotifier.logout();
 
-                    // Membersihkan secure storage
-                    // Note: Untuk mock API, kita hanya clear in-memory
-                    // Di production, gunakan: await SessionManager().clearToken();
-
-                    // Kembali ke halaman Login dengan mengganti stack
-                    context.goNamed(RouteNames.login);
+                      if (!context.mounted) return;
+                      ref.read(currentUserProvider.notifier).state = null;
+                      context.goNamed(RouteNames.login);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Logout dilakukan secara lokal. Error: ${e.toString()}'),
+                          backgroundColor: AppColors.statusRejected,
+                        ),
+                      );
+                      ref.read(currentUserProvider.notifier).state = null;
+                      context.goNamed(RouteNames.login);
+                    }
                   },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -191,56 +267,57 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // Helper Custom Widget untuk List Menu
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
+  // Helper Widget untuk Form Password
+  Widget _buildPasswordField({
+    required String label,
+    required TextEditingController controller,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.surfaceLight, width: 1.5),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: const Color(0xFF1E1E1E), size: 28),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Enter $label',
+            hintStyle: AppTypography.body1.copyWith(color: AppColors.textSecondary),
+            filled: true,
+            fillColor: AppColors.surface,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTypography.body1.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
             ),
-            Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), color: AppColors.textSecondary, size: 20),
-          ],
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0xFF1E1E1E), width: 1.5),
+            ),
+            prefixIcon: Icon(PhosphorIcons.lock(PhosphorIconsStyle.regular), color: AppColors.textSecondary, size: 22),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscureText 
+                  ? PhosphorIcons.eyeClosed(PhosphorIconsStyle.regular) 
+                  : PhosphorIcons.eye(PhosphorIconsStyle.regular),
+                color: AppColors.textSecondary,
+                size: 22,
+              ),
+              onPressed: onToggleVisibility,
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

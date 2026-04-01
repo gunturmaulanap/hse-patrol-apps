@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:getwidget/getwidget.dart';
 
 import '../../../areas/data/models/area_model.dart';
-import '../../../reports/presentation/providers/report_provider.dart';
+import '../../../reports/presentation/providers/task_provider.dart';
 
 class PicAreaDetailPage extends ConsumerWidget {
   final AreaModel area;
@@ -12,7 +12,7 @@ class PicAreaDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reportsAsync = ref.watch(reportsFutureProvider);
+    final reportsAsync = ref.watch(tasksFutureProvider);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,

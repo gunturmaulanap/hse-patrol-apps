@@ -11,4 +11,9 @@ class AreaRepositoryImpl implements AreaRepository {
   Future<List<AreaModel>> getAreas() async {
     return _remoteDataSource.fetchAreas();
   }
+
+  @override
+  Future<List<AreaModel>> getAreasByUser() async {
+    return _remoteDataSource.fetchAreasByUser();
+  }
 }
