@@ -21,7 +21,23 @@ class _CreateTaskNotesScreenState extends ConsumerState<CreateTaskNotesScreen> {
   @override
   void initState() {
     super.initState();
-    _notesController.text = ref.read(createTaskFormProvider).notes ?? '';
+    // Ambil notes dari provider dan bersihkan teks debugging
+    String? rawNotes = ref.read(createTaskFormProvider).notes;
+
+    // Sanitasi: hapus teks debugging jika ada
+    if (rawNotes != null && rawNotes.isNotEmpty) {
+      // Hapus teks yang mengandung kata-kata debugging
+      final debugPatterns = ['datasource', 'dart', 'MXtask', 'lib\\', 'main.dart', '.dart'];
+      for (var pattern in debugPatterns) {
+        if (rawNotes!.toLowerCase().contains(pattern.toLowerCase())) {
+          rawNotes = ''; // Reset jika ada teks debugging
+          debugPrint('[CreateTaskNotesScreen] Debug text detected, resetting notes');
+          break;
+        }
+      }
+    }
+
+    _notesController.text = rawNotes ?? '';
   }
 
   @override

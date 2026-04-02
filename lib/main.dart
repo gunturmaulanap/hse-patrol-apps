@@ -8,11 +8,19 @@ import 'core/network/dio_client.dart';
 import 'core/storage/secure_storage_service.dart';
 
 Future<void> main() async {
+  // 1. Inisialisasi wajib
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Hide navigation bar dan status bar untuk fullscreen experience
-  // Ini setara dengan SystemChrome.setEnabledSystemUIOverlays([]) di versi lama
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+  // 2. Sembunyikan navigasi & status bar secara total (Immersive Sticky)
+  // Mode ini akan menghilangkan semua icon. Icon hanya muncul jika di-swipe.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+  // 3. Maksa bar menjadi transparan (menghilangkan sisa warna bar jika sistem memaksanya muncul)
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.transparent,
+    statusBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
 
   await SecureStorageService.init();
   await DioClient.initInterceptors();
@@ -36,6 +44,19 @@ class MyApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      // 4. Trik Terakhir: Membungkus dengan Builder untuk menjaga mode fullscreen
+      builder: (context, child) {
+        return Focus(
+          onFocusChange: (hasFocus) {
+            if (hasFocus) {
+              // Jika aplikasi kehilangan fokus (misal buka notifikasi) lalu kembali, 
+              // kita paksa sembunyikan lagi navigasinya.
+              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+            }
+          },
+          child: child!,
+        );
+      },
     );
   }
 }

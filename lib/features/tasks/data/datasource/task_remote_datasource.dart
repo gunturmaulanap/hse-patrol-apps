@@ -64,7 +64,10 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   @override
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos) async {
     try {
+      _log('Creating task with title: ${request.title}');
+
       final formData = FormData.fromMap({
+        'title': request.title,              // ← TAMBAHKAN INI!
         'area_id': request.areaId,
         'risk_level': request.riskLevel,
         'root_cause': request.rootCause,
@@ -82,6 +85,8 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         }
       }
 
+      _log('FormData fields: ${formData.fields}');
+
       final response = await _dio.post(
         '/hse-reports',
         data: formData,
@@ -89,6 +94,9 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           contentType: Headers.multipartFormDataContentType,
         ),
       );
+
+      _log('Response status: ${response.statusCode}');
+      _log('Response data: ${response.data}');
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
@@ -100,6 +108,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
       return _parseReportModel(data);
     } catch (e) {
+      _log('Error creating task: ${e.toString()}');
       throw Exception('Gagal membuat report: ${e.toString()}');
     }
   }

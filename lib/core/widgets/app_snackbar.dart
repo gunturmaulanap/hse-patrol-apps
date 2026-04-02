@@ -8,6 +8,7 @@ class AppSnackBar {
     Color? backgroundColor,
     Duration duration = const Duration(seconds: 4),
     SnackBarBehavior behavior = SnackBarBehavior.floating,
+    Color? textColor,
   }) {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.hideCurrentSnackBar();
@@ -22,7 +23,7 @@ class AppSnackBar {
         ),
         action: SnackBarAction(
           label: '✕',
-          textColor: AppColors.textPrimary,
+          textColor: textColor ?? AppColors.textPrimary,
           onPressed: () {
             scaffoldMessenger.hideCurrentSnackBar();
           },
@@ -36,11 +37,13 @@ class AppSnackBar {
     required String message,
     Duration duration = const Duration(seconds: 3),
   }) {
+    // Icon close hitam agar kontras dengan background hijau muda
     show(
       context,
       message: message,
       backgroundColor: AppColors.statusApproved,
       duration: duration,
+      textColor: Colors.black,
     );
   }
 
@@ -49,11 +52,13 @@ class AppSnackBar {
     required String message,
     Duration duration = const Duration(seconds: 5),
   }) {
+    // Icon close putih agar kontras dengan background merah gelap
     show(
       context,
       message: message,
       backgroundColor: Colors.red.shade800,
       duration: duration,
+      textColor: Colors.white,
     );
   }
 
@@ -62,11 +67,13 @@ class AppSnackBar {
     required String message,
     Duration duration = const Duration(seconds: 4),
   }) {
+    // Icon close putih agar kontras dengan background kuning/oranye
     show(
       context,
       message: message,
       backgroundColor: AppColors.statusRejected,
       duration: duration,
+      textColor: Colors.black,
     );
   }
 
@@ -75,11 +82,13 @@ class AppSnackBar {
     required String message,
     Duration duration = const Duration(seconds: 3),
   }) {
+    // Icon close putih agar kontras dengan background biru
     show(
       context,
       message: message,
       backgroundColor: AppColors.primary,
       duration: duration,
+      textColor: Colors.white,
     );
   }
 }

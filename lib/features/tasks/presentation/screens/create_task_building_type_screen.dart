@@ -9,11 +9,27 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/create_task_form_provider.dart';
 
-class CreateTaskBuildingTypeScreen extends ConsumerWidget {
+class CreateTaskBuildingTypeScreen extends ConsumerStatefulWidget {
   const CreateTaskBuildingTypeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CreateTaskBuildingTypeScreen> createState() => _CreateTaskBuildingTypeScreenState();
+}
+
+class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildingTypeScreen> {
+  bool _hasReset = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Reset form state saat pertama kali membuka screen
+    if (!_hasReset) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(createTaskFormProvider.notifier).reset();
+        debugPrint('[CreateTaskBuildingTypeScreen] Form state reset');
+      });
+      _hasReset = true;
+    }
+
     final form = ref.watch(createTaskFormProvider);
 
     return Scaffold(
@@ -39,6 +55,22 @@ class CreateTaskBuildingTypeScreen extends ConsumerWidget {
                     fontWeight: FontWeight.bold,
                   ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Text(
+                'ℹ️ Informasi: Untuk saat ini pemilihan jenis bangunan bersifat formalitas. Nanti akan ada filter area berdasarkan jenis bangunan.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                    ),
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(height: AppSpacing.xl),
             Expanded(

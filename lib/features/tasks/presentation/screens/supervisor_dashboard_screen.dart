@@ -412,29 +412,32 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     if (rows.isEmpty) return _emptyState();
 
     return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
-        dataRowMinHeight: 48,
-        dataRowMaxHeight: 56,
-        columns: const [
-          DataColumn(label: Text('Status')),
-          DataColumn(label: Text('Task Name')),
-          DataColumn(label: Text('Risk')),
-          DataColumn(label: Text('Root Cause')),
-          DataColumn(label: Text('Reported By')),
-          DataColumn(label: Text('Date Created')),
-        ],
-        rows: rows.map((item) {
-          return DataRow(cells: [
-            DataCell(_statusCell(item['status']?.toString() ?? '-')),
-            DataCell(SizedBox(width: 180, child: Text(_titleOf(item), overflow: TextOverflow.ellipsis))),
-            DataCell(_riskDot(item['riskLevel']?.toString())),
-            DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-            DataCell(SizedBox(width: 130, child: Text(item['staffName']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-            DataCell(Text(_formatDate(item['date']?.toString()))),
-          ]);
-        }).toList(),
+      scrollDirection: Axis.vertical,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
+          dataRowMinHeight: 48,
+          dataRowMaxHeight: 56,
+          columns: const [
+            DataColumn(label: Text('Status')),
+            DataColumn(label: Text('Task Name')),
+            DataColumn(label: Text('Risk')),
+            DataColumn(label: Text('Root Cause')),
+            DataColumn(label: Text('Reported By')),
+            DataColumn(label: Text('Date Created')),
+          ],
+          rows: rows.map((item) {
+            return DataRow(cells: [
+              DataCell(_statusCell(item['status']?.toString() ?? '-')),
+              DataCell(SizedBox(width: 180, child: Text(_titleOf(item), overflow: TextOverflow.ellipsis))),
+              DataCell(_riskDot(item['riskLevel']?.toString())),
+              DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
+              DataCell(SizedBox(width: 130, child: Text(item['staffName']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
+              DataCell(Text(_formatDate(item['date']?.toString()))),
+            ]);
+          }).toList(),
+        ),
       ),
     );
   }
@@ -443,29 +446,32 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     if (rows.isEmpty) return _emptyState();
 
     return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
-        dataRowMinHeight: 48,
-        dataRowMaxHeight: 56,
-        columns: const [
-          DataColumn(label: Text('Status')),
-          DataColumn(label: Text('Area')),
-          DataColumn(label: Text('Risk')),
-          DataColumn(label: Text('Notes')),
-          DataColumn(label: Text('Root Cause')),
-          DataColumn(label: Text('Date Created')),
-        ],
-        rows: rows.map((item) {
-          return DataRow(cells: [
-            DataCell(_statusCell(item['status']?.toString() ?? '-')),
-            DataCell(SizedBox(width: 170, child: Text(item['area']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-            DataCell(_riskDot(item['riskLevel']?.toString())),
-            DataCell(SizedBox(width: 170, child: Text(item['notes']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-            DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-            DataCell(Text(_formatDate(item['date']?.toString()))),
-          ]);
-        }).toList(),
+      scrollDirection: Axis.vertical,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
+          dataRowMinHeight: 48,
+          dataRowMaxHeight: 56,
+          columns: const [
+            DataColumn(label: Text('Status')),
+            DataColumn(label: Text('Area')),
+            DataColumn(label: Text('Risk')),
+            DataColumn(label: Text('Notes')),
+            DataColumn(label: Text('Root Cause')),
+            DataColumn(label: Text('Date Created')),
+          ],
+          rows: rows.map((item) {
+            return DataRow(cells: [
+              DataCell(_statusCell(item['status']?.toString() ?? '-')),
+              DataCell(SizedBox(width: 170, child: Text(item['area']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
+              DataCell(_riskDot(item['riskLevel']?.toString())),
+              DataCell(SizedBox(width: 170, child: Text(item['notes']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
+              DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
+              DataCell(Text(_formatDate(item['date']?.toString()))),
+            ]);
+          }).toList(),
+        ),
       ),
     );
   }

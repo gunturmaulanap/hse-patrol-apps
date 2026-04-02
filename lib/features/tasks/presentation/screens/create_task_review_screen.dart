@@ -39,54 +39,159 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
   }
 
   void _submitData() async {
-    setState(() => _isSubmitting = true);
-    
-    final success = await ref.read(createTaskFormProvider.notifier).submitTask();
-    
-    if (success && mounted) {
-      ref.read(createTaskFormProvider.notifier).reset();
-      
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Berhasil!'),
-          content: const Text('Laporan Patroli berhasil dikirim.'),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            AppButton(
-              text: 'Bagikan via WhatsApp',
-              icon: const HugeIcon(
-                icon: HugeIcons.strokeRoundedShare01,
-                color: Colors.black,
-                size: 20,
+    // Validasi data sebelum submit
+    final draft = ref.read(createTaskFormProvider);
+
+    if (draft.buildingType == null ||
+        draft.buildingType!.isEmpty ||
+        draft.area == null ||
+        draft.area!.isEmpty ||
+        draft.riskLevel == null ||
+        draft.riskLevel!.isEmpty ||
+        draft.photos.isEmpty ||
+        draft.notes == null ||
+        draft.notes!.isEmpty ||
+        draft.rootCause == null ||
+        draft.rootCause!.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Data Belum Lengkap'),
+              ],
+            ),
+            content: const Text(
+              'Mohon lengkapi semua data sebelum mengirim laporan:\n'
+              '• Jenis Bangunan\n'
+              '• Lokasi Area\n'
+              '• Tingkat Risiko\n'
+              '• Minimal 1 Foto\n'
+              '• Keterangan\n'
+              '• Akar Masalah',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => ctx.pop(),
+                child: const Text('OK', style: TextStyle(color: Colors.orange)),
               ),
-              onPressed: () async {
-                final url = Uri.parse("whatsapp://send?text=Laporan Patroli Baru telah dibuat di aplikasi HSE Aksamala.");
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url);
-                }
-                if (!mounted || !ctx.mounted) return;
-                ctx.pop();
-                _goToHomeByRole(context);
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AppButton(
-              text: 'Selesai',
-              type: AppButtonType.outlined,
-              onPressed: () {
-                ctx.pop();
-                _goToHomeByRole(context);
-              },
-            ),
-          ],
-        ),
-      );
+            ],
+          ),
+        );
+      }
+      return;
     }
-    
-    if (mounted) {
-      setState(() => _isSubmitting = false);
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final success = await ref.read(createTaskFormProvider.notifier).submitTask();
+
+      if (success && mounted) {
+        // Form sudah di-reset di provider setelah submit berhasil
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Berhasil!'),
+              ],
+            ),
+            content: const Text('Laporan Patroli berhasil dikirim.'),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              AppButton(
+                text: 'Bagikan via WhatsApp',
+                icon: const HugeIcon(
+                  icon: HugeIcons.strokeRoundedShare01,
+                  color: Colors.black,
+                  size: 20,
+                ),
+                onPressed: () async {
+                  final url = Uri.parse("whatsapp://send?text=Laporan Patroli Baru telah dibuat di aplikasi HSE Aksamala.");
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url);
+                  }
+                  if (!mounted || !ctx.mounted) return;
+                  ctx.pop();
+                  _goToHomeByRole(context);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton(
+                text: 'Selesai',
+                type: AppButtonType.outlined,
+                onPressed: () {
+                  ctx.pop();
+                  _goToHomeByRole(context);
+                },
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Submit gagal
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.error, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Gagal Mengirim'),
+                ],
+              ),
+              content: const Text(
+                'Laporan gagal dikirim. Silakan periksa koneksi internet dan coba lagi. '
+                'Jika masalah berlanjut, hubungi administrator.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => ctx.pop(),
+                  child: const Text('OK', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Exception tidak tertangkap di provider
+      debugPrint('[CreateTaskReviewScreen] Submit error: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Terjadi Kesalahan'),
+              ],
+            ),
+            content: Text('Terjadi kesalahan: ${e.toString()}'),
+            actions: [
+              TextButton(
+                onPressed: () => ctx.pop(),
+                child: const Text('OK', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 

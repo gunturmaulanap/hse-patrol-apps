@@ -68,8 +68,9 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
       final areaName = state.area ?? 'Unknown Area';
       final rootCause = state.rootCause ?? '-';
 
-      // Generate title sesuai format: 'Inspeksi $area - Masalah: $cause'
-      final title = 'Inspeksi $areaName - Masalah: $rootCause';
+      // Generate title sesuai format backend response: 'Area [Nama Area] Masalah [Root Cause]'
+      // Contoh: "Area IT Masalah Lantai kotor"
+      final title = 'Area $areaName Masalah $rootCause';
 
       // Create request
       final request = CreateHseTaskRequest(
@@ -93,9 +94,15 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
       ref.invalidate(supervisorAllVisibleTaskMapsProvider);
       ref.invalidate(supervisorStaffNamesProvider);
 
+      // Reset form setelah submit berhasil
+      reset();
+      debugPrint('[CreateTaskFormNotifier] Form reset after successful submit');
+
       return true;
     } catch (e) {
       debugPrint('[CreateTaskFormNotifier] submitTask error: $e');
+      debugPrint('[CreateTaskFormNotifier] Error type: ${e.runtimeType}');
+      debugPrint('[CreateTaskFormNotifier] Error toString: ${e.toString()}');
       return false;
     }
   }

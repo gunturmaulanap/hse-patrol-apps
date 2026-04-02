@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:getwidget/getwidget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../shared/widgets/app_text_field.dart';
+import '../providers/create_task_form_provider.dart';
+import '../providers/task_provider.dart';
 
-class PetugasCreateTaskPage extends StatefulWidget {
+class PetugasCreateTaskPage extends ConsumerStatefulWidget {
   const PetugasCreateTaskPage({super.key});
 
   @override
-  State<PetugasCreateTaskPage> createState() => _PetugasCreateTaskPageState();
+  ConsumerState<PetugasCreateTaskPage> createState() => _PetugasCreateTaskPageState();
 }
 
-class _PetugasCreateTaskPageState extends State<PetugasCreateTaskPage> {
+class _PetugasCreateTaskPageState extends ConsumerState<PetugasCreateTaskPage> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
 
@@ -38,41 +41,98 @@ class _PetugasCreateTaskPageState extends State<PetugasCreateTaskPage> {
     }
   }
 
-  void _submit() {
+  void _submit() async {
+    // Sync form data ke provider
+    final formNotifier = ref.read(createTaskFormProvider.notifier);
+    formNotifier.setBuildingType(_buildingType ?? '');
+    formNotifier.setArea(_areaName ?? '');
+    formNotifier.setRiskLevel(_riskLevel ?? '');
+    formNotifier.setNotes(_notesController.text);
+    formNotifier.setRootCause(_rootCauseController.text);
+
+    // Show loading dialog
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Submit Sukses')]),
-        content: const Text('Laporan Inspeksi Anda berhasil divalidasi dan tersimpan di database. Apakah Anda ingin meneruskan laporan (Share) ke PIC via WhatsApp?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // close dialog
-              Navigator.of(context).pop(); // exit report wizard
-            },
-            child: const Text('TUTUP SAJA', style: TextStyle(color: Colors.grey)),
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Mengirim laporan...', style: TextStyle(fontSize: 16)),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final msg = 'Laporan Baru: $_formalTitle\nBgn $_buildingType.\nNotes: ${_notesController.text}';
-              final url = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(msg)}');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url);
-              }
-              if (context.mounted) {
-                Navigator.of(context).pop(); // close dialog
-                Navigator.of(context).pop(); // exit report wizard
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, foregroundColor: Colors.white, elevation: 0),
-            icon: const Icon(Icons.share),
-            label: const Text('Buka WhatsApp'),
-          )
-        ],
+        ),
       ),
     );
+
+    // Submit ke backend
+    final success = await formNotifier.submitTask();
+
+    // Close loading dialog
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    if (success) {
+      // Show success dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 8), Text('Submit Sukses')]),
+          content: const Text('Laporan Inspeksi Anda berhasil divalidasi dan tersimpan di database. Apakah Anda ingin meneruskan laporan (Share) ke PIC via WhatsApp?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // close dialog
+                Navigator.of(context).pop(); // exit report wizard
+              },
+              child: const Text('TUTUP SAJA', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final msg = 'Laporan Baru: $_formalTitle\nBgn $_buildingType.\nNotes: ${_notesController.text}';
+                final url = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(msg)}');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url);
+                }
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // close dialog
+                  Navigator.of(context).pop(); // exit report wizard
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, foregroundColor: Colors.white, elevation: 0),
+              icon: const Icon(Icons.share),
+              label: const Text('Buka WhatsApp'),
+            )
+          ],
+        ),
+      );
+    } else {
+      // Show error dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(children: [Icon(Icons.error, color: Colors.red), SizedBox(width: 8), Text('Submit Gagal')]),
+          content: const Text('Gagal mengirim laporan. Status code 422 - Validasi error dari backend. Silakan periksa kembali data Anda atau hubungi administrator.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override

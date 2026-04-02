@@ -20,6 +20,31 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
   AreaModel? _selectedArea;
 
   @override
+  void initState() {
+    super.initState();
+    // TODO: Nanti jika sudah ada API building type, filter areas by building type di sini
+    // final buildingType = ref.read(createTaskFormProvider).buildingType;
+    // Untuk sekarang, tampilkan semua areas tanpa filter
+
+    // Load selected area dari state provider jika ada
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final draft = ref.read(createTaskFormProvider);
+      final areasAsync = ref.read(areaProvider);
+      final areas = areasAsync.valueOrNull ?? [];
+
+      if (draft.areaId != null && areas.isNotEmpty) {
+        final existingArea = areas.firstWhere(
+          (area) => area.id == draft.areaId,
+          orElse: () => areas.first,
+        );
+        setState(() {
+          _selectedArea = existingArea;
+        });
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final areasAsync = ref.watch(areaProvider);
 
