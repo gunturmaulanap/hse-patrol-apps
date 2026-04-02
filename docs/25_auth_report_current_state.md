@@ -1,26 +1,30 @@
-# 25. Auth + Report Current State (April 2026)
+# 25. Auth + Report Current State (Production Backend)
 
-## Ringkasan status saat ini
+## Ringkasan
 
-Dokumen ini menjelaskan kondisi implementasi **auth** dan **report petugas screens** setelah integrasi backend terbaru.
+Dokumen ini merekam kondisi terbaru integrasi auth + report saat backend sudah masuk tahap production.
+
+Fokus perubahan:
+
+1. login membaca payload production terbaru (`token`, `role_id`, `role_name`),
+2. task dan area kembali menggunakan data backend sebagai source of truth,
+3. fallback mock untuk alur auth/report/create task dilepas.
 
 ---
 
-## 1) Auth flow (login + role + redirect)
+## 1) Auth flow production
 
-### Endpoint yang dipakai
+### Endpoint
 
 - `POST /login`
 - `GET /me`
 - `POST /logout`
 
-Base URL mengikuti `AppEnv.baseUrl`:
+Base URL:
 
 - `https://mes.aksamala.co.id/api`
 
-### Format response login yang didukung
-
-Frontend sekarang memproses response seperti ini secara defensif:
+### Contoh response login yang dipakai
 
 ```json
 {
@@ -31,140 +35,103 @@ Frontend sekarang memproses response seperti ini secara defensif:
     "id": 35,
     "name": "Abdul Majid",
     "email": "abdulmajid@aksamala.co.id",
-    "role": "pic_area"
+    "role_id": 22,
+    "role_name": "HSE"
   }
 }
 ```
 
 ### Mapping role backend -> role app
 
-Field `user.role` dari backend dipetakan sebagai berikut:
+Frontend memetakan role dari kombinasi `role_id`, `role_name`, dan fallback `role`:
 
-- `pic_area` -> `UserRole.pic`
-- `hse_staff` -> `UserRole.petugasHse`
-- `hse_supervisor` -> `UserRole.petugasHse`
-- fallback string yang mengandung `pic` -> `UserRole.pic`
-- fallback string yang mengandung `hse`/`petugas` -> `UserRole.petugasHse`
+- `role_id == 12` -> `UserRole.pic`
+- `role_id == 22` -> `UserRole.petugasHse`
+- `role_name` mengandung `pic` -> `UserRole.pic`
+- `role_name` mengandung `supervisor` -> `UserRole.hseSupervisor`
+- `role_name` mengandung `hse` -> `UserRole.petugasHse`
 
-### Dampak routing
+### Redirect setelah login
 
-Setelah login sukses:
-
-- role PIC diarahkan ke route PIC home
-- role HSE staff/supervisor diarahkan ke route Petugas home
-
-Masalah sebelumnya “semua role masuk ke petugas home” terjadi karena role belum tersedia pada payload lama / fallback default role. Dengan payload baru yang menyertakan role, redirect sudah bisa terbedakan.
+- `pic` -> PIC home
+- `hseSupervisor` -> Supervisor home
+- selain itu -> Petugas home
 
 ---
 
-## 2) Storage dan inisialisasi web
+## 2) Storage/session
 
-Perbaikan penting:
+Token tetap disimpan via `SessionManager` + `SecureStorageService`.
 
-- storage web tidak lagi menggunakan null-assert langsung ke shared preferences
-- dilakukan lazy init + explicit init saat app startup
-- `main()` memanggil:
-  - `SecureStorageService.init()`
-  - `DioClient.initInterceptors()`
-
-Tujuan:
-
-- mencegah error `Unexpected null value` di Flutter Web ketika token disimpan/dibaca.
+Pada web, penyimpanan memakai `SharedPreferences` melalui inisialisasi aman (`SecureStorageService.init()`), sehingga tidak bergantung null assertion.
 
 ---
 
-## 3) Report data source backend
+## 3) Report & area source of truth
 
-### Endpoint list report
+### Task list
+
+Provider task sekarang mengambil data langsung dari backend:
 
 - `GET /hse-reports`
 
-### Parsing list dibuat defensif
+Tidak ada fallback ke mock database pada provider task utama.
 
-Frontend sekarang mendukung kemungkinan bentuk response:
+### Area list
 
-- root array
-- wrapper `data: []`
-- wrapper nested `data.data: []`
-- wrapper `items: []`
-- nested `data.items: []`
+Provider area mengambil data backend:
 
-### Parsing title untuk report card
+- `GET /areas`
 
-- Jika backend mengirim `title`, maka dipakai sebagai judul utama.
-- Jika tidak ada `title`, fallback ke `name`.
-- Jika keduanya kosong, UI membentuk title dengan format:
-
-```text
-Inspeksi <area> - Masalah: <rootCause>
-```
-
-> Catatan: area fallback sementara bisa berupa `Area #<areaId>` jika backend list belum mengirim nama area.
+Tidak ada fallback ke mock area.
 
 ---
 
-## 4) Integrasi backend pada 3 layar Petugas
+## 4) Create task (production)
 
-Layar berikut tidak lagi mengambil data dari `mockDatabaseProvider` untuk list task utama:
+Create task tetap melalui backend:
 
-1. `petugas_home_screen.dart`
-2. `petugas_all_tasks_screen.dart`
-3. `petugas_calendar_screen.dart`
+- `POST /hse-reports`
 
-Ketiganya sekarang memakai provider backend map-ready:
+Response create terbaru sudah berbentuk wrapper `data` dan digunakan sebagai sumber data utama.
 
-- `petugasReportMapsProvider`
+Perubahan penting:
 
-Provider ini:
-
-- fetch list report dari backend
-- normalisasi status (`pending`, `followupdone`, `approved`, dll)
-- menyiapkan field UI (`title`, `area`, `rootCause`, `status`, `date`, dll)
-
-### Mapping status backend -> UI
-
-- `pending` -> `Pending`
-- `followupdone` / `follow_up_done` -> `Follow Up Done`
-- `approved` / `completed` -> `Completed`
-- `reject` / `rejected` -> `Pending`
-- `canceled` / `cancelled` -> `Canceled`
+- tidak lagi menulis report ke mock database setelah submit,
+- tidak ada fallback success palsu jika request backend gagal,
+- provider task di-`invalidate` setelah submit sukses agar UI memuat ulang data backend terbaru.
 
 ---
 
-## 5) Known limitations (sementara)
+## 5) Catatan parsing response
 
-1. **Area name**
-   - Jika endpoint list report belum mengirim `area_name`/`area.name`, UI fallback ke `Area #<id>`.
+### Login
 
-2. **Role source of truth**
-   - Role idealnya konsisten di login dan `/me`.
-   - Bila `/me` gagal, app masih dapat fallback ke user hasil login.
+- field token utama: `token`
+- fallback kompatibilitas masih mengizinkan `access_token` bila ada
+- user diparsing dari `user` root atau wrapper yang valid
 
-3. **Mock data masih ada di modul lain**
-   - Beberapa screen/page lain di project masih memakai mock provider untuk kebutuhan demo.
+### Report create/list/detail
 
----
+Parser task mendukung:
 
-## 6) Rekomendasi lanjutan
-
-1. Tambahkan contract response backend resmi untuk:
-   - list report (`title`, `area_name`, `created_at`, status enum final)
-   - `/me` (role enum final)
-
-2. Jika memungkinkan, standardisasi field role backend (mis. enum tunggal) agar mapping frontend lebih sederhana.
-
-3. Tambahkan integration test minimal untuk:
-   - login PIC vs HSE redirect
-   - fallback title format
-   - list report kosong/error state per layar
+- `id`, `user_id`, `area_id` bisa berupa int/string,
+- `photos` bisa berupa list atau object (`photo1`, `photo2`, dst),
+- `created_at` dipakai sebagai fallback tanggal jika `date` tidak tersedia.
 
 ---
 
-## 7) File yang terkait langsung dengan perubahan saat ini
+## 6) Scope yang sudah production-backed
 
-- `lib/features/auth/data/models/user_model.dart`
-- `lib/features/reports/data/datasource/report_remote_datasource.dart`
-- `lib/features/reports/presentation/providers/report_provider.dart`
-- `lib/features/reports/presentation/screens/petugas_home_screen.dart`
-- `lib/features/reports/presentation/screens/petugas_all_tasks_screen.dart`
-- `lib/features/reports/presentation/screens/petugas_calendar_screen.dart`
+Modul yang sudah kembali backend-driven untuk alur utama:
+
+- auth login/logout/me,
+- task list provider (petugas/supervisor dashboard flows),
+- area provider,
+- create task submit + refresh list.
+
+---
+
+## 7) Sisa modul non-target
+
+Beberapa screen lama di luar scope auth/report utama (khusus demo/legacy PIC flow tertentu) masih memiliki ketergantungan mock dan perlu migrasi terpisah jika ingin full backend-only untuk seluruh aplikasi.

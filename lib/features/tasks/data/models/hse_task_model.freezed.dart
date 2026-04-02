@@ -39,6 +39,7 @@ mixin _$HseTaskModel {
   List<Map<String, dynamic>> get followUps =>
       throw _privateConstructorUsedError;
   String? get date => throw _privateConstructorUsedError;
+  String? get userName => throw _privateConstructorUsedError;
 
   /// Serializes this HseTaskModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -69,7 +70,8 @@ abstract class $HseTaskModelCopyWith<$Res> {
       @JsonKey(name: 'pic_token') String? picToken,
       List<String> photos,
       List<Map<String, dynamic>> followUps,
-      String? date});
+      String? date,
+      String? userName});
 }
 
 /// @nodoc
@@ -100,6 +102,7 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
     Object? photos = null,
     Object? followUps = null,
     Object? date = freezed,
+    Object? userName = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -154,6 +157,10 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
           ? _value.date
           : date // ignore: cast_nullable_to_non_nullable
               as String?,
+      userName: freezed == userName
+          ? _value.userName
+          : userName // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -161,8 +168,8 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
 /// @nodoc
 abstract class _$$HseTaskModelImplCopyWith<$Res>
     implements $HseTaskModelCopyWith<$Res> {
-  factory _$$HseTaskModelImplCopyWith(_$HseTaskModelImpl value,
-          $Res Function(_$HseTaskModelImpl) then) =
+  factory _$$HseTaskModelImplCopyWith(
+          _$HseTaskModelImpl value, $Res Function(_$HseTaskModelImpl) then) =
       __$$HseTaskModelImplCopyWithImpl<$Res>;
   @override
   @useResult
@@ -179,7 +186,8 @@ abstract class _$$HseTaskModelImplCopyWith<$Res>
       @JsonKey(name: 'pic_token') String? picToken,
       List<String> photos,
       List<Map<String, dynamic>> followUps,
-      String? date});
+      String? date,
+      String? userName});
 }
 
 /// @nodoc
@@ -208,6 +216,7 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
     Object? photos = null,
     Object? followUps = null,
     Object? date = freezed,
+    Object? userName = freezed,
   }) {
     return _then(_$HseTaskModelImpl(
       id: null == id
@@ -262,6 +271,10 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
           ? _value.date
           : date // ignore: cast_nullable_to_non_nullable
               as String?,
+      userName: freezed == userName
+          ? _value.userName
+          : userName // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -282,7 +295,8 @@ class _$HseTaskModelImpl implements _HseTaskModel {
       @JsonKey(name: 'pic_token') this.picToken,
       final List<String> photos = const [],
       final List<Map<String, dynamic>> followUps = const [],
-      this.date})
+      this.date,
+      this.userName})
       : _photos = photos,
         _followUps = followUps;
 
@@ -334,10 +348,12 @@ class _$HseTaskModelImpl implements _HseTaskModel {
 
   @override
   final String? date;
+  @override
+  final String? userName;
 
   @override
   String toString() {
-    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date)';
+    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date, userName: $userName)';
   }
 
   @override
@@ -361,7 +377,9 @@ class _$HseTaskModelImpl implements _HseTaskModel {
             const DeepCollectionEquality().equals(other._photos, _photos) &&
             const DeepCollectionEquality()
                 .equals(other._followUps, _followUps) &&
-            (identical(other.date, date) || other.date == date));
+            (identical(other.date, date) || other.date == date) &&
+            (identical(other.userName, userName) ||
+                other.userName == userName));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -380,7 +398,8 @@ class _$HseTaskModelImpl implements _HseTaskModel {
       picToken,
       const DeepCollectionEquality().hash(_photos),
       const DeepCollectionEquality().hash(_followUps),
-      date);
+      date,
+      userName);
 
   /// Create a copy of HseTaskModel
   /// with the given fields replaced by the non-null parameter values.
@@ -388,8 +407,7 @@ class _$HseTaskModelImpl implements _HseTaskModel {
   @override
   @pragma('vm:prefer-inline')
   _$$HseTaskModelImplCopyWith<_$HseTaskModelImpl> get copyWith =>
-      __$$HseTaskModelImplCopyWithImpl<_$HseTaskModelImpl>(
-          this, _$identity);
+      __$$HseTaskModelImplCopyWithImpl<_$HseTaskModelImpl>(this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
@@ -413,7 +431,8 @@ abstract class _HseTaskModel implements HseTaskModel {
       @JsonKey(name: 'pic_token') final String? picToken,
       final List<String> photos,
       final List<Map<String, dynamic>> followUps,
-      final String? date}) = _$HseTaskModelImpl;
+      final String? date,
+      final String? userName}) = _$HseTaskModelImpl;
 
   factory _HseTaskModel.fromJson(Map<String, dynamic> json) =
       _$HseTaskModelImpl.fromJson;
@@ -449,6 +468,8 @@ abstract class _HseTaskModel implements HseTaskModel {
   List<Map<String, dynamic>> get followUps;
   @override
   String? get date;
+  @override
+  String? get userName;
 
   /// Create a copy of HseTaskModel
   /// with the given fields replaced by the non-null parameter values.

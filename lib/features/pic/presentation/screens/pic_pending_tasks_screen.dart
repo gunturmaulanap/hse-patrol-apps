@@ -8,14 +8,17 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicPendingTasksScreen extends ConsumerWidget {
   const PicPendingTasksScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(mockDatabaseProvider);
     final user = ref.watch(currentUserProvider);
+    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final areasAsync = ref.watch(areaByUserProvider);
 
     // FIX: Redirect ke login jika user null
     if (user == null) {
@@ -32,17 +35,27 @@ class PicPendingTasksScreen extends ConsumerWidget {
       );
     }
 
-    final areaAccess = user.areaAccess;
+    final areaAccess = (areasAsync.valueOrNull ?? const [])
+        .map((a) => a.name)
+        .toSet();
+    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Filter Task:
     // 1. Hanya Area yang dimiliki PIC
     // 2. Status Pending (Termasuk Rejected yang revert ke Pending)
-    final pendingTasks = db.reports.where((r) {
+    final pendingTasks = reports.where((r) {
       final isMyArea = areaAccess.contains(r['area']);
       final isPending = r['status'] == 'Pending';
       return isMyArea && isPending;
     }).toList()
-      ..sort((a, b) => DateTime.parse(b['date'] as String).compareTo(DateTime.parse(a['date'] as String)));
+      ..sort((a, b) => _safeParseDate(b['date']?.toString()).compareTo(_safeParseDate(a['date']?.toString())));
+
+    if (reportsAsync.isLoading && pendingTasks.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     // Pisahkan mana yang benar-benar baru, mana yang Rejected (urgent)
     final rejectedTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Rejected').toList();
@@ -120,12 +133,12 @@ class PicPendingTasksScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     ...rejectedTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildExactTaskCard(
-                        context,
-                        title: _getMockTitle(task),
-                        area: task['area']?.toString() ?? '-',
-                        dateString: task['date']?.toString(),
-                        tag: 'Rejected',
+                        child: _buildExactTaskCard(
+                          context,
+                          title: _getReportTitle(task),
+                          area: task['area']?.toString() ?? '-',
+                          dateString: task['date']?.toString(),
+                          tag: 'Rejected',
                         reportId: task['id'].toString(),
                       ),
                     )),
@@ -138,12 +151,12 @@ class PicPendingTasksScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     ...newTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildExactTaskCard(
-                        context,
-                        title: _getMockTitle(task),
-                        area: task['area']?.toString() ?? '-',
-                        dateString: task['date']?.toString(),
-                        tag: 'Pending',
+                        child: _buildExactTaskCard(
+                          context,
+                          title: _getReportTitle(task),
+                          area: task['area']?.toString() ?? '-',
+                          dateString: task['date']?.toString(),
+                          tag: 'Pending',
                         reportId: task['id'].toString(),
                       ),
                     )),
@@ -170,7 +183,11 @@ class PicPendingTasksScreen extends ConsumerWidget {
     final status = report['status']?.toString() ?? 'Pending';
     if (status == 'Pending') {
       final followUps = report['followUps'] as List<dynamic>? ?? [];
-      final isRejected = followUps.any((f) => f['action'] == 'Rejected');
+      final isRejected = followUps.any((f) {
+        final action = (f['action']?.toString() ?? '').toLowerCase();
+        final followStatus = (f['status']?.toString() ?? '').toLowerCase();
+        return action == 'rejected' || followStatus == 'rejected';
+      });
       if (isRejected) return 'Rejected';
     }
     return 'Pending';
@@ -303,9 +320,20 @@ class PicPendingTasksScreen extends ConsumerWidget {
     } catch (e) { return '-'; }
   }
 
-  String _getMockTitle(Map<String, dynamic> report) {
+  DateTime _safeParseDate(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String _getReportTitle(Map<String, dynamic> report) {
+    final title = report['title']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
-    return 'Temuan: $cause';
+    return 'Inspeksi $area - Masalah: $cause';
   }
 }
 

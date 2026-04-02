@@ -8,9 +8,9 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
 import '../../../follow_up/data/models/create_follow_up_request.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicFollowUpReviewScreen extends ConsumerStatefulWidget {
   const PicFollowUpReviewScreen({super.key});
@@ -26,7 +26,6 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
     setState(() => _isSaving = true);
 
     final draft = ref.read(picFollowUpFormProvider);
-    final db = ref.read(mockDatabaseProvider);
 
     try {
       if (draft.reportId != null) {
@@ -50,13 +49,12 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
           photoFiles,
         );
 
-        // Update local mock database for UI consistency
-        db.updateReportStatus(
-          draft.reportId!,
-          'Follow Up Done',
-          picNotes: draft.notes,
-          picPhotos: draft.photos,
-        );
+        ref.invalidate(taskDetailMapProvider(draft.reportId!));
+        ref.invalidate(tasksFutureProvider);
+        ref.invalidate(petugasTaskMapsProvider);
+        ref.invalidate(supervisorOwnTaskMapsProvider);
+        ref.invalidate(supervisorStaffTaskMapsProvider);
+        ref.invalidate(supervisorAllVisibleTaskMapsProvider);
       }
 
       if (mounted) {

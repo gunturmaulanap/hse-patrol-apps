@@ -168,25 +168,49 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         ? json['title']?.toString().trim()
         : json['name']?.toString().trim();
 
+    final parsedPhotos = _parsePhotos(json['photos']);
+
     return HseTaskModel(
-      id: json['id'] as int? ?? 0,
+      id: _toInt(json['id']),
       code: json['code']?.toString() ?? '',
-      userId: json['user_id'] as int? ?? json['userId'] as int? ?? 0,
-      areaId: json['area_id'] as int? ?? json['areaId'] as int? ?? 0,
+      userId: _toInt(json['created_by'] ?? json['createdBy'] ?? json['user_id'] ?? json['userId']),
+      areaId: _toInt(json['area_id'] ?? json['areaId']),
       name: title,
       riskLevel: json['risk_level']?.toString() ?? json['riskLevel']?.toString() ?? '',
       rootCause: json['root_cause']?.toString() ?? json['rootCause']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       picToken: json['pic_token']?.toString() ?? json['picToken']?.toString(),
-      photos: json['photos'] != null
-          ? List<String>.from(json['photos'])
-          : [],
+      photos: parsedPhotos,
       followUps: json['follow_ups'] != null || json['followUps'] != null
           ? List<Map<String, dynamic>>.from(json['follow_ups'] ?? json['followUps'] ?? [])
           : [],
       date: json['date']?.toString() ?? json['created_at']?.toString(),
     );
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  List<String> _parsePhotos(dynamic raw) {
+    if (raw is List) {
+      return raw
+          .map((e) => e?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    if (raw is Map) {
+      return raw.values
+          .map((e) => e?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    return <String>[];
   }
 
   List<dynamic> _extractListData(dynamic raw) {
@@ -203,6 +227,11 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       }
 
       if (data is Map) {
+        final reports = data['reports'];
+        if (reports is List) {
+          return reports;
+        }
+
         final nested = data['data'];
         if (nested is List) {
           return nested;
@@ -217,6 +246,11 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       final items = map['items'];
       if (items is List) {
         return items;
+      }
+
+      final reports = map['reports'];
+      if (reports is List) {
+        return reports;
       }
     }
 

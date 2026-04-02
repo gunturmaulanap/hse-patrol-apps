@@ -8,6 +8,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../app/router/route_names.dart';
+import '../../../../core/mock_api/mock_database.dart';
 import '../providers/create_task_form_provider.dart';
 
 class CreateTaskReviewScreen extends ConsumerStatefulWidget {
@@ -19,6 +20,23 @@ class CreateTaskReviewScreen extends ConsumerStatefulWidget {
 
 class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen> {
   bool _isSubmitting = false;
+
+  void _goToHomeByRole(BuildContext context) {
+    final user = ref.read(currentUserProvider);
+    final role = user?.role;
+
+    if (role == 'supervisor') {
+      context.goNamed(RouteNames.supervisorHome);
+      return;
+    }
+
+    if (role == 'pic') {
+      context.goNamed(RouteNames.picHome);
+      return;
+    }
+
+    context.goNamed(RouteNames.petugasHome);
+  }
 
   void _submitData() async {
     setState(() => _isSubmitting = true);
@@ -40,7 +58,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
               text: 'Bagikan via WhatsApp',
               icon: const HugeIcon(
                 icon: HugeIcons.strokeRoundedShare01,
-                color: Colors.white,
+                color: Colors.black,
                 size: 20,
               ),
               onPressed: () async {
@@ -48,10 +66,9 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url);
                 }
-                if (ctx.mounted) {
-                  ctx.pop();
-                  context.goNamed(RouteNames.petugasHome);
-                }
+                if (!mounted || !ctx.mounted) return;
+                ctx.pop();
+                _goToHomeByRole(context);
               },
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -60,7 +77,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
               type: AppButtonType.outlined,
               onPressed: () {
                 ctx.pop();
-                context.goNamed(RouteNames.petugasHome);
+                _goToHomeByRole(context);
               },
             ),
           ],

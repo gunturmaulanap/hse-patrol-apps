@@ -7,25 +7,26 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../providers/active_area_filter_provider.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicFindingScreen extends ConsumerWidget {
   const PicFindingScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(mockDatabaseProvider);
     final activeArea = ref.watch(activeAreaFilterProvider);
+    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Ambil data task khusus untuk area yang dipilih.
     // Sembunyikan task yang sudah di Canceled oleh petugas.
-    final tasksInArea = db.reports.where((r) {
-      final isAreaMatch = r['area'] == activeArea;
+    final tasksInArea = reports.where((r) {
+      final isAreaMatch = (r['area']?.toString() ?? '') == activeArea;
       final isNotCanceled = r['status'] != 'Canceled';
       return isAreaMatch && isNotCanceled;
     }).toList()
-      ..sort((a, b) => DateTime.parse(b['date'] as String).compareTo(DateTime.parse(a['date'] as String)));
+      ..sort((a, b) => _safeParseDate(b['date']?.toString()).compareTo(_safeParseDate(a['date']?.toString())));
 
     // Hitung status untuk insight
     final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
@@ -149,13 +150,13 @@ class PicFindingScreen extends ConsumerWidget {
                         final task = tasksInArea[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildExactTaskCard(
-                            context,
-                            title: _getMockTitle(task),
-                            dateString: task['date']?.toString(),
-                            rawStatus: task['status']?.toString() ?? 'Pending',
-                            tag: _getPicStatusTag(task),
-                            reportId: task['id'].toString(),
+                            child: _buildExactTaskCard(
+                              context,
+                              title: _getReportTitle(task),
+                              dateString: task['date']?.toString(),
+                              rawStatus: task['status']?.toString() ?? 'Pending',
+                              tag: _getPicStatusTag(task),
+                              reportId: task['id'].toString(),
                           ),
                         );
                       },
@@ -308,9 +309,20 @@ class PicFindingScreen extends ConsumerWidget {
     } catch (e) { return '-'; }
   }
 
-  String _getMockTitle(Map<String, dynamic> report) {
+  DateTime _safeParseDate(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String _getReportTitle(Map<String, dynamic> report) {
+    final title = report['title']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
-    return 'Temuan: $cause';
+    return 'Inspeksi $area - Masalah: $cause';
   }
 }
 

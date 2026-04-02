@@ -52,4 +52,5 @@ flutter:
     - lib/assets/calendar.svg
     - lib/assets/tasks.svg
     - lib/assets/home.svg
-    - lib/assets/logos/hse-aksamala.png
+    - lib/assets/logos/hse-logo.png
+    - lib/assets/logos/hse-logo-label.png

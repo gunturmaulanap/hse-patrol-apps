@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_radius.dart';
@@ -23,6 +24,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _errorMessage;
+
+  // State untuk toggle hide/show password
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -100,28 +104,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (!mounted) return;
           context.goNamed(targetRoute);
         } else {
-          final db = ref.read(mockDatabaseProvider);
-          final mockUser = db.findUserByEmailAndPassword(email, password);
-
-          if (mockUser != null) {
-            debugPrint('[LoginScreen] backend login failed, use mock role testing for: ${mockUser.email} (${mockUser.role})');
-            ref.read(currentUserProvider.notifier).state = mockUser;
-
-            final targetRoute = mockUser.role == 'pic'
-                ? RouteNames.picHome
-                : mockUser.role == 'supervisor'
-                    ? RouteNames.supervisorHome
-                    : RouteNames.petugasHome;
-
-            if (!mounted) return;
-            context.goNamed(targetRoute);
-            return;
-          }
-
           final errorState = ref.read(authNotifierProvider);
           setState(() {
-            _errorMessage = errorState.error ??
-                'Login gagal. Gunakan akun backend, atau akun mock email untuk testing role.';
+            _errorMessage = errorState.error ?? 'Login gagal. Periksa email dan password backend Anda.';
           });
         }
       }
@@ -152,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 // Logo or Icon Placeholder
                 Image.asset(
-                  'lib/assets/logos/hse-aksamala.png',
+                  'lib/assets/logos/hse-logo-label.png',
                   width: 160,
                   height: 160,
                   fit: BoxFit.contain,
@@ -178,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
-                  'Gunakan email backend. Untuk fallback mock testing role: staff/supervisor/pic.',
+                  'Gunakan akun backend production.',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -209,8 +194,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: 'Password',
                   hint: 'Masukkan password',
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   maxLines: 1,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? PhosphorIcons.eyeClosed(PhosphorIconsStyle.regular)
+                          : PhosphorIcons.eye(PhosphorIconsStyle.regular),
+                      color: AppColors.textSecondary,
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(
@@ -220,26 +219,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xxl),
 
-                // Info akun
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.surfaceVariant),
                     borderRadius: BorderRadius.circular(AppRadius.borderMd),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('INFORMASI:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: AppColors.primary, letterSpacing: 1.5)),
-                      const SizedBox(height: 8),
-                       Text(
-                         'Mock login (sementara):\n'
-                         '- hse_staff@aksamala.test / 123456\n'
-                         '- hse_supervisor@aksamala.test / 123456\n'
-                         '- pic_area@aksamala.test / 123456',
-                         style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                       ),
-                    ],
+                  child: const Text(
+                    'Login menggunakan endpoint backend production.',
+                    style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   ),
                 )
               ],

@@ -7,6 +7,8 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 import '../providers/active_area_filter_provider.dart';
 import '../widgets/area_card.dart';
 
@@ -16,10 +18,11 @@ class PicHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final db = ref.watch(mockDatabaseProvider);
+    final areasAsync = ref.watch(areaByUserProvider);
+    final reportsAsync = ref.watch(petugasTaskMapsProvider);
 
-    // Ambil daftar area yang bisa diakses oleh PIC
-    final areas = user?.areaAccess ?? [];
+    final areas = areasAsync.valueOrNull ?? const [];
+    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -92,7 +95,7 @@ class PicHomeScreen extends ConsumerWidget {
                   Text(
                     'Select an area to view and follow up tasks',
                     style: AppTypography.h3.copyWith(
-                      color: AppColors.textSecondary.withOpacity(0.8),
+                      color: AppColors.textSecondary.withValues(alpha: 0.8),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -115,26 +118,30 @@ class PicHomeScreen extends ConsumerWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final area = areas[index];
-                  
+                   
                   // Hitung jumlah task Pending dan Follow Up Done secara terpisah
-                  final tasksInArea = db.reports.where((r) => r['area'] == area).toList();
-                  
+                  final tasksInArea = reports.where((r) {
+                    final sameArea = (r['area']?.toString() ?? '') == area.name;
+                    final isNotCanceled = (r['status']?.toString() ?? '') != 'Canceled';
+                    return sameArea && isNotCanceled;
+                  }).toList();
+                   
                   // 1. Task Pending (Termasuk Rejected yang revert ke Pending) membutuhkan aksi PIC
                   final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
-                  
+                   
                   // 2. Task Follow Up Done yang sedang menunggu respon/approval Petugas
                   final waitingCount = tasksInArea.where((r) => r['status'] == 'Follow Up Done').length;
-                  
-                  final totalTasks = tasksInArea.where((r) => r['status'] != 'Canceled').length; // Abaikan yang dicancel petugas
+                   
+                  final totalTasks = tasksInArea.length;
 
                   return AreaCard(
-                    areaName: area,
+                    areaName: area.name,
                     pendingCount: pendingCount,
                     waitingResponseCount: waitingCount, // Pass data waiting
                     totalTasks: totalTasks, 
                     index: index, 
                     onTap: () {
-                      ref.read(activeAreaFilterProvider.notifier).state = area;
+                      ref.read(activeAreaFilterProvider.notifier).state = area.name;
                       context.pushNamed(RouteNames.picFinding);
                     },
                   );

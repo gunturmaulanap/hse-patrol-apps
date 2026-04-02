@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/router/app_router.dart';
@@ -8,6 +9,10 @@ import 'core/storage/secure_storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Hide navigation bar dan status bar untuk fullscreen experience
+  // Ini setara dengan SystemChrome.setEnabledSystemUIOverlays([]) di versi lama
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
 
   await SecureStorageService.init();
   await DioClient.initInterceptors();

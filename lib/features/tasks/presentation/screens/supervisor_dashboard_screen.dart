@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
 import '../providers/task_provider.dart';
 
 enum _DashboardMode { area, staff }
@@ -22,15 +23,6 @@ class SupervisorDashboardScreen extends ConsumerStatefulWidget {
 
 class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardScreen> {
   static const List<int> _pageSizes = [5, 10, 20];
-  static const List<String> _defaultAreas = [
-    'Area Produksi 1 - Mesin Bubut',
-    'Koridor Evakuasi Barat',
-    'Gudang Penyimpanan B',
-    'Area Parkir Timur',
-    'Ruang Rapat Utama',
-    'Kantin Karyawan',
-    'Area Loading Dock',
-  ];
 
   _DashboardMode _mode = _DashboardMode.area;
 
@@ -55,6 +47,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final areasAsync = ref.watch(areasFutureProvider);
     final tasksAsync = ref.watch(supervisorAllVisibleTaskMapsProvider);
 
     if (user == null || user.role != 'supervisor') {
@@ -70,6 +63,8 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     final allTasks = [...(tasksAsync.valueOrNull ?? <Map<String, dynamic>>[])]
       ..sort((a, b) => _parseDate(b['date']?.toString()).compareTo(_parseDate(a['date']?.toString())));
 
+    final areas = areasAsync.valueOrNull ?? [];
+
     if (tasksAsync.isLoading && allTasks.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -77,7 +72,11 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
       );
     }
 
-    final areaTabs = {..._defaultAreas, ...allTasks.map((e) => e['area']?.toString() ?? '').where((e) => e.trim().isNotEmpty)}.toList();
+    final areaTabs = {
+      ...areas.map((e) => e.name),
+      ...allTasks.map((e) => e['area']?.toString() ?? '').where((e) => e.trim().isNotEmpty)
+    }.toList()
+      ..sort();
     final staffTabs = allTasks
         .map((task) => task['staffName']?.toString().trim() ?? '')
         .where((name) => name.isNotEmpty)

@@ -4,6 +4,8 @@ class UserModel {
   final int id;
   final String name;
   final String email;
+  final int roleId;
+  final String roleName;
   final UserRole role;
   final String? phone;
   final bool isActive;
@@ -13,6 +15,8 @@ class UserModel {
     this.id = 0,
     this.name = '',
     this.email = '',
+    this.roleId = 0,
+    this.roleName = '',
     this.role = UserRole.petugasHse,
     this.phone,
     this.isActive = true,
@@ -30,7 +34,13 @@ class UserModel {
       id: _toInt(map['id']),
       name: _toSafeString(map['name']),
       email: _toSafeString(map['email']),
-      role: _parseUserRole(map['role']?.toString()),
+      roleId: _toInt(map['role_id'] ?? map['roleId']),
+      roleName: _toSafeString(map['role_name'] ?? map['roleName']),
+      role: _parseUserRole(
+        roleName: map['role_name']?.toString() ?? map['roleName']?.toString(),
+        roleRaw: map['role']?.toString(),
+        roleId: _toInt(map['role_id'] ?? map['roleId']),
+      ),
       phone: _toNullableString(map['phone']),
       isActive: _toBool(
         map['is_active'] ?? map['isActive'],
@@ -47,6 +57,8 @@ class UserModel {
       'id': id,
       'name': name,
       'email': email,
+      'role_id': roleId,
+      'role_name': roleName,
       'role': role.name,
       'phone': phone,
       'is_active': isActive,
@@ -58,6 +70,8 @@ class UserModel {
     int? id,
     String? name,
     String? email,
+    int? roleId,
+    String? roleName,
     UserRole? role,
     String? phone,
     bool? isActive,
@@ -67,6 +81,8 @@ class UserModel {
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
+      roleId: roleId ?? this.roleId,
+      roleName: roleName ?? this.roleName,
       role: role ?? this.role,
       phone: phone ?? this.phone,
       isActive: isActive ?? this.isActive,
@@ -75,10 +91,26 @@ class UserModel {
   }
 }
 
-UserRole _parseUserRole(String? roleString) {
-  if (roleString == null) return UserRole.petugasHse;
+UserRole _parseUserRole({
+  String? roleName,
+  String? roleRaw,
+  int? roleId,
+}) {
+  if (roleId == 12) {
+    return UserRole.pic;
+  }
 
-  final normalized = roleString.toLowerCase().trim();
+  if (roleId == 22) {
+    return UserRole.petugasHse;
+  }
+
+  final source = (roleName != null && roleName.trim().isNotEmpty)
+      ? roleName
+      : roleRaw;
+
+  if (source == null) return UserRole.petugasHse;
+
+  final normalized = source.toLowerCase().trim();
 
   if (normalized == 'pic_area') {
     return UserRole.pic;
@@ -90,6 +122,18 @@ UserRole _parseUserRole(String? roleString) {
 
   if (normalized == 'hse_supervisor') {
     return UserRole.hseSupervisor;
+  }
+
+  if (normalized == 'pic area') {
+    return UserRole.pic;
+  }
+
+  if (normalized == 'hse supervisor') {
+    return UserRole.hseSupervisor;
+  }
+
+  if (normalized == 'hse') {
+    return UserRole.petugasHse;
   }
 
   if (normalized == 'pic' || normalized.contains('pic')) {

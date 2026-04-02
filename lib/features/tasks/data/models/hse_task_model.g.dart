@@ -27,10 +27,10 @@ _$HseTaskModelImpl _$$HseTaskModelImplFromJson(Map<String, dynamic> json) =>
               .toList() ??
           const [],
       date: json['date'] as String?,
+      userName: json['userName'] as String?,
     );
 
-Map<String, dynamic> _$$HseTaskModelImplToJson(
-        _$HseTaskModelImpl instance) =>
+Map<String, dynamic> _$$HseTaskModelImplToJson(_$HseTaskModelImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'code': instance.code,
@@ -45,4 +45,5 @@ Map<String, dynamic> _$$HseTaskModelImplToJson(
       'photos': instance.photos,
       'followUps': instance.followUps,
       'date': instance.date,
+      'userName': instance.userName,
     };

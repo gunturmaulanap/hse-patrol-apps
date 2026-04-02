@@ -8,6 +8,8 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicAllTasksScreen extends ConsumerStatefulWidget {
   const PicAllTasksScreen({super.key});
@@ -29,7 +31,8 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final db = ref.watch(mockDatabaseProvider);
+    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final areasAsync = ref.watch(areaByUserProvider);
 
     // FIX: Redirect ke login jika user null
     if (user == null) {
@@ -46,13 +49,23 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       );
     }
 
-    final areaAccess = user.areaAccess;
+    final areaAccess = (areasAsync.valueOrNull ?? const [])
+        .map((a) => a.name)
+        .toSet();
+    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Filter base data: Hanya ambil task yang areanya diizinkan untuk PIC ini
     // Dan hilangkan yang statusnya Canceled (Dihapus dari pandangan PIC)
-    final picReports = db.reports.where((r) {
+    final picReports = reports.where((r) {
       return areaAccess.contains(r['area']) && r['status'] != 'Canceled';
     }).toList();
+
+    if (reportsAsync.isLoading && picReports.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return DefaultTabController(
       length: 5,
@@ -154,7 +167,11 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     final status = report['status']?.toString() ?? 'Pending';
     if (status == 'Pending') {
       final followUps = report['followUps'] as List<dynamic>? ?? [];
-      final isRejected = followUps.any((f) => f['action'] == 'Rejected');
+      final isRejected = followUps.any((f) {
+        final action = (f['action']?.toString() ?? '').toLowerCase();
+        final status = (f['status']?.toString() ?? '').toLowerCase();
+        return action == 'rejected' || status == 'rejected';
+      });
       if (isRejected) return 'Rejected';
       return 'Pending';
     } else if (status == 'Completed') {
@@ -172,7 +189,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     // Filter tambahan berdasarkan Search
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((r) {
-        final title = _getMockTitle(r).toLowerCase();
+        final title = _getReportTitle(r).toLowerCase();
         final area = (r['area']?.toString() ?? '').toLowerCase();
         final query = _searchQuery.toLowerCase();
         return title.contains(query) || area.contains(query);
@@ -219,7 +236,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: _buildExactTaskCard(
                   context,
-                  title: _getMockTitle(task),
+                  title: _getReportTitle(task),
                   dateString: task['date']?.toString(),
                   tag: tag,
                   reportId: task['id'].toString(),
@@ -356,9 +373,13 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     } catch (e) { return '-'; }
   }
 
-  String _getMockTitle(Map<String, dynamic> report) {
+  String _getReportTitle(Map<String, dynamic> report) {
+    final title = report['title']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
-    return 'Temuan: $cause';
+    return 'Inspeksi $area - Masalah: $cause';
   }
 }
 

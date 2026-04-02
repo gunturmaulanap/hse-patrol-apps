@@ -6,6 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/mock_api/mock_database.dart';
 import '../../../../core/storage/session_manager.dart';
+import '../../../../core/utils/system_ui_helper.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -20,7 +21,27 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   @override
   void initState() {
     super.initState();
+    // Atur System UI ketika app pertama kali dibuka
+    _setupSystemUI();
     _init();
+  }
+
+  /// Atur System UI (Status Bar & Navigation Bar)
+  void _setupSystemUI() {
+    // Opsi 1: Edge to Edge (RECOMMENDED) - Konten memenuhi layar
+    SystemUIHelper.setSystemUIMode(mode: 'edgeToEdge');
+
+    // Opsi 2: Immersive Sticky - Sembunyikan navigation bar, muncul saat swipe
+    // SystemUIHelper.enableImmersiveMode(sticky: true);
+
+    // Opsi 3: Immersive Full - Sembunyikan semua system bars (fullscreen)
+    // SystemUIHelper.enableImmersiveMode(sticky: false);
+
+    // Atur orientasi layar ke portrait only (opsional)
+    SystemUIHelper.portraitOnly();
+
+    // Set status bar style untuk dark theme
+    SystemUIHelper.setStatusBarStyle(isDark: true);
   }
 
   Future<void> _init() async {
@@ -30,8 +51,14 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
     try {
       final sessionManager = ref.read(sessionManagerProvider);
-      final isLoggedIn = await sessionManager.isLoggedIn();
 
+      // DEBUG: Tampilkan token untuk verifikasi
+      final token = await sessionManager.getToken();
+      final role = await sessionManager.getRole();
+      debugPrint('[Splash] DEBUG: Token = ${token?.substring(0, 20) ?? 'null'}...');
+      debugPrint('[Splash] DEBUG: Role = $role');
+
+      final isLoggedIn = await sessionManager.isLoggedIn();
       debugPrint('[Splash] isLoggedIn: $isLoggedIn');
 
       if (!isLoggedIn) {
@@ -88,7 +115,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       backgroundColor: AppColors.background,
       body: Center(
         child: Image.asset(
-          'lib/assets/logos/hse-aksamala.png',
+          'lib/assets/logos/hse-logo.png',
           width: 220,
           fit: BoxFit.contain,
         ),

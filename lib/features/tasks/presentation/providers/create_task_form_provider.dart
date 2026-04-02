@@ -1,6 +1,6 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../../data/models/create_hse_task_request.dart';
 import 'task_provider.dart';
 
@@ -86,40 +86,17 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
       // Call backend API
       await taskRepo.createTask(request, photoFiles.isNotEmpty ? photoFiles : null);
 
-      // Update local mock database untuk UI consistency
-      final db = ref.read(mockDatabaseProvider);
-      db.addReport({
-        'id': 'rpt_${DateTime.now().millisecondsSinceEpoch}',
-        'buildingType': state.buildingType ?? '-',
-        'area': state.area ?? '-',
-        'riskLevel': state.riskLevel ?? '-',
-        'photos': state.photos,
-        'notes': state.notes ?? '-',
-        'rootCause': state.rootCause ?? '-',
-        'date': DateTime.now().toIso8601String(),
-        'status': 'Pending',
-      });
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(supervisorOwnTaskMapsProvider);
+      ref.invalidate(supervisorStaffTaskMapsProvider);
+      ref.invalidate(supervisorAllVisibleTaskMapsProvider);
+      ref.invalidate(supervisorStaffNamesProvider);
 
       return true;
     } catch (e) {
-      // Jika backend API gagal, fallback ke mock database untuk development
-      print('Error submitting to backend: $e');
-
-      // Simpan ke Mock Database sebagai fallback
-      final db = ref.read(mockDatabaseProvider);
-      db.addReport({
-        'id': 'rpt_${DateTime.now().millisecondsSinceEpoch}',
-        'buildingType': state.buildingType ?? '-',
-        'area': state.area ?? '-',
-        'riskLevel': state.riskLevel ?? '-',
-        'photos': state.photos,
-        'notes': state.notes ?? '-',
-        'rootCause': state.rootCause ?? '-',
-        'date': DateTime.now().toIso8601String(),
-        'status': 'Pending',
-      });
-
-      return true;
+      debugPrint('[CreateTaskFormNotifier] submitTask error: $e');
+      return false;
     }
   }
 }

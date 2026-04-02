@@ -12,6 +12,7 @@ import '../../../../core/mock_api/mock_database.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../pic/presentation/providers/pic_follow_up_provider.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
+import '../providers/task_provider.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   final String taskId;
@@ -25,7 +26,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   bool _isSubmitting = false;
 
   // Modal Penolakan Modern / Pembatalan / Persetujuan
-  void _handlePetugasReview(MockDatabase db, String action) async {
+  void _handlePetugasReview(Map<String, dynamic> rpt, String action) async {
     if (_isSubmitting) return;
 
     String? reason;
@@ -96,8 +97,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     });
 
     try {
-      // Get the latest follow-up for this report
-      final rpt = db.reports.firstWhere((r) => r['id'].toString() == widget.taskId.toString());
       final followUps = rpt['followUps'] as List<dynamic>? ?? [];
 
       if (followUps.isNotEmpty && (action == 'Approved' || action == 'Rejected')) {
@@ -118,14 +117,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           );
         }
       } else if (action == 'Canceled') {
-        // Handle cancel report - this might need a separate API call
-        // For now, just update local mock database
-        db.updateReportStatus(widget.taskId, action, rejectedReason: reason);
+        final taskRepo = ref.read(taskRepositoryProvider);
+        await taskRepo.cancelTask(int.parse(widget.taskId));
       } else {
-        // Fallback to mock database update
-        db.updateReportStatus(widget.taskId, action, rejectedReason: reason);
+        // No-op: no follow-up to process.
       }
 
+      ref.invalidate(taskDetailMapProvider(widget.taskId));
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(supervisorOwnTaskMapsProvider);
+      ref.invalidate(supervisorStaffTaskMapsProvider);
+      ref.invalidate(supervisorAllVisibleTaskMapsProvider);
+
+      if (!mounted) return;
       setState(() {});
 
       final snackBarMsg = action == 'Approved' ? 'Tugas Selesai!' : (action == 'Rejected' ? 'Perbaikan ditolak!' : 'Laporan Dibatalkan!');
@@ -138,22 +143,53 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         AppSnackBar.warning(context, message: snackBarMsg);
       }
     } catch (e) {
+      if (!mounted) return;
       AppSnackBar.error(context, message: 'Gagal memproses aksi: ${e.toString()}');
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final db = ref.watch(mockDatabaseProvider);
+    final detailAsync = ref.watch(taskDetailMapProvider(widget.taskId));
     final user = ref.watch(currentUserProvider);
 
-    final rptIndex = db.reports.indexWhere((r) => r['id'].toString() == widget.taskId.toString());
+    if (detailAsync.isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    if (rptIndex == -1) {
+    if (detailAsync.hasError) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () => context.pop(),
+          ),
+          title: Text('Detail', style: AppTypography.h3.copyWith(color: Colors.white)),
+        ),
+        body: Center(
+          child: Text(
+            'Gagal memuat detail laporan.',
+            style: AppTypography.body1.copyWith(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
+    final rpt = detailAsync.valueOrNull;
+
+    if (rpt == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -165,7 +201,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       );
     }
 
-    final rpt = db.reports[rptIndex];
     final isPic = user?.role == 'pic';
     final isPetugas = user?.role == 'petugas';
     final isSupervisor = user?.role == 'supervisor';
@@ -236,11 +271,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   // UX IMPROVEMENT: Danger Zone untuk membatalkan Task (Bawah Halaman)
                   if ((isPetugas || (isSupervisor && isSupervisorOwner)) &&
                       (status == 'Pending' || status == 'Follow Up Done'))
-                    _buildDangerZone(),
+                    _buildDangerZone(rpt),
                 ],
               ),
             ),
-            _buildFloatingActionArea(isPic, isPetugas, isSupervisor, isSupervisorOwner, status, db),
+            _buildFloatingActionArea(isPic, isPetugas, isSupervisor, isSupervisorOwner, status, rpt),
           ],
         ),
       ),
@@ -248,7 +283,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   // Helper Custom Card Danger Zone Pembatalan (User Friendly UX)
-  Widget _buildDangerZone() {
+  Widget _buildDangerZone(Map<String, dynamic> rpt) {
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(20),
@@ -284,8 +319,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
               ),
               onPressed: () {
-                final db = ref.read(mockDatabaseProvider);
-                _handlePetugasReview(db, 'Canceled');
+                _handlePetugasReview(rpt, 'Canceled');
               },
               child: Text(
                 'Batalkan Laporan Ini',
@@ -504,7 +538,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     bool isSupervisor,
     bool isSupervisorOwner,
     String status,
-    MockDatabase db,
+    Map<String, dynamic> rpt,
   ) {
     Widget? actionWidget;
 
@@ -523,14 +557,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             child: AppButton(
               text: 'Tolak',
               type: AppButtonType.outlined,
-              onPressed: () => _handlePetugasReview(db, 'Rejected'),
+              onPressed: () => _handlePetugasReview(rpt, 'Rejected'),
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: AppButton(
               text: 'Selesai',
-              onPressed: () => _handlePetugasReview(db, 'Approved'),
+              onPressed: () => _handlePetugasReview(rpt, 'Approved'),
             ),
           ),
         ],

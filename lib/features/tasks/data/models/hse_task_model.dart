@@ -19,6 +19,7 @@ class HseTaskModel with _$HseTaskModel {
     @Default([]) List<String> photos,
     @Default([]) List<Map<String, dynamic>> followUps,
     String? date,
+    String? userName,
   }) = _HseTaskModel;
 
   factory HseTaskModel.fromJson(Map<String, dynamic> json) => _$HseTaskModelFromJson(json);

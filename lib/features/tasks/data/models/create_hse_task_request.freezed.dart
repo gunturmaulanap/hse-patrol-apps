@@ -14,8 +14,7 @@ T _$identity<T>(T value) => value;
 final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
-CreateHseTaskRequest _$CreateHseTaskRequestFromJson(
-    Map<String, dynamic> json) {
+CreateHseTaskRequest _$CreateHseTaskRequestFromJson(Map<String, dynamic> json) {
   return _CreateHseTaskRequest.fromJson(json);
 }
 
@@ -104,8 +103,7 @@ class _$CreateHseTaskRequestCopyWithImpl<$Res,
 /// @nodoc
 abstract class _$$CreateHseTaskRequestImplCopyWith<$Res>
     implements $CreateHseTaskRequestCopyWith<$Res> {
-  factory _$$CreateHseTaskRequestImplCopyWith(
-          _$CreateHseTaskRequestImpl value,
+  factory _$$CreateHseTaskRequestImplCopyWith(_$CreateHseTaskRequestImpl value,
           $Res Function(_$CreateHseTaskRequestImpl) then) =
       __$$CreateHseTaskRequestImplCopyWithImpl<$Res>;
   @override
@@ -120,11 +118,9 @@ abstract class _$$CreateHseTaskRequestImplCopyWith<$Res>
 
 /// @nodoc
 class __$$CreateHseTaskRequestImplCopyWithImpl<$Res>
-    extends _$CreateHseTaskRequestCopyWithImpl<$Res,
-        _$CreateHseTaskRequestImpl>
+    extends _$CreateHseTaskRequestCopyWithImpl<$Res, _$CreateHseTaskRequestImpl>
     implements _$$CreateHseTaskRequestImplCopyWith<$Res> {
-  __$$CreateHseTaskRequestImplCopyWithImpl(
-      _$CreateHseTaskRequestImpl _value,
+  __$$CreateHseTaskRequestImplCopyWithImpl(_$CreateHseTaskRequestImpl _value,
       $Res Function(_$CreateHseTaskRequestImpl) _then)
       : super(_value, _then);
 
@@ -221,8 +217,9 @@ class _$CreateHseTaskRequestImpl implements _CreateHseTaskRequest {
   @override
   @pragma('vm:prefer-inline')
   _$$CreateHseTaskRequestImplCopyWith<_$CreateHseTaskRequestImpl>
-      get copyWith => __$$CreateHseTaskRequestImplCopyWithImpl<
-          _$CreateHseTaskRequestImpl>(this, _$identity);
+      get copyWith =>
+          __$$CreateHseTaskRequestImplCopyWithImpl<_$CreateHseTaskRequestImpl>(
+              this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {

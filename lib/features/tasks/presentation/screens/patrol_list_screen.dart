@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/status_badge.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../providers/task_provider.dart';
 
 class PatrolListScreen extends ConsumerStatefulWidget {
   const PatrolListScreen({super.key});
@@ -17,11 +18,51 @@ class PatrolListScreen extends ConsumerStatefulWidget {
 class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
   @override
   Widget build(BuildContext context) {
-    final mockDb = ref.watch(mockDatabaseProvider);
-    final reports = mockDb.reports;
+    final user = ref.watch(currentUserProvider);
+    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+
+    // Redirect ke login jika user null atau bukan petugas
+    if (user == null || user.role != 'petugas') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed('login');
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+
+    if (reportsAsync.isLoading && reports.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (reportsAsync.hasError && reports.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Gagal memuat data patroli dari backend.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
         title: const Text('Riwayat Patroli'),
       ),
       body: reports.isEmpty
@@ -32,11 +73,13 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
               separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
               itemBuilder: (context, index) {
                 final rpt = reports[index];
-                final dateStr = rpt['date'] as String;
-                final date = DateTime.tryParse(dateStr);
-                final formattedDate = date != null ? '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}' : '-';
+                final dateStr = rpt['date']?.toString();
+                final date = DateTime.tryParse(dateStr ?? '');
+                final formattedDate = date != null ? DateFormat('dd/MM/yyyy HH:mm').format(date) : '-';
 
-                final formalTitle = 'Inspeksi ${rpt['area'] ?? '-'} - Peringatan: ${rpt['riskLevel'] ?? '-'}';
+                final area = rpt['area']?.toString() ?? '-';
+                final riskLevel = rpt['riskLevel']?.toString() ?? '-';
+                final status = rpt['status']?.toString() ?? 'Pending';
 
                 return AppCard(
                   onTap: () {
@@ -66,7 +109,7 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              rpt['area'] ?? '-',
+                              area,
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -87,13 +130,13 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           StatusBadge(
-                            text: rpt['status'] ?? 'Pending',
-                            backgroundColor: _getStatusColor(rpt['status'] ?? 'Pending'),
+                            text: status,
+                            backgroundColor: _getStatusColor(status),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           StatusBadge(
-                            text: rpt['riskLevel'] ?? 'Ringan',
-                            backgroundColor: _getRiskLevelColor(rpt['riskLevel'] ?? 'Ringan'),
+                            text: riskLevel,
+                            backgroundColor: _getRiskLevelColor(riskLevel),
                             type: BadgeType.risk,
                           ),
                         ],
@@ -108,9 +151,14 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'completed':
       case 'approved':
         return AppColors.statusApproved;
       case 'rejected':
+        return AppColors.statusRejected;
+      case 'follow up done':
+        return const Color(0xFFFAFF9F);
+      case 'canceled':
         return AppColors.statusRejected;
       case 'pending':
       default:
@@ -119,16 +167,13 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
   }
 
   Color _getRiskLevelColor(String level) {
-    switch (level.toLowerCase()) {
-      case 'kritis':
-        return AppColors.riskCritical;
-      case 'berat':
-        return AppColors.riskHigh;
-      case 'sedang':
-        return AppColors.riskMedium;
-      case 'ringan':
-      default:
-        return AppColors.riskLow;
-    }
+    final value = level.toLowerCase();
+
+    if (value.contains('ringan') || value == '1') return AppColors.riskLow;
+    if (value.contains('menengah') || value == 'sedang' || value == '2') return AppColors.riskMedium;
+    if (value.contains('berat') || value == '3') return AppColors.riskHigh;
+    if (value.contains('kritis') || value == '4') return AppColors.riskCritical;
+
+    return AppColors.riskLow;
   }
 }

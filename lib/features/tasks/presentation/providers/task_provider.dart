@@ -5,6 +5,7 @@ import '../../data/repositories/task_repository_impl.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../../data/models/hse_task_model.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
 
 final taskRemoteDataSourceProvider = Provider<TaskRemoteDataSource>((ref) {
   return TaskRemoteDataSourceImpl();
@@ -20,84 +21,99 @@ final tasksFutureProvider = FutureProvider<List<HseTaskModel>>((ref) async {
   return repository.getTasks();
 });
 
-final petugasTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final currentUser = ref.watch(currentUserProvider);
-  final isMockRoleTesting = (currentUser?.email ?? '').toLowerCase().endsWith('@aksamala.test');
-
-  if (isMockRoleTesting) {
-    final db = ref.read(mockDatabaseProvider);
-    final mapped = db.reports.map((task) {
-      final areaName = task['area']?.toString() ?? 'Unknown Area';
-      final rootCause = task['rootCause']?.toString() ?? '-';
-
-      return <String, dynamic>{
-        'id': task['id']?.toString() ?? '',
-        'title': (task['title']?.toString().trim().isNotEmpty ?? false)
-            ? task['title'].toString().trim()
-            : 'Inspeksi $areaName - Masalah: $rootCause',
-        'area': areaName,
-        'rootCause': rootCause,
-        'notes': task['notes']?.toString() ?? '-',
-        'riskLevel': task['riskLevel']?.toString() ?? '-',
-        'status': _normalizeStatus(task['status']?.toString() ?? 'Pending'),
-        'date': task['date']?.toString(),
-        'userId': _toInt(task['userId']),
-        'staffName': task['staffName']?.toString() ?? 'HSE Staff Demo',
-      };
-    }).toList();
-
-    if (currentUser?.role == 'petugas') {
-      final currentUserId = _toInt(currentUser?.id);
-      return mapped.where((task) => _toInt(task['userId']) == currentUserId).toList();
-    }
-
-    return mapped;
+final taskDetailMapProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, taskId) async {
+  final id = int.tryParse(taskId);
+  if (id == null) {
+    throw Exception('ID task tidak valid: $taskId');
   }
 
-  try {
-    final tasks = await ref.watch(tasksFutureProvider.future);
-
-    return tasks.map((task) {
-      final areaName = _resolveAreaName(task);
-      final title = _resolveTitle(task, areaName);
-
-      return <String, dynamic>{
-        'id': task.id.toString(),
-        'title': title,
-        'area': areaName,
-        'rootCause': task.rootCause,
-        'notes': task.notes,
-        'riskLevel': '-',
-        'status': _normalizeStatus(task.status),
-        'date': task.date,
-        'userId': task.userId,
-        'staffName': _resolveStaffName(task),
-      };
-    }).toList();
-  } catch (_) {
-    final db = ref.read(mockDatabaseProvider);
-
-    return db.reports.map((task) {
-      final areaName = task['area']?.toString() ?? 'Unknown Area';
-      final rootCause = task['rootCause']?.toString() ?? '-';
-
-      return <String, dynamic>{
-        'id': task['id']?.toString() ?? '',
-        'title': (task['title']?.toString().trim().isNotEmpty ?? false)
-            ? task['title'].toString().trim()
-            : 'Inspeksi $areaName - Masalah: $rootCause',
-        'area': areaName,
-        'rootCause': rootCause,
-        'notes': task['notes']?.toString() ?? '-',
-        'riskLevel': task['riskLevel']?.toString() ?? '-',
-        'status': _normalizeStatus(task['status']?.toString() ?? 'Pending'),
-        'date': task['date']?.toString(),
-        'userId': _toInt(task['userId']),
-        'staffName': task['staffName']?.toString() ?? 'HSE Staff Demo',
-      };
-    }).toList();
-  }
+  final repository = ref.watch(taskRepositoryProvider);
+  final task = await repository.getTaskById(id);
+  final areaNameById = await _buildAreaNameByIdMap(ref);
+  return _toUiTaskMap(task, areaNameById: areaNameById);
 });
+
+final petugasTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final tasks = await ref.watch(tasksFutureProvider.future);
+  final areaNameById = await _buildAreaNameByIdMap(ref);
+
+  return tasks
+      .map((task) => _toUiTaskMap(task, areaNameById: areaNameById))
+      .toList();
+});
+
+Map<String, dynamic> _toUiTaskMap(
+  HseTaskModel task, {
+  required Map<int, String> areaNameById,
+}) {
+  final areaName = _resolveAreaName(task, areaNameById);
+  final title = _resolveTitle(task, areaName);
+
+  final followUps = task.followUps
+      .map((item) {
+        final map = Map<String, dynamic>.from(item);
+        final rawStatus = (map['status']?.toString() ?? '').toLowerCase();
+        final normalizedAction = rawStatus == 'approved'
+            ? 'Approved'
+            : rawStatus == 'rejected'
+                ? 'Rejected'
+                : rawStatus == 'canceled' || rawStatus == 'cancelled'
+                    ? 'Canceled'
+                    : (map['action']?.toString() ?? 'Follow Up');
+
+        final photosRaw = map['photos'];
+        final photos = photosRaw is Map
+            ? photosRaw.values
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : photosRaw is List
+                ? photosRaw
+                    .map((e) => e?.toString() ?? '')
+                    .where((e) => e.isNotEmpty)
+                    .toList()
+                : <String>[];
+
+        return <String, dynamic>{
+          ...map,
+          'type': 'PIC_FOLLOW_UP',
+          'action': normalizedAction,
+          'notes': map['notes_hse']?.toString().isNotEmpty == true
+              ? map['notes_hse']?.toString()
+              : map['notes_pic']?.toString() ?? '',
+          'photos': photos,
+        };
+      })
+      .toList();
+
+  return <String, dynamic>{
+    'id': task.id.toString(),
+    'title': title,
+    'area': areaName,
+    'rootCause': task.rootCause,
+    'notes': task.notes,
+    'riskLevel': task.riskLevel,
+    'status': _normalizeStatus(task.status),
+    'date': task.date,
+    'userId': task.userId,
+    'user_id': task.userId,
+    'created_by': task.userId,
+    'staffName': _resolveStaffName(task),
+    'photos': task.photos,
+    'followUps': followUps,
+  };
+}
+
+Future<Map<int, String>> _buildAreaNameByIdMap(Ref ref) async {
+  try {
+    final areas = await ref.read(areaRepositoryProvider).getAreas();
+    return {
+      for (final area in areas) area.id: area.name,
+    };
+  } catch (_) {
+    return <int, String>{};
+  }
+}
 
 final supervisorOwnTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final currentUser = ref.watch(currentUserProvider);
@@ -145,7 +161,11 @@ final supervisorStaffTaskByNameProvider =
       .toList();
 });
 
-String _resolveAreaName(HseTaskModel report) {
+String _resolveAreaName(HseTaskModel report, Map<int, String> areaNameById) {
+  final areaName = areaNameById[report.areaId]?.trim();
+  if (areaName != null && areaName.isNotEmpty) {
+    return areaName;
+  }
   return 'Area #${report.areaId}';
 }
 
@@ -164,7 +184,7 @@ String _resolveTitle(HseTaskModel report, String areaName) {
 String _normalizeStatus(String rawStatus) {
   final value = rawStatus.trim().toLowerCase();
 
-  if (value == 'followupdone' || value == 'follow_up_done') {
+  if (value == 'followupdone' || value == 'follow_up_done' || value == 'followed_up') {
     return 'Follow Up Done';
   }
 
