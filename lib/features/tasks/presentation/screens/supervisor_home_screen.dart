@@ -17,7 +17,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final staffReportsAsync = ref.watch(supervisorStaffTaskMapsProvider);
+    final ownReportsAsync = ref.watch(supervisorOwnTaskMapsProvider);
 
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -39,26 +39,35 @@ class SupervisorHomeScreen extends ConsumerWidget {
       );
     }
 
-    final reports = [...(staffReportsAsync.valueOrNull ?? <Map<String, dynamic>>[])]
+    // Filter task milik supervisor sendiri
+    final allReports = ownReportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    final myReports = allReports.where((report) {
+      final reportOwnerId = report['userId']?.toString() ??
+                           report['created_by']?.toString() ??
+                           report['user_id']?.toString();
+      return reportOwnerId == user.id;
+    }).toList();
+
+    final reports = [...myReports]
       ..sort(
         (a, b) => _tryParseDate(b['date']?.toString()).compareTo(_tryParseDate(a['date']?.toString())),
       );
 
-    if (staffReportsAsync.isLoading && reports.isEmpty) {
+    if (ownReportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (staffReportsAsync.hasError && reports.isEmpty) {
+    if (ownReportsAsync.hasError && reports.isEmpty) {
       return Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'Gagal memuat task staff.',
+              'Gagal memuat task.',
               style: AppTypography.body1,
               textAlign: TextAlign.center,
             ),
@@ -67,7 +76,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
       );
     }
 
-    final latestThreeStaffTasks = reports.take(3).toList();
+    final latestFourTasks = reports.take(4).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -132,7 +141,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${latestThreeStaffTasks.length} Staff Tasks',
+                              '${latestFourTasks.length} My Tasks',
                               style: AppTypography.h1.copyWith(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w700,
@@ -141,7 +150,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'latest updates for quick supervision',
+                              'latest tasks you created',
                               style: AppTypography.h3.copyWith(
                                 color: AppColors.textSecondary.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w500,
@@ -188,9 +197,9 @@ class SupervisorHomeScreen extends ConsumerWidget {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final task = latestThreeStaffTasks[index];
+                  final task = latestFourTasks[index];
                   return Align(
-                    heightFactor: index == latestThreeStaffTasks.length - 1 ? 1.0 : 0.92,
+                    heightFactor: index == latestFourTasks.length - 1 ? 1.0 : 0.92,
                     alignment: Alignment.topCenter,
                     child: _buildExactTaskCard(
                       context,
@@ -199,11 +208,10 @@ class SupervisorHomeScreen extends ConsumerWidget {
                       rawStatus: task['status']?.toString() ?? 'Pending',
                       tag: _getStatusTag(task['status']?.toString()),
                       reportId: task['id'].toString(),
-                      staffName: task['staffName']?.toString() ?? '-',
                     ),
                   );
                 },
-                childCount: latestThreeStaffTasks.length,
+                childCount: latestFourTasks.length,
               ),
             ),
           ),
@@ -349,7 +357,6 @@ class SupervisorHomeScreen extends ConsumerWidget {
     required String? dateString,
     required String rawStatus,
     required String reportId,
-    required String staffName,
     String? tag,
   }) {
     final bool isDark = rawStatus.toLowerCase() == 'canceled';
@@ -405,22 +412,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Icon(PhosphorIcons.user(PhosphorIconsStyle.bold), size: 16, color: textColor.withValues(alpha: 0.7)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          staffName,
-                          style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(

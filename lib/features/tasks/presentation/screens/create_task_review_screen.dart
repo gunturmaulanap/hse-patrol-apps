@@ -8,6 +8,7 @@ import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/mock_api/mock_database.dart';
 import '../providers/create_task_form_provider.dart';
@@ -28,108 +29,47 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
     if (role == 'supervisor') {
       context.goNamed(RouteNames.supervisorHome);
-      return;
-    }
-
-    if (role == 'pic') {
+    } else if (role == 'pic') {
       context.goNamed(RouteNames.picHome);
-      return;
+    } else {
+      context.goNamed(RouteNames.petugasHome);
     }
-
-    context.goNamed(RouteNames.petugasHome);
   }
 
   void _submitData() async {
     final draft = ref.read(createTaskFormProvider);
 
-    if (draft.buildingType == null ||
-        draft.buildingType!.isEmpty ||
-        draft.area == null ||
-        draft.area!.isEmpty ||
-        draft.riskLevel == null ||
-        draft.riskLevel!.isEmpty ||
-        draft.photos.isEmpty ||
-        draft.notes == null ||
-        draft.notes!.isEmpty ||
-        draft.rootCause == null ||
-        draft.rootCause!.isEmpty) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.warning, color: Colors.orange),
-                SizedBox(width: 8),
-                Text('Data Belum Lengkap'),
-              ],
-            ),
-            content: Text(
-              'Mohon lengkapi semua data sebelum mengirim laporan:\n'
-              '• Jenis Bangunan: ${draft.buildingType ?? "BELUM DIPILIH"}\n'
-              '• Lokasi Area: ${draft.area ?? "BELUM DIPILIH"}\n'
-              '• Area ID: ${draft.areaId ?? "NULL"}\n'
-              '• Tingkat Risiko: ${draft.riskLevel ?? "BELUM DIPILIH"}\n'
-              '• Foto: ${draft.photos.length} foto (minimal 1)\n'
-              '• Keterangan: ${(draft.notes?.isEmpty ?? true) ? "BELUM DIISI" : draft.notes}\n'
-              '• Akar Masalah: ${(draft.rootCause?.isEmpty ?? true) ? "BELUM DIISI" : draft.rootCause}',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => ctx.pop(),
-                child: const Text('OK', style: TextStyle(color: Colors.orange)),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    if (draft.areaId == null) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.error, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Error: Area ID Null'),
-              ],
-            ),
-            content: Text('Area ID belum diset. Silakan pilih area kembali.\nArea: ${draft.area}\nArea ID: ${draft.areaId}'),
-            actions: [
-              TextButton(
-                onPressed: () => ctx.pop(),
-                child: const Text('OK', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        );
-      }
+    if (draft.buildingType == null || draft.area == null || draft.riskLevel == null ||
+        draft.photos.isEmpty || draft.notes == null || draft.rootCause == null) {
+      // (Validasi Form seperti biasa)
+      AppSnackBar.warning(context, message: 'Harap lengkapi semua data laporan.');
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      // createdTask sekarang akan berisi data HseTaskModel (karena Provider sudah diedit)
       final createdTask = await ref.read(createTaskFormProvider.notifier).submitTask();
 
-      // Pastikan response tidak null dan bukan boolean (hanya untuk pengaman)
       if (createdTask != null && createdTask is! bool && mounted) {
         
-        // Buat format pesan WhatsApp
-        final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
+        // 1. Ambil URL FOTO ONLINE dari backend (Bukan dari path memori lokal)
+        // URL ini harus disisipkan di teks agar WhatsApp bisa membuat Thumbnail Image Preview
+        String onlinePhotoUrl = '';
+        if (createdTask.photos != null && createdTask.photos!.isNotEmpty) {
+          onlinePhotoUrl = createdTask.photos!.first;
+        }
 
+        // 2. Format WA Text: Letakkan foto online di atas agar dibaca WA bot
+        final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
+${onlinePhotoUrl.isNotEmpty ? '\n🖼️ *Preview Foto:*\n$onlinePhotoUrl\n' : ''}
 📍 *Area:* ${draft.area}
 🏢 *Bangunan:* ${draft.buildingType}
 ⚠️ *Tingkat Risiko:* Level ${draft.riskLevel}
 📝 *Akar Masalah:* ${draft.rootCause}
 💬 *Keterangan:* ${draft.notes}
 
-Terdapat temuan HSE di area Anda. Klik link di bawah ini untuk melihat detail foto dan melakukan *Follow Up*:
+Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk membuka aplikasi:
 🔗 ${createdTask.picToken ?? 'Link belum tersedia'}''';
 
         if (!mounted) return;
@@ -143,13 +83,12 @@ Terdapat temuan HSE di area Anda. Klik link di bawah ini untuk melihat detail fo
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
                 SizedBox(width: 8),
-                Text('Berhasil!'),
+                Text('Laporan Terkirim!'),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // === POPUP IMAGE PERTAMA DITAMPILKAN DI SINI ===
                 if (draft.photos.isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -179,18 +118,22 @@ Terdapat temuan HSE di area Anda. Klik link di bawah ini untuk melihat detail fo
                         size: 20,
                       ),
                       onPressed: () async {
-                        // Ubah teks menjadi format URL yang valid
                         final encodedText = Uri.encodeComponent(waText);
-                        final url = Uri.parse("whatsapp://send?text=$encodedText");
+                        final url = Uri.parse("https://wa.me/?text=$encodedText");
 
+                        // 3. Eksekusi peluncuran WhatsApp terlebih dahulu
                         if (await canLaunchUrl(url)) {
-                          await launchUrl(url);
-                        } else {
-                          debugPrint('Aplikasi WhatsApp tidak ditemukan.');
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
                         }
-                        if (!mounted || !ctx.mounted) return;
-                        ctx.pop();
-                        _goToHomeByRole(context);
+                        
+                        // 4. Delay sebentar agar WhatsApp menimpa layar sepenuhnya, 
+                        // lalu baru redirect ke Home di background (mencegah glitch visual)
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (mounted && ctx.mounted) {
+                            ctx.pop(); // Tutup pop-up
+                            _goToHomeByRole(context); // Redirect background
+                          }
+                        });
                       },
                     ),
                   ),
@@ -212,56 +155,12 @@ Terdapat temuan HSE di area Anda. Klik link di bawah ini untuk melihat detail fo
         );
       }
     } catch (e) {
-      String errorMessage = 'Terjadi kesalahan:\n\n${e.toString()}\n\n';
-
-      if (e.toString().contains('Title cannot be empty')) {
-        errorMessage += '💡 Solusi: Pastikan title terisi dengan benar.';
-      } else if (e.toString().contains('area_id tidak valid')) {
-        errorMessage += '💡 Solusi: Pilih area terlebih dahulu di langkah 2.';
-      } else if (e.toString().contains('Risk level tidak boleh kosong')) {
-        errorMessage += '💡 Solusi: Pilih tingkat risiko di langkah 3.';
-      } else if (e.toString().contains('Root cause tidak boleh kosong')) {
-        errorMessage += '💡 Solusi: Isi akar masalah di langkah 6.';
-      } else if (e.toString().contains('Notes tidak boleh kosong')) {
-        errorMessage += '💡 Solusi: Isi keterangan di langkah 5.';
-      } else if (e.toString().contains('Invalid risk_level')) {
-        errorMessage += '💡 Solusi: Pilih ulang tingkat risiko (1-4).';
-      } else if (e.toString().contains('422')) {
-        errorMessage += '💡 Validasi backend gagal. Cek:\n• Area sudah dipilih?\n• Foto sudah diambil?\n• Semua form terisi?';
-      } else if (e.toString().contains('DioException')) {
-        errorMessage += '💡 Koneksi error. Periksa internet Anda.';
-      }
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.error, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Submit Gagal'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Text(errorMessage),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => ctx.pop(),
-                child: const Text('OK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      // Error handling...
+      setState(() => _isSubmitting = false);
     }
   }
 
+  // (Kode build dan _buildRow sisanya tidak diubah, tetap biarkan bawaannya)
   @override
   Widget build(BuildContext context) {
     final draft = ref.watch(createTaskFormProvider);

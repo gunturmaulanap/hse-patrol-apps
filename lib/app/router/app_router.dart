@@ -54,6 +54,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           return TaskDetailScreen(taskId: id);
         },
       ),
+      // Deep Link Route untuk WhatsApp PIC Token
+      GoRoute(
+        path: '/api/hse/reports/pic/:picToken',
+        builder: (context, state) {
+          final picToken = state.pathParameters['picToken']!;
+
+          // Cek apakah user sudah login
+          // Jika belum login, bisa redirect ke login atau simpan token untuk diproses setelah login
+          // Untuk sekarang, kita redirect langsung ke task detail dengan picToken sebagai parameter
+
+          return TaskDetailScreen(taskId: picToken, picToken: picToken);
+        },
+      ),
       GoRoute(
         path: '/pic/follow-up/photos',
         name: RouteNames.picFollowUpPhotos,

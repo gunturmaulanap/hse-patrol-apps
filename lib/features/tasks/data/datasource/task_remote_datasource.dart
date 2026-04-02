@@ -8,6 +8,7 @@ import '../models/create_hse_task_request.dart';
 abstract class TaskRemoteDataSource {
   Future<List<HseTaskModel>> fetchTasks({int? areaId, String? status});
   Future<HseTaskModel> getTaskById(int id);
+  Future<HseTaskModel> getTaskByPicToken(String picToken);
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos);
   Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request, {List<File>? photos, String? mode});
   Future<void> cancelTask(int id);
@@ -51,6 +52,32 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       return _parseReportModel(data);
     } catch (e) {
       throw Exception('Gagal mengambil detail report: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<HseTaskModel> getTaskByPicToken(String picToken) async {
+    try {
+      _log('Fetching task by picToken: $picToken');
+      // Menggunakan API endpoint untuk mencari task berdasarkan picToken
+      final response = await _dio.get('/hse-reports/pic/$picToken');
+
+      _log('Response status: ${response.statusCode}');
+
+      final data = response.data is Map
+          ? (response.data['data'] as Map<String, dynamic>?)
+          : (response.data as Map<String, dynamic>?);
+
+      if (data == null) {
+        _log('Task not found for picToken');
+        throw Exception('Task not found');
+      }
+
+      _log('Task found with ID: ${data['id']}');
+      return _parseReportModel(data);
+    } catch (e) {
+      _log('Error getting task by picToken: ${e.toString()}');
+      throw Exception('Gagal mengambil task: ${e.toString()}');
     }
   }
 

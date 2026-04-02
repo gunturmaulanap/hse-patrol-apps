@@ -33,6 +33,14 @@ final taskDetailMapProvider = FutureProvider.family<Map<String, dynamic>, String
   return _toUiTaskMap(task, areaNameById: areaNameById);
 });
 
+// Provider untuk mencari task berdasarkan picToken (untuk Deep Link dari WhatsApp)
+final taskDetailByPicTokenProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
+  final repository = ref.watch(taskRepositoryProvider);
+  final task = await repository.getTaskByPicToken(picToken);
+  final areaNameById = await _buildAreaNameByIdMap(ref);
+  return _toUiTaskMap(task, areaNameById: areaNameById);
+});
+
 final petugasTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final tasks = await ref.watch(tasksFutureProvider.future);
   final areaNameById = await _buildAreaNameByIdMap(ref);

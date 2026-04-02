@@ -3,16 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/mock_api/mock_database.dart';
-import '../../../areas/presentation/providers/area_provider.dart';
 import '../providers/task_provider.dart';
-
-enum _DashboardMode { area, staff }
 
 class SupervisorDashboardScreen extends ConsumerStatefulWidget {
   const SupervisorDashboardScreen({super.key});
@@ -22,32 +20,21 @@ class SupervisorDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardScreen> {
-  static const List<int> _pageSizes = [5, 10, 20];
-
-  _DashboardMode _mode = _DashboardMode.area;
-
-  String? _selectedArea;
-  String? _selectedStaff;
   DateTime? _dateFrom;
   DateTime? _dateTo;
-
-  int _page = 1;
-  int _pageSize = 10;
 
   @override
   void initState() {
     super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
+    // Default filter: 7 hari terakhir
+    final now = DateTime.now();
+    _dateTo = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    _dateFrom = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final areasAsync = ref.watch(areasFutureProvider);
     final tasksAsync = ref.watch(supervisorAllVisibleTaskMapsProvider);
 
     if (user == null || user.role != 'supervisor') {
@@ -63,8 +50,6 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     final allTasks = [...(tasksAsync.valueOrNull ?? <Map<String, dynamic>>[])]
       ..sort((a, b) => _parseDate(b['date']?.toString()).compareTo(_parseDate(a['date']?.toString())));
 
-    final areas = areasAsync.valueOrNull ?? [];
-
     if (tasksAsync.isLoading && allTasks.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -72,35 +57,17 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
       );
     }
 
-    final areaTabs = {
-      ...areas.map((e) => e.name),
-      ...allTasks.map((e) => e['area']?.toString() ?? '').where((e) => e.trim().isNotEmpty)
-    }.toList()
-      ..sort();
-    final staffTabs = allTasks
-        .map((task) => task['staffName']?.toString().trim() ?? '')
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    // Filter tasks berdasarkan tanggal
+    final filteredTasks = _filterTasksByDate(allTasks);
 
-    final activeArea = _selectedArea ?? areaTabs.firstOrNull;
-    final activeStaff = _selectedStaff ?? staffTabs.firstOrNull;
+    // Group tasks per hari untuk chart
+    final dailyTaskData = _groupTasksByDay(filteredTasks);
 
-    final filtered = _filteredTasks(
-      allTasks,
-      mode: _mode,
-      area: activeArea,
-      staff: activeStaff,
-      from: _dateFrom,
-      to: _dateTo,
-    );
-
-    final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
-    final safePage = _page.clamp(1, totalPages);
-    final start = (safePage - 1) * _pageSize;
-    final end = (start + _pageSize).clamp(0, filtered.length);
-    final paged = filtered.sublist(start, end);
+    // Calculate stats
+    final totalTasks = filteredTasks.length;
+    final pendingTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'pending').length;
+    final completedTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'completed').length;
+    final followUpDoneTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'follow up done').length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
@@ -140,7 +107,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Welcome to Dashboard Supervisor',
+                          'Dashboard',
                           style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
                         ),
                         Text(
@@ -155,45 +122,35 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+
+            // Stats Cards Row
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                height: 162,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _kpiCard(
-                        icon: PhosphorIcons.mapPinArea(PhosphorIconsStyle.bold),
-                        countText: '${areaTabs.length} Areas',
-                        description: 'Patrol reports across all Aksama Adi Andana areas.',
-                        isActive: _mode == _DashboardMode.area,
-                        isStaffCard: false,
-                        onTap: () => setState(() {
-                          _mode = _DashboardMode.area;
-                          _resetPage();
-                        }),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _kpiCard(
-                        icon: PhosphorIcons.usersThree(PhosphorIconsStyle.bold),
-                        countText: '${staffTabs.length} HSE Staff',
-                        description: 'HSE personnel who submit reports from each location.',
-                        isActive: _mode == _DashboardMode.staff,
-                        isStaffCard: true,
-                        onTap: () => setState(() {
-                          _mode = _DashboardMode.staff;
-                          _resetPage();
-                        }),
-                      ),
-                    ),
-                  ],
-                ),
+              child: Row(
+                children: [
+                  Expanded(child: _statCard('Total Tasks', '$totalTasks', AppColors.primary)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statCard('Pending', '$pendingTasks', const Color(0xFFD4D8FF))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statCard('Completed', '$completedTasks', const Color(0xFFC1F0D0))),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(child: _statCard('Follow Up Done', '$followUpDoneTasks', const Color(0xFFFAFF9F))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statCard('Avg per Day', '${totalTasks > 0 ? (totalTasks / 7).toStringAsFixed(1) : '0'}', AppColors.secondary)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -204,17 +161,13 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                   child: Column(
                     children: [
-                      _buildContextTabs(areaTabs: areaTabs, staffTabs: staffTabs, activeArea: activeArea, activeStaff: activeStaff),
-                      const SizedBox(height: 12),
                       _buildDateFilters(context),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Expanded(
-                        child: _mode == _DashboardMode.area
-                            ? _buildAreaTable(paged)
-                            : _buildStaffTable(paged),
+                        child: _buildBarChart(dailyTaskData),
                       ),
                       const SizedBox(height: 8),
-                      _buildPagination(filtered.length, safePage, totalPages),
+                      _buildLegend(),
                     ],
                   ),
                 ),
@@ -226,114 +179,27 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     );
   }
 
-  Widget _kpiCard({
-    required IconData icon,
-    required String countText,
-    required String description,
-    required bool isActive,
-    required bool isStaffCard,
-    required VoidCallback onTap,
-  }) {
-    final bool isStaffActive = isStaffCard && isActive;
-    final Color accentColor = isStaffCard ? AppColors.primary : const Color(0xFFD4D8FF);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1E1E1E) : const Color(0xFF161616),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isActive ? accentColor : Colors.white.withValues(alpha: 0.08),
-            width: isActive ? 1.2 : 1,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: const Color(0xFF1E1E1E), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    countText,
-                    style: AppTypography.h3.copyWith(
-                      color: isStaffActive ? AppColors.primary : Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.caption.copyWith(color: Colors.white.withValues(alpha: 0.75), height: 1.25),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  Widget _statCard(String title, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
-    );
-  }
-
-  Widget _buildContextTabs({
-    required List<String> areaTabs,
-    required List<String> staffTabs,
-    required String? activeArea,
-    required String? activeStaff,
-  }) {
-    final labels = _mode == _DashboardMode.area ? areaTabs : staffTabs;
-    if (labels.isEmpty) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text('No tab data available.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
-      );
-    }
-
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (_, index) {
-          final label = labels[index];
-          final selected = _mode == _DashboardMode.area ? label == activeArea : label == activeStaff;
-
-          return ChoiceChip(
-            label: Text(label),
-            selected: selected,
-            onSelected: (_) => setState(() {
-              if (_mode == _DashboardMode.area) {
-                _selectedArea = label;
-              } else {
-                _selectedStaff = label;
-              }
-              _resetPage();
-            }),
-            selectedColor: _mode == _DashboardMode.staff ? AppColors.primary : const Color(0xFFD4D8FF),
-            backgroundColor: AppColors.surface,
-            side: BorderSide.none,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
-            labelStyle: AppTypography.caption.copyWith(
-              fontWeight: FontWeight.w600,
-              color: selected ? const Color(0xFF1E1E1E) : AppColors.textSecondary,
-            ),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemCount: labels.length,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: AppTypography.h3.copyWith(color: color, fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }
@@ -353,12 +219,23 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 lastDate: DateTime(2100),
               );
               if (picked == null) return;
-              setState(() {
-                _dateFrom = DateTime(picked.year, picked.month, picked.day);
-                if (_dateTo != null && _dateTo!.isBefore(_dateFrom!)) {
-                  _dateTo = _dateFrom;
+
+              final newFrom = DateTime(picked.year, picked.month, picked.day);
+              // Max 7 days constraint
+              if (_dateTo != null) {
+                final maxFrom = _dateTo!.subtract(const Duration(days: 6));
+                if (newFrom.isBefore(maxFrom)) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Maksimal filter adalah 7 hari')),
+                    );
+                  }
+                  return;
                 }
-                _resetPage();
+              }
+
+              setState(() {
+                _dateFrom = newFrom;
               });
             },
           ),
@@ -376,9 +253,23 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 lastDate: DateTime(2100),
               );
               if (picked == null) return;
+
+              final newTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+              // Max 7 days constraint
+              if (_dateFrom != null) {
+                final maxTo = _dateFrom!.add(const Duration(days: 6));
+                if (newTo.isAfter(maxTo)) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Maksimal filter adalah 7 hari')),
+                    );
+                  }
+                  return;
+                }
+              }
+
               setState(() {
-                _dateTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
-                _resetPage();
+                _dateTo = newTo;
               });
             },
           ),
@@ -408,217 +299,194 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     );
   }
 
-  Widget _buildAreaTable(List<Map<String, dynamic>> rows) {
-    if (rows.isEmpty) return _emptyState();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
-          dataRowMinHeight: 48,
-          dataRowMaxHeight: 56,
-          columns: const [
-            DataColumn(label: Text('Status')),
-            DataColumn(label: Text('Task Name')),
-            DataColumn(label: Text('Risk')),
-            DataColumn(label: Text('Root Cause')),
-            DataColumn(label: Text('Reported By')),
-            DataColumn(label: Text('Date Created')),
-          ],
-          rows: rows.map((item) {
-            return DataRow(cells: [
-              DataCell(_statusCell(item['status']?.toString() ?? '-')),
-              DataCell(SizedBox(width: 180, child: Text(_titleOf(item), overflow: TextOverflow.ellipsis))),
-              DataCell(_riskDot(item['riskLevel']?.toString())),
-              DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(SizedBox(width: 130, child: Text(item['staffName']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(Text(_formatDate(item['date']?.toString()))),
-            ]);
-          }).toList(),
+  Widget _buildBarChart(Map<String, int> dailyData) {
+    if (dailyData.isEmpty) {
+      return Center(
+        child: Text(
+          'No data available',
+          style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildStaffTable(List<Map<String, dynamic>> rows) {
-    if (rows.isEmpty) return _emptyState();
+    // Sort keys by date
+    final sortedDates = dailyData.keys.toList()
+      ..sort((a, b) => DateFormat('dd MMM yyyy').parse(a).compareTo(DateFormat('dd MMM yyyy').parse(b)));
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
-          dataRowMinHeight: 48,
-          dataRowMaxHeight: 56,
-          columns: const [
-            DataColumn(label: Text('Status')),
-            DataColumn(label: Text('Area')),
-            DataColumn(label: Text('Risk')),
-            DataColumn(label: Text('Notes')),
-            DataColumn(label: Text('Root Cause')),
-            DataColumn(label: Text('Date Created')),
-          ],
-          rows: rows.map((item) {
-            return DataRow(cells: [
-              DataCell(_statusCell(item['status']?.toString() ?? '-')),
-              DataCell(SizedBox(width: 170, child: Text(item['area']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(_riskDot(item['riskLevel']?.toString())),
-              DataCell(SizedBox(width: 170, child: Text(item['notes']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(SizedBox(width: 150, child: Text(item['rootCause']?.toString() ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(Text(_formatDate(item['date']?.toString()))),
-            ]);
-          }).toList(),
-        ),
-      ),
-    );
-  }
+    // Find max value for Y-axis scaling
+    final maxValue = dailyData.values.fold(0, (max, value) => value > max ? value : max);
+    final yMax = maxValue > 0 ? ((maxValue / 5).ceil() * 5) : 10;
 
-  Widget _statusCell(String status) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(PhosphorIcons.circle(PhosphorIconsStyle.fill), size: 10, color: _statusColor(status)),
-        const SizedBox(width: 6),
-        Text(status),
-      ],
-    );
-  }
-
-  Widget _riskDot(String? level) {
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        color: _riskColor(level),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-
-  Widget _emptyState() {
-    return Center(
-      child: Text(
-        'No reports found for selected filters.',
-        style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
-      ),
-    );
-  }
-
-  Widget _buildPagination(int totalItems, int page, int totalPages) {
-    Widget pagerInfo = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          onPressed: page > 1 ? () => setState(() => _page = page - 1) : null,
-          icon: Icon(PhosphorIcons.caretLeft(PhosphorIconsStyle.bold), color: Colors.white),
-        ),
-        Text(
-          'Page $page of $totalPages',
-          style: AppTypography.caption.copyWith(color: Colors.white),
-        ),
-        IconButton(
-          onPressed: page < totalPages ? () => setState(() => _page = page + 1) : null,
-          icon: Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), color: Colors.white),
-        ),
-      ],
-    );
-
-    Widget pageSizeSelector = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            value: _pageSize,
-            dropdownColor: AppColors.surface,
-            style: AppTypography.caption.copyWith(color: Colors.white),
-            items: _pageSizes
-                .map((size) => DropdownMenuItem<int>(
-                      value: size,
-                      child: Text('$size items per page'),
-                    ))
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() {
-                _pageSize = value;
-                _resetPage();
-              });
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: yMax.toDouble(),
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (group) => const Color(0xFF1E1E1E),
+              tooltipPadding: const EdgeInsets.all(8),
+              tooltipMargin: 8,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final date = sortedDates[groupIndex.toInt()];
+                final value = group.x.toInt();
+                return BarTooltipItem(
+                  '$date\n$value Tasks',
+                  TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                );
+              },
+            ),
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= sortedDates.length) return const Text('');
+                  final date = sortedDates[index];
+                  final parts = date.split(' ');
+                  if (parts.length >= 2) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        parts[0], // Only show day
+                        style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                      ),
+                    );
+                  }
+                  return Text(
+                    date,
+                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                  );
+                },
+                reservedSize: 30,
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  if (value == meta.max) return const Text('');
+                  return Text(
+                    value.toInt().toString(),
+                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                  );
+                },
+                reservedSize: 32,
+                interval: yMax > 20 ? 10 : 5,
+              ),
+            ),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.white.withValues(alpha: 0.08),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(
+            sortedDates.length,
+            (index) {
+              final date = sortedDates[index];
+              final value = dailyData[date]?.toDouble() ?? 0;
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: value,
+                    color: AppColors.primary,
+                    width: 20,
+                    borderRadius: BorderRadius.circular(4),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withValues(alpha: 0.8),
+                        AppColors.primary.withValues(alpha: 0.4),
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                  ),
+                ],
+              );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegend() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.8),
+                AppColors.primary.withValues(alpha: 0.4),
+              ],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
         const SizedBox(width: 8),
         Text(
-          '$totalItems items',
+          'Total Tasks per Day',
           style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 430;
-
-        if (isCompact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              pagerInfo,
-              const SizedBox(height: 4),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: pageSizeSelector,
-              ),
-            ],
-          );
-        }
-
-        return Row(
-          children: [
-            pagerInfo,
-            const Spacer(),
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: pageSizeSelector,
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
-  List<Map<String, dynamic>> _filteredTasks(
-    List<Map<String, dynamic>> input, {
-    required _DashboardMode mode,
-    required String? area,
-    required String? staff,
-    required DateTime? from,
-    required DateTime? to,
-  }) {
-    return input.where((task) {
-      if (mode == _DashboardMode.area) {
-        if (area != null && (task['area']?.toString() ?? '') != area) return false;
-      } else {
-        if (staff != null && (task['staffName']?.toString() ?? '') != staff) return false;
-      }
+  List<Map<String, dynamic>> _filterTasksByDate(List<Map<String, dynamic>> tasks) {
+    if (_dateFrom == null || _dateTo == null) return tasks;
 
-      final dt = _parseDate(task['date']?.toString());
-      if (from != null && dt.isBefore(from)) return false;
-      if (to != null && dt.isAfter(to)) return false;
-      return true;
+    return tasks.where((task) {
+      final taskDate = _parseDate(task['date']?.toString());
+      return !taskDate.isBefore(_dateFrom!) && !taskDate.isAfter(_dateTo!);
     }).toList();
   }
 
-  String _titleOf(Map<String, dynamic> task) {
-    final title = task['title']?.toString().trim();
-    if (title != null && title.isNotEmpty) return title;
-    final area = task['area']?.toString() ?? '-';
-    final cause = task['rootCause']?.toString() ?? '-';
-    return 'Inspeksi $area - Masalah: $cause';
+  Map<String, int> _groupTasksByDay(List<Map<String, dynamic>> tasks) {
+    final Map<String, int> grouped = {};
+
+    // Initialize all dates in range with 0
+    if (_dateFrom != null && _dateTo != null) {
+      var current = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
+      final end = DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day);
+
+      while (current.isBefore(end.add(const Duration(days: 1)))) {
+        final key = DateFormat('dd MMM yyyy').format(current);
+        grouped[key] = 0;
+        current = current.add(const Duration(days: 1));
+      }
+    }
+
+    // Count tasks per day
+    for (final task in tasks) {
+      final taskDate = _parseDate(task['date']?.toString());
+      final key = DateFormat('dd MMM yyyy').format(taskDate);
+      grouped[key] = (grouped[key] ?? 0) + 1;
+    }
+
+    return grouped;
   }
 
   DateTime _parseDate(String? raw) {
@@ -631,37 +499,4 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     if (dt == null) return '-';
     return DateFormat('dd MMM yyyy, HH:mm').format(dt);
   }
-
-  Color _statusColor(String raw) {
-    switch (raw.toLowerCase()) {
-      case 'pending':
-        return const Color(0xFFD4D8FF);
-      case 'follow up done':
-        return const Color(0xFFFAFF9F);
-      case 'completed':
-        return const Color(0xFFC1F0D0);
-      case 'canceled':
-        return Colors.white;
-      default:
-        return AppColors.textSecondary;
-    }
-  }
-
-  Color _riskColor(String? riskLevel) {
-    final value = (riskLevel ?? '').toLowerCase();
-
-    if (value.contains('ringan') || value == '1') return AppColors.riskLevel1;
-    if (value.contains('menengah') || value == '2') return AppColors.riskLevel2;
-    if (value.contains('berat') || value == '3') return AppColors.riskLevel3;
-    if (value.contains('kritis') || value == '4') return AppColors.riskLevel4;
-    return AppColors.textSecondary;
-  }
-
-  void _resetPage() {
-    _page = 1;
-  }
-}
-
-extension _FirstOrNullX<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

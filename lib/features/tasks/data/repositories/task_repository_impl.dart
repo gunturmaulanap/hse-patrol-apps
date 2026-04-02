@@ -20,6 +20,11 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   @override
+  Future<HseTaskModel> getTaskByPicToken(String picToken) async {
+    return _remoteDataSource.getTaskByPicToken(picToken);
+  }
+
+  @override
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos) async {
     return _remoteDataSource.createTask(request, photos);
   }

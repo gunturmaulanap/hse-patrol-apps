@@ -48,7 +48,16 @@ class PetugasHomeScreen extends ConsumerWidget {
       );
     }
 
-    final reports = [...(reportsAsync.valueOrNull ?? <Map<String, dynamic>>[])]
+    // Filter task milik petugas sendiri
+    final allReports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    final myReports = allReports.where((report) {
+      final reportOwnerId = report['userId']?.toString() ??
+                           report['created_by']?.toString() ??
+                           report['user_id']?.toString();
+      return reportOwnerId == user.id;
+    }).toList();
+
+    final reports = [...myReports]
       ..sort((a, b) => _tryParseDate(b['date']?.toString())
           .compareTo(_tryParseDate(a['date']?.toString())));
 
@@ -75,7 +84,7 @@ class PetugasHomeScreen extends ConsumerWidget {
       );
     }
 
-    final latestReports = reports.take(3).toList();
+    final latestReports = reports.take(4).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -139,12 +148,12 @@ class PetugasHomeScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${latestReports.length} More Tasks',
+                              '${latestReports.length} My Tasks',
                               style: AppTypography.h1.copyWith(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'that have already been patrolled',
+                              'latest tasks you created',
                               style: AppTypography.h3.copyWith(color: AppColors.textSecondary.withValues(alpha: 0.8), fontWeight: FontWeight.w500),
                             ),
                           ],
