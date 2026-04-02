@@ -21,23 +21,25 @@ class _CreateTaskNotesScreenState extends ConsumerState<CreateTaskNotesScreen> {
   @override
   void initState() {
     super.initState();
-    // Ambil notes dari provider dan bersihkan teks debugging
-    String? rawNotes = ref.read(createTaskFormProvider).notes;
+    // Ambil notes dari provider
+    final rawNotes = ref.read(createTaskFormProvider).notes;
 
-    // Sanitasi: hapus teks debugging jika ada
+    // Filter Sanitasi: Cegah teks random / log error masuk ke textfield
     if (rawNotes != null && rawNotes.isNotEmpty) {
-      // Hapus teks yang mengandung kata-kata debugging
-      final debugPatterns = ['datasource', 'dart', 'MXtask', 'lib\\', 'main.dart', '.dart'];
-      for (var pattern in debugPatterns) {
-        if (rawNotes!.toLowerCase().contains(pattern.toLowerCase())) {
-          rawNotes = ''; // Reset jika ada teks debugging
-          debugPrint('[CreateTaskNotesScreen] Debug text detected, resetting notes');
-          break;
-        }
+      final isGarbageData = rawNotes.contains('.dart') || 
+                            rawNotes.contains('Exception') || 
+                            rawNotes.contains('lib\\') ||
+                            rawNotes.contains('datasource') ||
+                            rawNotes.contains('MXtask');
+                            
+      if (isGarbageData) {
+        _notesController.text = ''; // Kosongkan jika terdeteksi teks random
+      } else {
+        _notesController.text = rawNotes; // Tampilkan jika teks normal dari user
       }
+    } else {
+      _notesController.text = '';
     }
-
-    _notesController.text = rawNotes ?? '';
   }
 
   @override

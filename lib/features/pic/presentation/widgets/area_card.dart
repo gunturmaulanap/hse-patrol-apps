@@ -117,26 +117,29 @@ class AreaCard extends StatelessWidget {
   Widget _buildStatusBadges() {
     if (pendingCount == 0 && waitingResponseCount == 0) {
       // Kondisi ALL CLEAR
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green[700], size: 14),
-            const SizedBox(width: 4),
-            Text(
-              'All Clear',
-              style: AppTypography.caption.copyWith(
-                color: const Color(0xFF1E1E1E),
-                fontWeight: FontWeight.w700,
-                fontSize: 10,
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: Colors.green[700], size: 14),
+              const SizedBox(width: 4),
+              Text(
+                'All Clear',
+                style: AppTypography.caption.copyWith(
+                  color: const Color(0xFF1E1E1E),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -144,59 +147,64 @@ class AreaCard extends StatelessWidget {
     // Kondisi memiliki Pending atau Waiting atau keduanya
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Badge Action Needed
         if (pendingCount > 0)
-          Container(
-            margin: const EdgeInsets.only(bottom: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  '$pendingCount Action Needed',
-                  style: AppTypography.caption.copyWith(
-                    color: const Color(0xFF1E1E1E),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.warningCircle(PhosphorIconsStyle.fill), color: Colors.redAccent, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$pendingCount Action Needed',
+                    style: AppTypography.caption.copyWith(
+                      color: const Color(0xFF1E1E1E),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          
+
         // Badge Waiting Response
         if (waitingResponseCount > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(PhosphorIcons.clock(PhosphorIconsStyle.fill), color: Colors.orange, size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  '$waitingResponseCount Waiting Resp...',
-                  style: AppTypography.caption.copyWith(
-                    color: const Color(0xFF1E1E1E),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(PhosphorIcons.clock(PhosphorIconsStyle.fill), color: Colors.orange, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$waitingResponseCount Waiting...',
+                    style: AppTypography.caption.copyWith(
+                      color: const Color(0xFF1E1E1E),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
       ],

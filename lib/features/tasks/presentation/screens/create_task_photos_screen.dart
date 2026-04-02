@@ -54,13 +54,6 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
             : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
             
         ref.read(createTaskFormProvider.notifier).setNotes(newNotes);
-
-        if (mounted) {
-          AppSnackBar.success(
-            context,
-            message: 'Teks pada foto berhasil dideteksi dan dimasukkan ke Catatan!',
-          );
-        }
       }
       
       textRecognizer.close();

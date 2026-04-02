@@ -20,6 +20,8 @@ class PicAllTasksScreen extends ConsumerStatefulWidget {
 
 class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   final TextEditingController _searchController = TextEditingController();
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
   String _searchQuery = '';
 
   @override
@@ -75,69 +77,80 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Profile Header (Sama dengan Petugas All Tasks)
+              // Compact Title
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Text('PIC Tasks', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+              ),
+
+              // Date Filter & Search
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pushNamed(RouteNames.petugasProfile),
-                      child: Container(
-                        width: 56, height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(color: AppColors.surface, width: 2),
+                    // Date Filter Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _dateFilterButton(
+                            label: 'From',
+                            date: _dateFrom,
+                            onTap: () => _selectDateFrom(context),
+                          ),
                         ),
-                        child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _dateFilterButton(
+                            label: 'To',
+                            date: _dateTo,
+                            onTap: () => _selectDateTo(context),
+                          ),
+                        ),
+                        if (_dateFrom != null || _dateTo != null)
+                          IconButton(
+                            icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), size: 20),
+                            onPressed: () => setState(() {
+                              _dateFrom = null;
+                              _dateTo = null;
+                            }),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('PIC Dashboard', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                          Text(user.username, style: AppTypography.h1, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
+                    const SizedBox(height: 8),
+
+                    // Search Bar
+                    TextField(
+                      controller: _searchController,
+                      style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
+                      onChanged: (value) => setState(() => _searchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle: AppTypography.body1.copyWith(color: AppColors.textSecondary),
+                        prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppColors.textSecondary, size: 18),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), color: AppColors.textSecondary, size: 18), onPressed: () { _searchController.clear(); setState(() { _searchQuery = ''; }); })
+                            : null,
+                        filled: true, fillColor: AppColors.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        isDense: true,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // Search Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: TextField(
-                  controller: _searchController,
-                  style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  decoration: InputDecoration(
-                    hintText: 'Search report name or area...',
-                    hintStyle: AppTypography.body1.copyWith(color: AppColors.textSecondary),
-                    prefixIcon: Padding(padding: const EdgeInsets.all(12), child: Icon(PhosphorIcons.magnifyingGlass(), color: AppColors.textSecondary, size: 20)),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), color: AppColors.textSecondary, size: 20), onPressed: () { _searchController.clear(); setState(() { _searchQuery = ''; }); })
-                        : null,
-                    filled: true, fillColor: AppColors.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.pill), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
               // Tab Navigasi (Penamaan disesuaikan POV PIC)
               TabBar(
-                isScrollable: true, tabAlignment: TabAlignment.start, dividerColor: Colors.transparent, 
-                padding: const EdgeInsets.symmetric(horizontal: 24), labelPadding: const EdgeInsets.symmetric(horizontal: 8), 
+                isScrollable: true, tabAlignment: TabAlignment.start, dividerColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(horizontal: 16), labelPadding: const EdgeInsets.symmetric(horizontal: 6),
                 indicator: BoxDecoration(color: const Color(0xFFD4D8FF), borderRadius: BorderRadius.circular(AppRadius.pill)),
                 labelColor: const Color(0xFF1E1E1E), unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: AppTypography.body1.copyWith(fontWeight: FontWeight.bold), indicatorPadding: EdgeInsets.zero,
                 tabs: [ _buildTab('All'), _buildTab('Pending'), _buildTab('Follow Up Done'), _buildTab('Rejected'), _buildTab('Approved') ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // List View berdasarkan Tab
               Expanded(
@@ -159,7 +172,60 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   }
 
   Widget _buildTab(String text) {
-    return Tab(height: 40, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(text)));
+    return Tab(height: 36, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(text, style: TextStyle(fontSize: 13))));
+  }
+
+  Widget _dateFilterButton({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        minimumSize: Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        side: BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      icon: Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 16, color: AppColors.textSecondary),
+      label: Text(
+        date == null ? label : DateFormat('dd MMM').format(date),
+        style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
+      ),
+    );
+  }
+
+  Future<void> _selectDateFrom(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateFrom ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateFrom = DateTime(picked.year, picked.month, picked.day);
+        if (_dateTo != null && _dateTo!.isBefore(_dateFrom!)) {
+          _dateTo = _dateFrom;
+        }
+      });
+    }
+  }
+
+  Future<void> _selectDateTo(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateTo ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+      });
+    }
   }
 
   // --- Logika Filter POV PIC ---
@@ -182,8 +248,8 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
 
   Widget _buildTaskList(List<Map<String, dynamic>> allReports, String filter) {
     // Filter berdasarkan tab (menggunakan tag POV PIC)
-    List<Map<String, dynamic>> filtered = filter == 'All' 
-        ? allReports 
+    List<Map<String, dynamic>> filtered = filter == 'All'
+        ? allReports
         : allReports.where((r) => _getPicStatusTag(r) == filter).toList();
 
     // Filter tambahan berdasarkan Search
@@ -196,15 +262,30 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       }).toList();
     }
 
+    // Filter berdasarkan tanggal
+    if (_dateFrom != null || _dateTo != null) {
+      filtered = filtered.where((r) {
+        final dateStr = r['date']?.toString();
+        if (dateStr == null || dateStr.isEmpty) return false;
+        try {
+          final date = DateTime.parse(dateStr);
+          if (_dateFrom != null && date.isBefore(_dateFrom!)) return false;
+          if (_dateTo != null && date.isAfter(_dateTo!)) return false;
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+    }
+
     if (filtered.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 64, color: AppColors.surfaceLight),
-            const SizedBox(height: 16),
+            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 48, color: AppColors.surfaceLight),
+            const SizedBox(height: 12),
             Text(_searchQuery.isNotEmpty ? 'No tasks found for "$_searchQuery"' : 'No $filter tasks yet.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
-            const SizedBox(height: 80),
           ],
         ),
       );
@@ -220,8 +301,8 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     final sortedAreas = grouped.keys.toList()..sort();
 
     return ListView.builder(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, 
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 100), // Spacing bawah untuk bottom nav
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
       itemCount: sortedAreas.length,
       itemBuilder: (context, index) {
         final area = sortedAreas[index];
@@ -229,11 +310,11 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('${index + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary))),
+            Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('${index + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontSize: 14))),
             ...tasks.map((task) {
               final tag = _getPicStatusTag(task);
               return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.only(bottom: 12),
                 child: _buildExactTaskCard(
                   context,
                   title: _getReportTitle(task),
@@ -243,7 +324,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                 ),
               );
             }),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
         );
       },
@@ -273,20 +354,20 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
 
     return InkWell(
       onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF1E1E1E), width: 1.2),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
             Positioned.fill(child: CustomPaint(painter: _CardStripedPainter(color: stripeColor))),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -298,51 +379,42 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                       Expanded(
                         child: Text(
                           title,
-                          style: AppTypography.h2.copyWith(color: textColor, fontSize: 18, fontWeight: FontWeight.w600, height: 1.2),
+                          style: AppTypography.body1.copyWith(color: textColor, fontSize: 14, fontWeight: FontWeight.w600, height: 1.2),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(tag, style: AppTypography.caption.copyWith(
-                          color: tag == 'Rejected' ? Colors.redAccent : const Color(0xFF6B6E94), 
-                          fontWeight: FontWeight.w700
+                          color: tag == 'Rejected' ? Colors.redAccent : const Color(0xFF6B6E94),
+                          fontWeight: FontWeight.w700, fontSize: 9
                         )),
                       )
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
+                      Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                      const SizedBox(width: 4),
                       Expanded(
-                        child: Row(
-                          children: [
-                            Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 16, color: textColor.withValues(alpha: 0.7)),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _formatIndonesianDate(dateString),
-                                style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          _formatIndonesianDate(dateString),
+                          style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Row(
-                        children: [
-                          Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 16, color: textColor.withValues(alpha: 0.7)),
-                          const SizedBox(width: 6),
-                          Text(
-                            _formatTime(dateString),
-                            style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
-                        ],
+                      const SizedBox(width: 8),
+                      Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatTime(dateString),
+                        style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
                       ),
                     ],
                   ),

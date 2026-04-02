@@ -42,6 +42,16 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
     // Validasi data sebelum submit
     final draft = ref.read(createTaskFormProvider);
 
+    // Debug: Tampilkan data yang akan dikirim
+    debugPrint('[CreateTaskReviewScreen] Submitting with data:');
+    debugPrint('  - buildingType: ${draft.buildingType}');
+    debugPrint('  - area: ${draft.area}');
+    debugPrint('  - areaId: ${draft.areaId}');
+    debugPrint('  - riskLevel: ${draft.riskLevel}');
+    debugPrint('  - photos: ${draft.photos.length} files');
+    debugPrint('  - notes: ${draft.notes?.substring(0, draft.notes!.length > 50 ? 50 : draft.notes!.length)}...');
+    debugPrint('  - rootCause: ${draft.rootCause}');
+
     if (draft.buildingType == null ||
         draft.buildingType!.isEmpty ||
         draft.area == null ||
@@ -64,19 +74,46 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
                 Text('Data Belum Lengkap'),
               ],
             ),
-            content: const Text(
+            content: Text(
               'Mohon lengkapi semua data sebelum mengirim laporan:\n'
-              '• Jenis Bangunan\n'
-              '• Lokasi Area\n'
-              '• Tingkat Risiko\n'
-              '• Minimal 1 Foto\n'
-              '• Keterangan\n'
-              '• Akar Masalah',
+              '• Jenis Bangunan: ${draft.buildingType ?? "BELUM DIPILIH"}\n'
+              '• Lokasi Area: ${draft.area ?? "BELUM DIPILIH"}\n'
+              '• Area ID: ${draft.areaId ?? "NULL"}\n'
+              '• Tingkat Risiko: ${draft.riskLevel ?? "BELUM DIPILIH"}\n'
+              '• Foto: ${draft.photos.length} foto (minimal 1)\n'
+              '• Keterangan: ${(draft.notes?.isEmpty ?? true) ? "BELUM DIISI" : draft.notes}\n'
+              '• Akar Masalah: ${(draft.rootCause?.isEmpty ?? true) ? "BELUM DIISI" : draft.rootCause}',
             ),
             actions: [
               TextButton(
                 onPressed: () => ctx.pop(),
                 child: const Text('OK', style: TextStyle(color: Colors.orange)),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // Validasi areaId tidak null
+    if (draft.areaId == null) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Error: Area ID Null'),
+              ],
+            ),
+            content: Text('Area ID belum diset. Silakan pilih area kembali.\nArea: ${draft.area}\nArea ID: ${draft.areaId}'),
+            actions: [
+              TextButton(
+                onPressed: () => ctx.pop(),
+                child: const Text('OK', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
@@ -166,7 +203,33 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
       }
     } catch (e) {
       // Exception tidak tertangkap di provider
-      debugPrint('[CreateTaskReviewScreen] Submit error: $e');
+      debugPrint('═════════════════════════════════════');
+      debugPrint('❌ [CreateTaskReviewScreen] SUBMIT ERROR');
+      debugPrint('❌ Error: ${e.toString()}');
+      debugPrint('❌ Type: ${e.runtimeType}');
+      debugPrint('═════════════════════════════════════');
+
+      // Tampilkan dialog dengan detail error lengkap
+      String errorMessage = 'Terjadi kesalahan:\n\n${e.toString()}\n\n';
+
+      if (e.toString().contains('Title cannot be empty')) {
+        errorMessage += '💡 Solusi: Pastikan title terisi dengan benar.';
+      } else if (e.toString().contains('area_id tidak valid')) {
+        errorMessage += '💡 Solusi: Pilih area terlebih dahulu di langkah 2.';
+      } else if (e.toString().contains('Risk level tidak boleh kosong')) {
+        errorMessage += '💡 Solusi: Pilih tingkat risiko di langkah 3.';
+      } else if (e.toString().contains('Root cause tidak boleh kosong')) {
+        errorMessage += '💡 Solusi: Isi akar masalah di langkah 6.';
+      } else if (e.toString().contains('Notes tidak boleh kosong')) {
+        errorMessage += '💡 Solusi: Isi keterangan di langkah 5.';
+      } else if (e.toString().contains('Invalid risk_level')) {
+        errorMessage += '💡 Solusi: Pilih ulang tingkat risiko (1-4).';
+      } else if (e.toString().contains('422')) {
+        errorMessage += '💡 Validasi backend gagal. Cek:\n• Area sudah dipilih?\n• Foto sudah diambil?\n• Semua form terisi?';
+      } else if (e.toString().contains('DioException')) {
+        errorMessage += '💡 Koneksi error. Periksa internet Anda.';
+      }
+
       if (mounted) {
         showDialog(
           context: context,
@@ -175,14 +238,16 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
               children: [
                 Icon(Icons.error, color: Colors.red),
                 SizedBox(width: 8),
-                Text('Terjadi Kesalahan'),
+                Text('Submit Gagal'),
               ],
             ),
-            content: Text('Terjadi kesalahan: ${e.toString()}'),
+            content: SingleChildScrollView(
+              child: Text(errorMessage),
+            ),
             actions: [
               TextButton(
                 onPressed: () => ctx.pop(),
-                child: const Text('OK', style: TextStyle(color: Colors.red)),
+                child: const Text('OK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
