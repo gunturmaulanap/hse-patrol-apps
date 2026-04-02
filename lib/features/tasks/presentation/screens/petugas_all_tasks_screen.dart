@@ -90,7 +90,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     }
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
@@ -176,7 +176,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                 indicator: BoxDecoration(color: const Color(0xFFD4D8FF), borderRadius: BorderRadius.circular(AppRadius.pill)),
                 labelColor: const Color(0xFF1E1E1E), unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: AppTypography.body1.copyWith(fontWeight: FontWeight.bold), indicatorPadding: EdgeInsets.zero,
-                tabs: [ _buildTab('All'), _buildTab('Pending'), _buildTab('Follow Up Done'), _buildTab('Completed'), _buildTab('Canceled') ],
+                tabs: [ _buildTab('All'), _buildTab('Pending'), _buildTab('Follow Up Done'), _buildTab('Pending Rejected'), _buildTab('Completed'), _buildTab('Canceled') ],
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -185,6 +185,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                     _buildTaskList(reports, 'All'),
                     _buildTaskList(reports, 'Pending'),
                     _buildTaskList(reports, 'Follow Up Done'),
+                    _buildTaskList(reports, 'Pending Rejected'),
                     _buildTaskList(reports, 'Completed'),
                     _buildTaskList(reports, 'Canceled'),
                   ],
@@ -254,10 +255,30 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     }
   }
 
+  // Helper untuk menentukan status sebenarnya dari report
+  String _getActualStatus(Map<String, dynamic> report) {
+    // Cek follow-ups terakhir
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
   Widget _buildTaskList(List<Map<String, dynamic>> allReports, String filter) {
     List<Map<String, dynamic>> filtered = filter == 'All'
         ? allReports
-        : allReports.where((r) => r['status'] == filter).toList();
+        : allReports.where((r) => _getActualStatus(r) == filter).toList();
 
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((r) {
@@ -319,6 +340,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
             Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('${index + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontSize: 14))),
             ...tasks.asMap().entries.map((taskEntry) {
               final task = taskEntry.value;
+              final actualStatus = _getActualStatus(task);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _buildExactTaskCard(
@@ -326,8 +348,8 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                   index: taskEntry.key,
                   title: _getReportTitle(task),
                   dateString: task['date']?.toString(),
-                  rawStatus: task['status']?.toString() ?? 'Pending',
-                  tag: _getStatusTag(task['status']?.toString()),
+                  rawStatus: actualStatus,
+                  tag: _getStatusTag(actualStatus),
                   reportId: task['id'].toString(),
                 ),
               );
@@ -343,6 +365,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     switch (status.toLowerCase()) {
       case 'pending': return const Color(0xFFD4D8FF);
       case 'follow up done': return const Color(0xFFFAFF9F);
+      case 'pending rejected': return const Color(0xFFFFCDD2); // Merah muda
       case 'completed': return const Color(0xFFC1F0D0);
       case 'canceled': return const Color(0xFF1E1E1E); // Hitam Solid
       default: return const Color(0xFFFFFFFF);
@@ -476,6 +499,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     switch (status.toLowerCase()) {
       case 'pending': return 'Pending';
       case 'follow up done': return 'Waiting Review';
+      case 'pending rejected': return 'Rejected';
       case 'completed': return 'Completed';
       case 'canceled': return 'Canceled';
       default: return null;

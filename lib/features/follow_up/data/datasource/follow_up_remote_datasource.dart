@@ -25,7 +25,8 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   Future<List<FollowUpModel>> getFollowUpsByReport(int reportId) async {
     try {
       _log('Fetching follow-ups for report $reportId');
-      final response = await _dio.get('/hse-reports/$reportId/follow-ups');
+      // PERBAIKAN 1: Endpoint sesuai API Docs (tanpa /hse-reports)
+      final response = await _dio.get('/$reportId/follow-ups');
 
       _log('Response status: ${response.statusCode}');
 
@@ -45,7 +46,8 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   Future<FollowUpModel> getFollowUpById(int reportId, int followUpId) async {
     try {
       _log('Fetching follow-up $followUpId for report $reportId');
-      final response = await _dio.get('/hse-reports/$reportId/follow-ups/$followUpId');
+      // PERBAIKAN 1: Endpoint sesuai API Docs
+      final response = await _dio.get('/$reportId/follow-ups/$followUpId');
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
@@ -68,12 +70,6 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
       _log('═════════════════════════════════════');
       _log('🚀 CREATING NEW FOLLOW-UP');
       _log('═════════════════════════════════════');
-      _log('📋 Report ID: $reportId');
-      _log('📋 Request Data:');
-      _log('  • action: "${request.action}"');
-      _log('  • notes_pic: "${request.notesPic}"');
-      _log('  • notes_hse: "${request.notesHse ?? "null"}"');
-      _log('  • photos: ${photos?.length ?? 0} files');
 
       final formData = FormData.fromMap({
         'action': request.action.trim(),
@@ -81,100 +77,63 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
         if (request.notesHse != null && request.notesHse!.trim().isNotEmpty) 'notes_hse': request.notesHse!.trim(),
       });
 
-      // PERBAIKAN 1: Kirim foto sebagai array 'photos[]' bukan 'photo1', 'photo2'
+      // PERBAIKAN 2: Format array key photos[$i] sesuai docs API
       if (photos != null && photos.isNotEmpty) {
         _log('📷 Processing ${photos.length} photos...');
         for (var i = 0; i < photos.length && i < 3; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
-            filename: 'photo${i + 1}.jpg',
+            filename: 'photo_${i + 1}.jpg', // Set ekstensi yang valid
           );
-          formData.files.add(MapEntry('photos[]', file)); // Gunakan 'photos[]' untuk array
-          _log('  • photos[]: ${photos[i].path}');
+          formData.files.add(MapEntry('photos[$i]', file)); 
+          _log('  • photos[$i]: ${photos[i].path}');
         }
       }
 
-      _log('✅ All validations passed');
-      _log('📤 FormData fields: ${formData.fields.map((e) => '${e.key}: ${e.value}').toList()}');
-      _log('📤 FormData files: ${formData.files.length} files');
-
-      _log('🌐 Sending POST request to /hse-reports/$reportId/follow-ups...');
+      _log('🌐 Sending POST request to /$reportId/follow-ups...');
+      
+      // PERBAIKAN 3: Jangan gunakan options contentType secara manual agar boundary Dio tidak hilang
       final response = await _dio.post(
-        '/hse-reports/$reportId/follow-ups',
+        '/$reportId/follow-ups',
         data: formData,
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
-
-      _log('📥 Response status: ${response.statusCode}');
-      _log('📥 Response data: ${response.data}');
-
-      if (response.statusCode == 422) {
-        // Parse error message dari response backend
-        String errorMsg = 'Validation error from backend';
-        dynamic errors = null;
-
-        if (response.data is Map) {
-          final data = response.data as Map<String, dynamic>;
-          errorMsg = data['message']?.toString() ??
-                     data['error']?.toString() ??
-                     data['errors']?.toString() ??
-                     'Validation error (422): ${data.toString()}';
-
-          // Cek apakah ada field errors
-          if (data['errors'] != null) {
-            errors = data['errors'];
-          }
-        }
-
-        _log('❌❌❌ ERROR 422 DETAIL ❌❌❌');
-        _log('❌ Message: $errorMsg');
-        _log('❌ Errors: $errors');
-        _log('❌ Full Response: ${response.data}');
-
-        // Buat pesan error yang sangat detail
-        final errorDetail = StringBuffer('Backend validation error (422)\n\n');
-        errorDetail.writeln('📋 Pesan Backend: $errorMsg');
-
-        if (errors != null) {
-          if (errors is Map) {
-            errors.forEach((key, value) {
-              errorDetail.writeln('• $key: $value');
-            });
-          } else if (errors is List) {
-            errors.forEach((item) {
-              errorDetail.writeln('• $item');
-            });
-          }
-        }
-
-        throw Exception(errorDetail.toString());
-      }
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
       if (data == null) {
-        _log('❌ ERROR: Failed to extract data from response');
         throw Exception('Failed to create follow-up');
       }
 
-      _log('✅ SUCCESS! Follow-up created with ID: ${data['id']}');
-      _log('═════════════════════════════════════');
+      _log('✅ SUCCESS! Follow-up created');
       return _parseFollowUpModel(data);
-    } catch (e) {
-      _log('❌ Error creating follow-up: ${e.toString()}');
-      _log('❌ Error type: ${e.runtimeType}');
-
-      // Ekstrak response body dari DioException
-      if (e is DioException) {
-        _log('❌ DioException response status: ${e.response?.statusCode}');
-        _log('❌ DioException response data: ${e.response?.data}');
-        _log('❌ DioException response headers: ${e.response?.headers}');
+    } on DioException catch (e) {
+      // Tangkap error validasi secara rapih
+      if (e.response?.statusCode == 422) {
+        final responseData = e.response?.data;
+        String errorMsg = 'Validasi data gagal.';
+        
+        if (responseData is Map<String, dynamic>) {
+          errorMsg = responseData['message']?.toString() ?? errorMsg;
+          final errors = responseData['errors'];
+          
+          if (errors is Map) {
+            final errorDetail = StringBuffer('$errorMsg\n\n');
+            errors.forEach((key, value) {
+              if (value is List) {
+                errorDetail.writeln('• ${value.join(", ")}');
+              } else {
+                errorDetail.writeln('• $value');
+              }
+            });
+            throw Exception(errorDetail.toString().trim());
+          }
+        }
+        throw Exception(errorMsg);
       }
-
+      rethrow;
+    } catch (e) {
       rethrow;
     }
   }
@@ -182,8 +141,6 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   @override
   Future<FollowUpModel> updateFollowUp(int reportId, int followUpId, CreateFollowUpRequest request, {List<File>? photos}) async {
     try {
-      _log('Updating follow-up $followUpId for report $reportId');
-
       final formData = FormData.fromMap({
         'mode': 'update',
         'action': request.action.trim(),
@@ -191,23 +148,20 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
         if (request.notesHse != null && request.notesHse!.trim().isNotEmpty) 'notes_hse': request.notesHse!.trim(),
       });
 
-      // Disamakan format fotonya menjadi photos[] untuk array
       if (photos != null && photos.isNotEmpty) {
         for (var i = 0; i < photos.length && i < 3; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
-            filename: 'photo${i + 1}.jpg',
+            filename: 'photo_${i + 1}.jpg',
           );
-          formData.files.add(MapEntry('photos[]', file)); // Gunakan 'photos[]' untuk array
+          formData.files.add(MapEntry('photos[$i]', file)); 
         }
       }
 
+      // Endpoint sesuai docs dan tanpa options header manual
       final response = await _dio.put(
-        '/hse-reports/$reportId/follow-ups/$followUpId',
+        '/$reportId/follow-ups/$followUpId',
         data: formData,
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
 
       final data = response.data is Map
@@ -219,8 +173,12 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
       }
 
       return _parseFollowUpModel(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+         throw Exception(e.response?.data['message'] ?? 'Validasi update gagal');
+      }
+      throw Exception('Gagal update follow-up: ${e.message}');
     } catch (e) {
-      _log('Error updating follow-up: ${e.toString()}');
       throw Exception('Gagal update follow-up: ${e.toString()}');
     }
   }
@@ -229,7 +187,7 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   Future<FollowUpModel> approveFollowUp(int reportId, int followUpId, String approval, String? notesHse) async {
     try {
       final response = await _dio.put(
-        '/hse-reports/$reportId/follow-ups/$followUpId',
+        '/$reportId/follow-ups/$followUpId',
         data: {
           'mode': 'approval',
           'approval': approval.trim(),
@@ -258,7 +216,7 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   Future<void> deleteFollowUp(int reportId, int followUpId) async {
     try {
       await _dio.put(
-        '/hse-reports/$reportId/follow-ups/$followUpId',
+        '/$reportId/follow-ups/$followUpId',
         data: {'mode': 'delete'},
         options: Options(
           contentType: Headers.jsonContentType,
@@ -272,26 +230,22 @@ class FollowUpRemoteDataSourceImpl implements FollowUpRemoteDataSource {
   FollowUpModel _parseFollowUpModel(Map<String, dynamic> json) {
     return FollowUpModel(
       id: _toInt(json['id']),
-      // PERBAIKAN 2: Menambahkan fallback untuk hse_report_id
       reportId: _toInt(json['hse_report_id'] ?? json['report_id'] ?? json['reportId']), 
       action: json['action']?.toString() ?? '',
       notesPic: json['notes_pic']?.toString() ?? json['notesPic']?.toString(),
       notesHse: json['notes_hse']?.toString() ?? json['notesHse']?.toString(),
-      // PERBAIKAN 3: Memanggil fungsi helper parsing foto agar aman meskipun format dari backend adalah Map {}
       photos: _parsePhotos(json['photos']),
       status: json['status']?.toString(),
       date: json['date']?.toString() ?? json['created_at']?.toString(),
     );
   }
 
-  // Helper aman untuk konversi integer
   int _toInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  // Helper aman untuk parse foto (mendukung List[] maupun Map{}) dan filter null
   List<String> _parsePhotos(dynamic raw) {
     if (raw is List) {
       return raw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty && e != 'null').toList();

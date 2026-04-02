@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -22,18 +25,46 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
   Future<void> _takePhoto(int index) async {
     final draft = ref.read(picFollowUpFormProvider);
     final hasPhoto = index < draft.photos.length;
-    
-    if (hasPhoto) return; 
+
+    if (hasPhoto) return;
 
     final picker = ImagePicker();
-    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-    
+    // PERBAIKAN: Kompresi gambar agar tidak ditolak oleh server (PHP upload max limit)
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 60, // Kompresi kualitas menjadi 60%
+      maxWidth: 1200,   // Batasi resolusi maksimal 1200px
+      maxHeight: 1200,  // Batasi resolusi maksimal 1200px
+    );
+
     if (photo == null) return;
 
     if (mounted) setState(() => _isProcessing = true);
-    
+
     ref.read(picFollowUpFormProvider.notifier).addPhoto(photo.path);
-    
+
+    // Terapkan ML Kit Text Recognition
+    try {
+      final inputImage = InputImage.fromFilePath(photo.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+
+      final String extractedText = recognizedText.text.trim();
+
+      if (extractedText.isNotEmpty) {
+        final currentNotes = ref.read(picFollowUpFormProvider).notes ?? '';
+        final newNotes = currentNotes.isEmpty
+            ? extractedText
+            : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
+
+        ref.read(picFollowUpFormProvider.notifier).setNotes(newNotes);
+      }
+
+      textRecognizer.close();
+    } catch (e) {
+      debugPrint('ML Kit Text Recognition Error: $e');
+    }
+
     if (mounted) setState(() => _isProcessing = false);
   }
 
@@ -55,12 +86,12 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
                   child: Text('Langkah 1 dari 3', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
                 ),
                 Text(
-                  'Ambil Foto Tindak Lanjut',
+                  'Ambil Foto Perbaikan',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Wajib melampirkan minimal 1 foto langsung dari kamera untuk membuktikan bahwa perbaikan telah dilakukan di lapangan.',
+                  'Minimal 1 foto wajib diambil langsung dari kamera untuk bukti riil. Jika terdapat tulisan pada foto, sistem akan mengekstrak otomatis.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -125,8 +156,18 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
           ),
         ),
         child: hasPhoto
-            ? ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(draft.photos[index]), fit: BoxFit.cover))
-            : const Icon(Icons.add_a_photo, color: AppColors.textHint, size: 36),
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  File(draft.photos[index]),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : const HugeIcon(
+                icon: HugeIcons.strokeRoundedCameraAdd01,
+                color: AppColors.textHint,
+                size: 36,
+              ),
       ),
     );
   }

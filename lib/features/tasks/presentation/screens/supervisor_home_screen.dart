@@ -252,7 +252,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Monitor task progres lintas HSE staff dengan visual status yang konsisten.',
+            'Pantau progres task HSE staff dengan visual status.',
             style: AppTypography.body1.copyWith(color: AppColors.textInverted.withValues(alpha: 0.9)),
           ),
           const SizedBox(height: 16),

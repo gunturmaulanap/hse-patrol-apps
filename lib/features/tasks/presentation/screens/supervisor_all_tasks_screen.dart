@@ -188,6 +188,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                   _buildTab('All'),
                   _buildTab('Pending'),
                   _buildTab('Follow Up Done'),
+                  _buildTab('Pending Rejected'),
                   _buildTab('Completed'),
                   _buildTab('Canceled'),
                 ],
@@ -199,6 +200,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                     _buildTaskList(sourceList, 'All'),
                     _buildTaskList(sourceList, 'Pending'),
                     _buildTaskList(sourceList, 'Follow Up Done'),
+                    _buildTaskList(sourceList, 'Pending Rejected'),
                     _buildTaskList(sourceList, 'Completed'),
                     _buildTaskList(sourceList, 'Canceled'),
                   ],
@@ -377,8 +379,28 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     );
   }
 
+  // Helper untuk menentukan status sebenarnya dari report
+  String _getActualStatus(Map<String, dynamic> report) {
+    // Cek follow-ups terakhir
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
   Widget _buildTaskList(List<Map<String, dynamic>> source, String filter) {
-    var filtered = filter == 'All' ? source : source.where((r) => (r['status']?.toString() ?? '') == filter).toList();
+    var filtered = filter == 'All' ? source : source.where((r) => _getActualStatus(r) == filter).toList();
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
@@ -447,14 +469,15 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
             ),
             ...tasks.asMap().entries.map((entry) {
               final task = entry.value;
+              final actualStatus = _getActualStatus(task);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _buildExactTaskCard(
                   context,
                   title: _getReportTitle(task),
                   dateString: task['date']?.toString(),
-                  rawStatus: task['status']?.toString() ?? 'Pending',
-                  tag: _getStatusTag(task['status']?.toString()),
+                  rawStatus: actualStatus,
+                  tag: _getStatusTag(actualStatus),
                   reportId: task['id'].toString(),
                   staffName: task['staffName']?.toString() ?? '-',
                 ),
@@ -473,6 +496,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         return const Color(0xFFD4D8FF);
       case 'follow up done':
         return const Color(0xFFFAFF9F);
+      case 'pending rejected':
+        return const Color(0xFFFFCDD2); // Merah muda
       case 'completed':
         return const Color(0xFFC1F0D0);
       case 'canceled':
@@ -620,6 +645,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         return 'Pending';
       case 'follow up done':
         return 'Waiting Review';
+      case 'pending rejected':
+        return 'Rejected';
       case 'completed':
         return 'Completed';
       case 'canceled':

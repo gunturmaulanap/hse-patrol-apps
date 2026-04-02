@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,18 +40,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
   }
 
   void _submitData() async {
-    // Validasi data sebelum submit
     final draft = ref.read(createTaskFormProvider);
-
-    // Debug: Tampilkan data yang akan dikirim
-    debugPrint('[CreateTaskReviewScreen] Submitting with data:');
-    debugPrint('  - buildingType: ${draft.buildingType}');
-    debugPrint('  - area: ${draft.area}');
-    debugPrint('  - areaId: ${draft.areaId}');
-    debugPrint('  - riskLevel: ${draft.riskLevel}');
-    debugPrint('  - photos: ${draft.photos.length} files');
-    debugPrint('  - notes: ${draft.notes?.substring(0, draft.notes!.length > 50 ? 50 : draft.notes!.length)}...');
-    debugPrint('  - rootCause: ${draft.rootCause}');
 
     if (draft.buildingType == null ||
         draft.buildingType!.isEmpty ||
@@ -96,7 +86,6 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
       return;
     }
 
-    // Validasi areaId tidak null
     if (draft.areaId == null) {
       if (mounted) {
         showDialog(
@@ -125,91 +114,104 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
     setState(() => _isSubmitting = true);
 
     try {
-      final success = await ref.read(createTaskFormProvider.notifier).submitTask();
+      // createdTask sekarang akan berisi data HseTaskModel (karena Provider sudah diedit)
+      final createdTask = await ref.read(createTaskFormProvider.notifier).submitTask();
 
-      if (success && mounted) {
-        // Form sudah di-reset di provider setelah submit berhasil
+      // Pastikan response tidak null dan bukan boolean (hanya untuk pengaman)
+      if (createdTask != null && createdTask is! bool && mounted) {
+        
+        // Buat format pesan WhatsApp
+        final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
+
+📍 *Area:* ${draft.area}
+🏢 *Bangunan:* ${draft.buildingType}
+⚠️ *Tingkat Risiko:* Level ${draft.riskLevel}
+📝 *Akar Masalah:* ${draft.rootCause}
+💬 *Keterangan:* ${draft.notes}
+
+Terdapat temuan HSE di area Anda. Klik link di bawah ini untuk melihat detail foto dan melakukan *Follow Up*:
+🔗 ${createdTask.picToken ?? 'Link belum tersedia'}''';
 
         if (!mounted) return;
+        
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             title: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
                 SizedBox(width: 8),
                 Text('Berhasil!'),
               ],
             ),
-            content: const Text('Laporan Patroli berhasil dikirim.'),
-            actionsAlignment: MainAxisAlignment.center,
-            actions: [
-              AppButton(
-                text: 'Bagikan via WhatsApp',
-                icon: const HugeIcon(
-                  icon: HugeIcons.strokeRoundedShare01,
-                  color: Colors.black,
-                  size: 20,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // === POPUP IMAGE PERTAMA DITAMPILKAN DI SINI ===
+                if (draft.photos.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(draft.photos.first),
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Laporan patroli berhasil dikirim ke server. Silakan bagikan ke WhatsApp PIC terkait.',
+                  textAlign: TextAlign.center,
                 ),
-                onPressed: () async {
-                  final url = Uri.parse("whatsapp://send?text=Laporan Patroli Baru telah dibuat di aplikasi HSE Aksamala.");
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url);
-                  }
-                  if (!mounted || !ctx.mounted) return;
-                  ctx.pop();
-                  _goToHomeByRole(context);
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AppButton(
-                text: 'Selesai',
-                type: AppButtonType.outlined,
-                onPressed: () {
-                  ctx.pop();
-                  _goToHomeByRole(context);
-                },
+              ],
+            ),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      text: 'Bagikan',
+                      icon: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedShare01,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+                      onPressed: () async {
+                        // Ubah teks menjadi format URL yang valid
+                        final encodedText = Uri.encodeComponent(waText);
+                        final url = Uri.parse("whatsapp://send?text=$encodedText");
+
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        } else {
+                          debugPrint('Aplikasi WhatsApp tidak ditemukan.');
+                        }
+                        if (!mounted || !ctx.mounted) return;
+                        ctx.pop();
+                        _goToHomeByRole(context);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppButton(
+                      text: 'Selesai',
+                      type: AppButtonType.outlined,
+                      onPressed: () {
+                        ctx.pop();
+                        _goToHomeByRole(context);
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         );
-      } else {
-        // Submit gagal
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.error, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Gagal Mengirim'),
-                ],
-              ),
-              content: const Text(
-                'Laporan gagal dikirim. Silakan periksa koneksi internet dan coba lagi. '
-                'Jika masalah berlanjut, hubungi administrator.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => ctx.pop(),
-                  child: const Text('OK', style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            ),
-          );
-        }
       }
     } catch (e) {
-      // Exception tidak tertangkap di provider
-      debugPrint('═════════════════════════════════════');
-      debugPrint('❌ [CreateTaskReviewScreen] SUBMIT ERROR');
-      debugPrint('❌ Error: ${e.toString()}');
-      debugPrint('❌ Type: ${e.runtimeType}');
-      debugPrint('═════════════════════════════════════');
-
-      // Tampilkan dialog dengan detail error lengkap
       String errorMessage = 'Terjadi kesalahan:\n\n${e.toString()}\n\n';
 
       if (e.toString().contains('Title cannot be empty')) {

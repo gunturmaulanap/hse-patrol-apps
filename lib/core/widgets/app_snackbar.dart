@@ -6,7 +6,7 @@ class AppSnackBar {
     BuildContext context, {
     required String message,
     Color? backgroundColor,
-    Duration duration = const Duration(seconds: 4),
+    Duration duration = const Duration(seconds: 2),
     SnackBarBehavior behavior = SnackBarBehavior.floating,
     Color? textColor,
   }) {
@@ -18,6 +18,7 @@ class AppSnackBar {
         backgroundColor: backgroundColor ?? AppColors.surface,
         duration: duration,
         behavior: behavior,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -35,7 +36,7 @@ class AppSnackBar {
   static void success(
     BuildContext context, {
     required String message,
-    Duration duration = const Duration(seconds: 3),
+    Duration duration = const Duration(seconds: 2),
   }) {
     // Icon close hitam agar kontras dengan background hijau muda
     show(
@@ -50,7 +51,7 @@ class AppSnackBar {
   static void error(
     BuildContext context, {
     required String message,
-    Duration duration = const Duration(seconds: 5),
+    Duration duration = const Duration(seconds: 2),
   }) {
     // Icon close putih agar kontras dengan background merah gelap
     show(
@@ -65,7 +66,7 @@ class AppSnackBar {
   static void warning(
     BuildContext context, {
     required String message,
-    Duration duration = const Duration(seconds: 4),
+    Duration duration = const Duration(seconds: 2),
   }) {
     // Icon close putih agar kontras dengan background kuning/oranye
     show(
@@ -80,7 +81,7 @@ class AppSnackBar {
   static void info(
     BuildContext context, {
     required String message,
-    Duration duration = const Duration(seconds: 3),
+    Duration duration = const Duration(seconds: 2),
   }) {
     // Icon close putih agar kontras dengan background biru
     show(

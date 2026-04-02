@@ -8,7 +8,6 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/create_task_form_provider.dart';
 
@@ -29,8 +28,13 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
     if (hasPhoto) return; // Prevent overwriting existing slot
 
     final picker = ImagePicker();
-    // Dipaksa hanya menggunakan kamera asli:
-    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+    // PERBAIKAN: Kompresi gambar agar tidak ditolak oleh server (PHP upload max limit)
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 60, // Kompresi kualitas menjadi 60%
+      maxWidth: 1200,   // Batasi resolusi maksimal 1200px
+      maxHeight: 1200,  // Batasi resolusi maksimal 1200px
+    );
     
     if (photo == null) return;
 

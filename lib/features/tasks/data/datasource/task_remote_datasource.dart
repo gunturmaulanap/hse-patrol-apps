@@ -32,10 +32,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
 
-      _log('raw /hse-reports response', response.data);
-
       final List<dynamic> data = _extractListData(response.data);
-
       return data.map((json) => _parseReportModel(json as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception('Gagal mengambil data reports: ${e.toString()}');
@@ -46,15 +43,11 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   Future<HseTaskModel> getTaskById(int id) async {
     try {
       final response = await _dio.get('/hse-reports/$id');
-
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) {
-        throw Exception('Report not found');
-      }
-
+      if (data == null) throw Exception('Report not found');
       return _parseReportModel(data);
     } catch (e) {
       throw Exception('Gagal mengambil detail report: ${e.toString()}');
@@ -64,145 +57,76 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   @override
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos) async {
     try {
-      // VALIDASI DATA DENGAN PESAN ERROR YANG JELAS
-      if (request.title.trim().isEmpty) {
-        throw Exception('❌ Title tidak boleh kosong');
-      }
-      if (request.areaId == null || request.areaId! <= 0) {
-        throw Exception('❌ area_id tidak valid: ${request.areaId}. Pastikan area sudah dipilih dengan benar.');
-      }
-      if (request.riskLevel.trim().isEmpty) {
-        throw Exception('❌ Risk level tidak boleh kosong');
-      }
-      if (request.rootCause.trim().isEmpty) {
-        throw Exception('❌ Root cause tidak boleh kosong');
-      }
-      if (request.notes.trim().isEmpty) {
-        throw Exception('❌ Notes tidak boleh kosong');
-      }
-
-      _log('═════════════════════════════════════');
-      _log('🚀 CREATING NEW HSE REPORT');
-      _log('═════════════════════════════════════');
-      _log('📋 Request Data:');
-      _log('  • title: "${request.title}" (${request.title.runtimeType})');
-      _log('  • area_id: ${request.areaId} (${request.areaId.runtimeType})');
-      _log('  • risk_level: "${request.riskLevel}" (${request.riskLevel.runtimeType})');
-      _log('  • root_cause: "${request.rootCause}" (${request.rootCause.runtimeType})');
-      _log('  • notes: "${request.notes}" (${request.notes.runtimeType})');
-      _log('  • photos: ${photos?.length ?? 0} files');
-
-      // Validasi risk level
-      final validRiskLevels = ['1', '2', '3', '4'];
-      if (!validRiskLevels.contains(request.riskLevel)) {
-        throw Exception('❌ Invalid risk_level: "${request.riskLevel}". Must be one of: ${validRiskLevels.join(', ')}');
-      }
-
-      _log('✅ All validations passed');
+      if (request.title.trim().isEmpty) throw Exception('❌ Title tidak boleh kosong');
+      if (request.areaId == null || request.areaId! <= 0) throw Exception('❌ area_id tidak valid');
+      if (request.riskLevel.trim().isEmpty) throw Exception('❌ Risk level tidak boleh kosong');
+      if (request.rootCause.trim().isEmpty) throw Exception('❌ Root cause tidak boleh kosong');
+      if (request.notes.trim().isEmpty) throw Exception('❌ Notes tidak boleh kosong');
 
       final formData = FormData.fromMap({
         'title': request.title.trim(),
-        'area_id': request.areaId, // Integer, bukan string
-        'risk_level': request.riskLevel.trim(), // String sudah sesuai
+        'area_id': request.areaId,
+        'risk_level': request.riskLevel.trim(),
         'root_cause': request.rootCause.trim(),
         'notes': request.notes.trim(),
       });
 
-      _log('📤 FormData fields: ${formData.fields.map((e) => '${e.key}: ${e.value}').toList()}');
-
-      // PERBAIKAN: Kirim foto sebagai array 'photos[]' bukan 'photo1', 'photo2'
+      // PERBAIKAN 1: Format key sesuai API Doc (photos[0], photos[1])
       if (photos != null && photos.isNotEmpty) {
-        _log('📷 Processing ${photos.length} photos...');
         for (var i = 0; i < photos.length && i < 3; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
-            filename: 'photo${i + 1}.jpg',
+            filename: 'photo_${i + 1}.jpg', // Berikan ekstensi valid
           );
-          formData.files.add(MapEntry('photos[]', file)); // Gunakan 'photos[]' untuk array
-          _log('  • photos[]: ${photos[i].path}');
+          formData.files.add(MapEntry('photos[$i]', file)); 
         }
       }
 
-      _log('📤 FormData files: ${formData.files.length} files');
-
-      _log('🌐 Sending POST request to /hse-reports...');
+      // PERBAIKAN 2: Jangan menimpa Options(contentType: ...). 
+      // Biarkan Dio yang membuatkan header Content-Type + Boundary secara otomatis!
       final response = await _dio.post(
         '/hse-reports',
         data: formData,
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
-
-      _log('📥 Response status: ${response.statusCode}');
-      _log('📥 Response data: ${response.data}');
-
-      if (response.statusCode == 422) {
-        // Parse error message dari response backend
-        String errorMsg = 'Validation error from backend';
-        dynamic errors = null;
-
-        if (response.data is Map) {
-          final data = response.data as Map<String, dynamic>;
-          errorMsg = data['message']?.toString() ??
-                     data['error']?.toString() ??
-                     data['errors']?.toString() ??
-                     'Validation error (422): ${data.toString()}';
-
-          // Cek apakah ada field errors
-          if (data['errors'] != null) {
-            errors = data['errors'];
-          }
-        }
-
-        _log('❌❌❌ ERROR 422 DETAIL ❌❌❌');
-        _log('❌ Message: $errorMsg');
-        _log('❌ Errors: $errors');
-        _log('❌ Full Response: ${response.data}');
-
-        // Buat pesan error yang sangat detail
-        final errorDetail = StringBuffer('Backend validation error (422)\n\n');
-        errorDetail.writeln('📋 Pesan Backend: $errorMsg');
-
-        if (errors != null) {
-          if (errors is Map) {
-            errors.forEach((key, value) {
-              errorDetail.writeln('• $key: $value');
-            });
-          } else if (errors is List) {
-            errors.forEach((item) {
-              errorDetail.writeln('• $item');
-            });
-          }
-        }
-
-        throw Exception(errorDetail.toString());
-      }
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) {
-        _log('❌ ERROR: Failed to extract data from response');
-        throw Exception('Failed to create report: ${response.data}');
-      }
+      if (data == null) throw Exception('Failed to create report: ${response.data}');
 
-      _log('✅ SUCCESS! Task created with ID: ${data['id']}');
-      _log('═════════════════════════════════════');
       return _parseReportModel(data);
-    } catch (e) {
-      _log('❌ ERROR creating task: ${e.toString()}');
-      _log('❌ Error type: ${e.runtimeType}');
 
-      // PERBAIKAN: Ekstrak response body dari DioException
-      if (e is DioException) {
-        _log('❌ DioException response status: ${e.response?.statusCode}');
-        _log('❌ DioException response data: ${e.response?.data}');
-        _log('❌ DioException response headers: ${e.response?.headers}');
+    } on DioException catch (e) {
+      // PERBAIKAN 3: Tangkap error 422 di dalam catch block DioException
+      if (e.response?.statusCode == 422) {
+        final responseData = e.response?.data;
+        String errorMsg = 'Validasi data gagal.';
+        
+        if (responseData is Map<String, dynamic>) {
+          errorMsg = responseData['message']?.toString() ?? errorMsg;
+          final errors = responseData['errors'];
+          
+          if (errors is Map) {
+            final errorDetail = StringBuffer('$errorMsg\n\n');
+            errors.forEach((key, value) {
+              if (value is List) {
+                errorDetail.writeln('• ${value.join(", ")}');
+              } else {
+                errorDetail.writeln('• $value');
+              }
+            });
+            // Lempar dengan pesan rapih yang akan dibaca oleh UI
+            throw Exception(errorDetail.toString().trim());
+          }
+        }
+        throw Exception(errorMsg);
       }
-
-      rethrow; // PERBAIKAN: Lempar errornya ke layer atas
+      
+      _log('❌ ERROR creating task: ${e.message}');
+      rethrow;
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -217,34 +141,35 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'notes': request.notes,
       });
 
-      // Disamakan formatnya dengan create (photos[] untuk array)
       if (photos != null && photos.isNotEmpty) {
         for (var i = 0; i < photos.length && i < 3; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
-            filename: 'photo${i + 1}.jpg',
+            filename: 'photo_${i + 1}.jpg',
           );
-          formData.files.add(MapEntry('photos[]', file)); // Gunakan 'photos[]' untuk array
+          formData.files.add(MapEntry('photos[$i]', file)); 
         }
       }
 
+      // Sama, biarkan dio mengatur Boundary untuk PUT multipart (jika server support)
       final response = await _dio.put(
         '/hse-reports/$id',
         data: formData,
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) {
-        throw Exception('Failed to update report');
-      }
+      if (data == null) throw Exception('Failed to update report');
 
       return _parseReportModel(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+         // Sama seperti create, bisa Anda perluas jika butuh pesan detail
+         throw Exception(e.response?.data['message'] ?? 'Validasi update gagal');
+      }
+      throw Exception('Gagal update report: ${e.message}');
     } catch (e) {
       throw Exception('Gagal update report: ${e.toString()}');
     }
@@ -256,9 +181,6 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       await _dio.put(
         '/hse-reports/$id',
         data: FormData.fromMap({'mode': 'cancel'}),
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
     } catch (e) {
       throw Exception('Gagal cancel report: ${e.toString()}');
@@ -284,7 +206,6 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       status: json['status']?.toString() ?? '',
       picToken: json['pic_token']?.toString() ?? json['picToken']?.toString(),
       photos: parsedPhotos,
-      // PERBAIKAN: Parsing aman untuk followUps kosong dari backend
       followUps: (json['follow_ups'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ??
                  (json['followUps'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ??
                  [],

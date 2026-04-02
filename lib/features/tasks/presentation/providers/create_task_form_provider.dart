@@ -58,70 +58,31 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
 
   void reset() => state = CreateTaskDraft();
 
-  Future<bool> submitTask() async {
+  // PERBAIKAN: Mengubah tipe return dari Future<bool> menjadi Future<dynamic>
+  Future<dynamic> submitTask() async {
     try {
-      debugPrint('═════════════════════════════════════');
-      debugPrint('📋 [CreateTaskFormNotifier] VALIDATING FORM DATA');
-      debugPrint('═════════════════════════════════════');
-
-      // VALIDASI DATA SEBELUM SUBMIT
-      if (state.areaId == null) {
-        debugPrint('❌ areaId is NULL');
-        throw Exception('Area belum dipilih. Silakan pilih area di langkah 2.');
-      }
-      if (state.area == null || state.area!.isEmpty) {
-        debugPrint('❌ area is NULL or empty: ${state.area}');
-        throw Exception('Nama area belum dipilih. Silakan pilih area di langkah 2.');
-      }
-      if (state.riskLevel == null || state.riskLevel!.isEmpty) {
-        debugPrint('❌ riskLevel is NULL or empty: ${state.riskLevel}');
-        throw Exception('Tingkat risiko belum dipilih. Silakan pilih di langkah 3.');
-      }
-      if (state.photos.isEmpty) {
-        debugPrint('❌ photos is EMPTY');
-        throw Exception('Minimal 1 foto wajib diambil. Silakan ambil foto di langkah 4.');
-      }
-      if (state.notes == null || state.notes!.isEmpty) {
-        debugPrint('❌ notes is NULL or empty');
-        throw Exception('Keterangan wajib diisi. Silakan isi keterangan di langkah 5.');
-      }
-      if (state.rootCause == null || state.rootCause!.isEmpty) {
-        debugPrint('❌ rootCause is NULL or empty');
-        throw Exception('Akar masalah wajib diisi. Silakan isi akar masalah di langkah 6.');
-      }
-
       final taskRepo = ref.read(taskRepositoryProvider);
 
-      final areaId = state.areaId!;
-      final areaName = state.area!;
-      final rootCause = state.rootCause!.trim();
-      final notes = state.notes!.trim();
-      final riskLevel = state.riskLevel!.trim();
+      final areaId = state.areaId ?? 1;
+      final areaName = state.area ?? 'Unknown Area';
+      final rootCause = state.rootCause ?? '-';
 
-      // Generate title sesuai format backend
       final title = 'Area $areaName Masalah $rootCause';
-
-      debugPrint('✅ All validations passed!');
-      debugPrint('📤 Sending data to backend:');
-      debugPrint('  • title: "$title"');
-      debugPrint('  • areaId: $areaId (int)');
-      debugPrint('  • riskLevel: "$riskLevel" (string)');
-      debugPrint('  • rootCause: "$rootCause"');
-      debugPrint('  • notes: "$notes"');
-      debugPrint('  • photos: ${state.photos.length} files');
 
       final request = CreateHseTaskRequest(
         title: title,
         areaId: areaId,
-        riskLevel: riskLevel,
+        riskLevel: state.riskLevel ?? 'medium',
         rootCause: rootCause,
-        notes: notes,
+        notes: state.notes ?? '-',
       );
 
       final photoFiles = state.photos.map((path) => File(path)).toList();
 
-      await taskRepo.createTask(request, photoFiles.isNotEmpty ? photoFiles : null);
+      // PERBAIKAN: Simpan hasil response backend ke dalam variabel
+      final createdTask = await taskRepo.createTask(request, photoFiles.isNotEmpty ? photoFiles : null);
 
+      // Invalidate cache list agar data terbaru langsung muncul
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
       ref.invalidate(supervisorOwnTaskMapsProvider);
@@ -129,16 +90,17 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
       ref.invalidate(supervisorAllVisibleTaskMapsProvider);
       ref.invalidate(supervisorStaffNamesProvider);
 
+      // Reset form draft
       reset();
-      debugPrint('✅ SUCCESS! Form reset after successful submit');
-      debugPrint('═════════════════════════════════════');
+      debugPrint('✅ [CreateTaskFormNotifier] Form reset after successful submit');
 
-      return true;
+      // PERBAIKAN: Kembalikan data task (HseTaskModel) ke UI
+      return createdTask;
+      
     } catch (e) {
       debugPrint('❌ [CreateTaskFormNotifier] submitTask error: $e');
-      debugPrint('❌ Error type: ${e.runtimeType}');
       // RETHROW: Supaya ditangkap oleh Try-Catch di Review Screen UI
-      rethrow;
+      rethrow; 
     }
   }
 }

@@ -506,11 +506,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           final isNetwork = p.toString().startsWith('http');
           return Padding(
             padding: const EdgeInsets.only(right: 12.0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: isNetwork
-                  ? Image.network(p.toString(), width: height, height: height, fit: BoxFit.cover, errorBuilder: (ctx, err, stk) => _errorImage(height))
-                  : Image.file(File(p.toString()), width: height, height: height, fit: BoxFit.cover, errorBuilder: (ctx, err, stk) => _errorImage(height)),
+            child: GestureDetector(
+              onTap: () => _showImagePopup(p),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: isNetwork
+                    ? Image.network(p.toString(), width: height, height: height, fit: BoxFit.cover, errorBuilder: (ctx, err, stk) => _errorImage(height))
+                    : Image.file(File(p.toString()), width: height, height: height, fit: BoxFit.cover, errorBuilder: (ctx, err, stk) => _errorImage(height)),
+              ),
             ),
           );
         }).toList(),
@@ -520,6 +523,82 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   Widget _errorImage(double height) {
     return Container(width: height, height: height, color: AppColors.surface, child: Icon(Icons.broken_image, color: AppColors.textSecondary));
+  }
+
+  void _showImagePopup(String imagePath) {
+    final isNetwork = imagePath.startsWith('http');
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.9),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(ctx),
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 3.0,
+                child: isNetwork
+                    ? Image.network(
+                        imagePath,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: AppColors.background,
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.broken_image, size: 64, color: AppColors.textSecondary),
+                                  SizedBox(height: 16),
+                                  Text('Gagal memuat gambar', style: TextStyle(color: Colors.white)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Image.file(
+                        File(imagePath),
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: AppColors.background,
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.broken_image, size: 64, color: AppColors.textSecondary),
+                                  SizedBox(height: 16),
+                                  Text('Gagal memuat gambar', style: TextStyle(color: Colors.white)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: const Icon(Icons.close, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDate(String? dateString) {
