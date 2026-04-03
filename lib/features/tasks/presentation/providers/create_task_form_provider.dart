@@ -52,6 +52,23 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
   void setArea(String value) => state = state.copyWith(area: value);
   void setRiskLevel(String value) => state = state.copyWith(riskLevel: value);
   void addPhoto(String photoPath) => state = state.copyWith(photos: [...state.photos, photoPath]);
+
+  void removePhoto(int index) {
+    if (index >= 0 && index < state.photos.length) {
+      final newPhotos = List<String>.from(state.photos);
+      newPhotos.removeAt(index);
+      state = state.copyWith(photos: newPhotos);
+    }
+  }
+
+  void updatePhotoAtIndex(int index, String photoPath) {
+    if (index >= 0 && index < state.photos.length) {
+      final newPhotos = List<String>.from(state.photos);
+      newPhotos[index] = photoPath;
+      state = state.copyWith(photos: newPhotos);
+    }
+  }
+
   void setNotes(String value) => state = state.copyWith(notes: value);
   void setRootCause(String value) => state = state.copyWith(rootCause: value);
   void setAreaId(int? id) => state = state.copyWith(areaId: id);

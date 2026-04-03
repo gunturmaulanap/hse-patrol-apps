@@ -205,11 +205,46 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   @override
   Future<void> cancelTask(int id) async {
     try {
-      await _dio.put(
+      // PERBAIKAN: Backend memerlukan field 'mode' = 'cancel'
+      // Kirim sebagai JSON (bukan FormData) karena tidak ada file upload
+      // Menggunakan PATCH untuk partial update (lebih sesuai daripada PUT)
+      final response = await _dio.patch(
         '/hse-reports/$id',
-        data: FormData.fromMap({'mode': 'cancel'}),
+        data: {'mode': 'cancel'},
       );
+
+      // Log response untuk debugging
+      _log('Cancel task response: ${response.statusCode}');
+    } on DioException catch (e) {
+      _log('Cancel task DioException: ${e.response?.statusCode} => ${e.response?.data}');
+
+      // Tangkap error detail dari backend
+      if (e.response?.statusCode == 422) {
+        final responseData = e.response?.data;
+        String errorMsg = 'Gagal membatalkan laporan.';
+
+        if (responseData is Map<String, dynamic>) {
+          errorMsg = responseData['message']?.toString() ?? errorMsg;
+          final errors = responseData['errors'];
+
+          if (errors is Map) {
+            final errorDetail = StringBuffer('$errorMsg\n\n');
+            errors.forEach((key, value) {
+              if (value is List) {
+                errorDetail.writeln('• ${value.join(", ")}');
+              } else {
+                errorDetail.writeln('• $value');
+              }
+            });
+            throw Exception(errorDetail.toString().trim());
+          }
+        }
+        throw Exception(errorMsg);
+      }
+
+      throw Exception('Gagal cancel report: ${e.toString()}');
     } catch (e) {
+      _log('Cancel task error: ${e.toString()}');
       throw Exception('Gagal cancel report: ${e.toString()}');
     }
   }

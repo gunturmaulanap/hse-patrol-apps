@@ -38,7 +38,6 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     final user = ref.watch(currentUserProvider);
     final ownAsync = ref.watch(supervisorOwnTaskMapsProvider);
     final staffAsync = ref.watch(supervisorStaffTaskMapsProvider);
-    final masterStaff = ref.watch(staffMasterUsersProvider);
 
     if (user == null || user.role != 'supervisor') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -52,7 +51,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
     final ownTasks = ownAsync.valueOrNull ?? <Map<String, dynamic>>[];
     final staffTasks = staffAsync.valueOrNull ?? <Map<String, dynamic>>[];
-    final staffEntries = _buildStaffEntries(staffTasks, masterStaff);
+    final staffEntries = _buildStaffEntries(staffTasks);
 
     final selectedStaffId = _selectedStaffId ?? staffEntries.firstOrNull?.id;
     final sourceList = _scope == 'own'
@@ -359,15 +358,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
   List<_StaffEntry> _buildStaffEntries(
     List<Map<String, dynamic>> staffTasks,
-    List<({int id, String name})> masterStaff,
   ) {
     final byId = <int, String>{};
-
-    for (final user in masterStaff) {
-      if (user.id > 0 && user.name.trim().isNotEmpty) {
-        byId[user.id] = user.name.trim();
-      }
-    }
 
     // Build dari data API report: grouping berdasarkan created_by/user_id.
     for (final task in staffTasks) {

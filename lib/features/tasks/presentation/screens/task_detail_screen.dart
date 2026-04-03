@@ -169,9 +169,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           final followUpRepo = ref.read(followUpRepositoryProvider);
           final approval = action.toLowerCase();
 
-          final taskId = _getTaskId();
+          // Gunakan ID dari response API (rpt['id']) yang valid untuk kedua kasus
+          final taskId = rpt['id'] as int?;
           if (taskId == null) {
-            throw Exception('PicToken tidak dapat digunakan untuk operasi ini');
+            throw Exception('Task ID tidak ditemukan dalam response API');
           }
 
           await followUpRepo.approveFollowUp(
@@ -184,10 +185,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
       } else if (action == 'Canceled') {
         // PROSES PEMBATALAN LAPORAN
         final taskRepo = ref.read(taskRepositoryProvider);
-        final taskId = _getTaskId();
+
+        // Gunakan ID dari response API (rpt['id']) yang valid untuk kedua kasus:
+        // - ID numerik biasa
+        // - PicToken dari deep link WhatsApp
+        final taskId = rpt['id'] as int?;
         if (taskId == null) {
-          throw Exception('PicToken tidak dapat digunakan untuk operasi ini');
+          throw Exception('Task ID tidak ditemukan dalam response API');
         }
+
         await taskRepo.cancelTask(taskId);
       }
 

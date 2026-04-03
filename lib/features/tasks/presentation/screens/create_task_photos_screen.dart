@@ -24,7 +24,7 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
   Future<void> _takePhoto(int index) async {
     final draft = ref.read(createTaskFormProvider);
     final hasPhoto = index < draft.photos.length;
-    
+
     if (hasPhoto) return; // Prevent overwriting existing slot
 
     final picker = ImagePicker();
@@ -35,37 +35,82 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
       maxWidth: 1200,   // Batasi resolusi maksimal 1200px
       maxHeight: 1200,  // Batasi resolusi maksimal 1200px
     );
-    
+
     if (photo == null) return;
 
     if (mounted) setState(() => _isProcessing = true);
-    
+
     // Simpan foto ke provider
     ref.read(createTaskFormProvider.notifier).addPhoto(photo.path);
-    
+
     // Terapkan ML Kit Text Recognition
     try {
       final inputImage = InputImage.fromFilePath(photo.path);
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-      
+
       final String extractedText = recognizedText.text.trim();
-      
+
       if (extractedText.isNotEmpty) {
         final currentNotes = ref.read(createTaskFormProvider).notes ?? '';
-        final newNotes = currentNotes.isEmpty 
-            ? extractedText 
+        final newNotes = currentNotes.isEmpty
+            ? extractedText
             : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
-            
+
         ref.read(createTaskFormProvider.notifier).setNotes(newNotes);
       }
-      
+
       textRecognizer.close();
     } catch (e) {
       debugPrint('ML Kit Text Recognition Error: $e');
     }
-    
+
     if (mounted) setState(() => _isProcessing = false);
+  }
+
+  Future<void> _retakePhoto(int index) async {
+    final picker = ImagePicker();
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 60,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+
+    if (photo == null) return;
+
+    if (mounted) setState(() => _isProcessing = true);
+
+    // Update foto di index yang sama
+    ref.read(createTaskFormProvider.notifier).updatePhotoAtIndex(index, photo.path);
+
+    // Terapkan ML Kit Text Recognition
+    try {
+      final inputImage = InputImage.fromFilePath(photo.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+
+      final String extractedText = recognizedText.text.trim();
+
+      if (extractedText.isNotEmpty) {
+        final currentNotes = ref.read(createTaskFormProvider).notes ?? '';
+        final newNotes = currentNotes.isEmpty
+            ? extractedText
+            : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
+
+        ref.read(createTaskFormProvider.notifier).setNotes(newNotes);
+      }
+
+      textRecognizer.close();
+    } catch (e) {
+      debugPrint('ML Kit Text Recognition Error: $e');
+    }
+
+    if (mounted) setState(() => _isProcessing = false);
+  }
+
+  void _removePhoto(int index) {
+    ref.read(createTaskFormProvider.notifier).removePhoto(index);
   }
 
   @override
@@ -101,7 +146,8 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                
+
+                // 3 kolom horizontal - Layout asli dengan simple container
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -151,7 +197,7 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
     final hasPhoto = index < draft.photos.length;
 
     return GestureDetector(
-      onTap: () => _takePhoto(index),
+      onTap: () => hasPhoto ? _retakePhoto(index) : _takePhoto(index),
       child: Container(
         width: 100,
         height: 100,
@@ -164,19 +210,48 @@ class _CreateTaskPhotosScreenState extends ConsumerState<CreateTaskPhotosScreen>
             style: hasPhoto ? BorderStyle.solid : BorderStyle.none,
           ),
         ),
-        child: hasPhoto
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.file(
-                  File(draft.photos[index]), 
-                  fit: BoxFit.cover,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!hasPhoto)
+              const Center(
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCameraAdd01,
+                  color: AppColors.textHint,
+                  size: 36,
                 ),
               )
-            : const HugeIcon(
-                icon: HugeIcons.strokeRoundedCameraAdd01,
-                color: AppColors.textHint,
-                size: 36,
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  File(draft.photos[index]),
+                  fit: BoxFit.cover,
+                ),
               ),
+            // Tombol delete jika ada foto
+            if (hasPhoto)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: GestureDetector(
+                  onTap: () => _removePhoto(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

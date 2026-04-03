@@ -68,6 +68,52 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
     if (mounted) setState(() => _isProcessing = false);
   }
 
+  Future<void> _retakePhoto(int index) async {
+    final picker = ImagePicker();
+    final XFile? photo = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 60,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+
+    if (photo == null) return;
+
+    if (mounted) setState(() => _isProcessing = true);
+
+    // Hapus foto lama dan tambahkan foto baru di index yang sama
+    ref.read(picFollowUpFormProvider.notifier).removePhoto(index);
+    ref.read(picFollowUpFormProvider.notifier).addPhoto(photo.path);
+
+    // Terapkan ML Kit Text Recognition
+    try {
+      final inputImage = InputImage.fromFilePath(photo.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+
+      final String extractedText = recognizedText.text.trim();
+
+      if (extractedText.isNotEmpty) {
+        final currentNotes = ref.read(picFollowUpFormProvider).notes ?? '';
+        final newNotes = currentNotes.isEmpty
+            ? extractedText
+            : '$currentNotes\n\n[Auto-Deteksi Teks ML Kit]:\n$extractedText';
+
+        ref.read(picFollowUpFormProvider.notifier).setNotes(newNotes);
+      }
+
+      textRecognizer.close();
+    } catch (e) {
+      debugPrint('ML Kit Text Recognition Error: $e');
+    }
+
+    if (mounted) setState(() => _isProcessing = false);
+  }
+
+  void _removePhoto(int index) {
+    ref.read(picFollowUpFormProvider.notifier).removePhoto(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final draft = ref.watch(picFollowUpFormProvider);
@@ -95,7 +141,8 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                
+
+                // 3 kolom horizontal - Layout asli dengan simple container
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -142,7 +189,7 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
     final hasPhoto = index < draft.photos.length;
 
     return GestureDetector(
-      onTap: () => _takePhoto(index),
+      onTap: () => hasPhoto ? _retakePhoto(index) : _takePhoto(index),
       child: Container(
         width: 100,
         height: 100,
@@ -155,19 +202,48 @@ class _PicFollowUpPhotosScreenState extends ConsumerState<PicFollowUpPhotosScree
             style: hasPhoto ? BorderStyle.solid : BorderStyle.none,
           ),
         ),
-        child: hasPhoto
-            ? ClipRRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!hasPhoto)
+              const Center(
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCameraAdd01,
+                  color: AppColors.textHint,
+                  size: 36,
+                ),
+              )
+            else
+              ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image.file(
                   File(draft.photos[index]),
                   fit: BoxFit.cover,
                 ),
-              )
-            : const HugeIcon(
-                icon: HugeIcons.strokeRoundedCameraAdd01,
-                color: AppColors.textHint,
-                size: 36,
               ),
+            // Tombol delete jika ada foto
+            if (hasPhoto)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: GestureDetector(
+                  onTap: () => _removePhoto(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart'; // <--- IMPORT PACKAGE BARU
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -41,7 +41,6 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
     if (draft.buildingType == null || draft.area == null || draft.riskLevel == null ||
         draft.photos.isEmpty || draft.notes == null || draft.rootCause == null) {
-      // (Validasi Form seperti biasa)
       AppSnackBar.warning(context, message: 'Harap lengkapi semua data laporan.');
       return;
     }
@@ -53,16 +52,9 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
       if (createdTask != null && createdTask is! bool && mounted) {
         
-        // 1. Ambil URL FOTO ONLINE dari backend (Bukan dari path memori lokal)
-        // URL ini harus disisipkan di teks agar WhatsApp bisa membuat Thumbnail Image Preview
-        String onlinePhotoUrl = '';
-        if (createdTask.photos != null && createdTask.photos!.isNotEmpty) {
-          onlinePhotoUrl = createdTask.photos!.first;
-        }
-
-        // 2. Format WA Text: Letakkan foto online di atas agar dibaca WA bot
+        // Format Teks Caption WA (Sangat bersih tanpa link gambar aneh)
         final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
-${onlinePhotoUrl.isNotEmpty ? '\n🖼️ *Preview Foto:*\n$onlinePhotoUrl\n' : ''}
+
 📍 *Area:* ${draft.area}
 🏢 *Bangunan:* ${draft.buildingType}
 ⚠️ *Tingkat Risiko:* Level ${draft.riskLevel}
@@ -78,6 +70,7 @@ Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk m
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -86,67 +79,87 @@ Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk m
                 Text('Laporan Terkirim!'),
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (draft.photos.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(draft.photos.first),
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Laporan patroli berhasil dikirim ke server. Silakan bagikan ke WhatsApp PIC terkait.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            actions: [
-              Row(
+            content: SizedBox(
+              width: MediaQuery.of(ctx).size.width * 0.8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: AppButton(
-                      text: 'Bagikan',
-                      icon: const HugeIcon(
-                        icon: HugeIcons.strokeRoundedShare01,
-                        color: Colors.black,
-                        size: 20,
+                  if (draft.photos.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(draft.photos.first),
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
-                      onPressed: () async {
-                        final encodedText = Uri.encodeComponent(waText);
-                        final url = Uri.parse("https://wa.me/?text=$encodedText");
-
-                        // 3. Eksekusi peluncuran WhatsApp terlebih dahulu
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(url, mode: LaunchMode.externalApplication);
-                        }
-                        
-                        // 4. Delay sebentar agar WhatsApp menimpa layar sepenuhnya, 
-                        // lalu baru redirect ke Home di background (mencegah glitch visual)
-                        Future.delayed(const Duration(milliseconds: 500), () {
-                          if (mounted && ctx.mounted) {
-                            ctx.pop(); // Tutup pop-up
-                            _goToHomeByRole(context); // Redirect background
-                          }
-                        });
-                      },
                     ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Laporan patroli berhasil dikirim ke server. Silakan bagikan ke WhatsApp PIC terkait.',
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AppButton(
-                      text: 'Selesai',
-                      type: AppButtonType.outlined,
-                      onPressed: () {
-                        ctx.pop();
-                        _goToHomeByRole(context);
-                      },
+                ],
+              ),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppButton(
+                    text: 'Bagikan Laporan',
+                    icon: const HugeIcon(
+                      icon: HugeIcons.strokeRoundedShare01,
+                      color: Colors.black,
+                      size: 20,
                     ),
+                    onPressed: () async {
+                      try {
+                        // REFACTOR UTAMA: Menggunakan Sistem Share Intent OS
+                        // Kita mengirimkan FILE FOTO FISIK dari cache lokal Flutter
+                        // beserta Teks Laporan sebagai caption-nya.
+                        
+                        final filePaths = draft.photos.map((path) => XFile(path)).toList();
+                        
+                        if (filePaths.isNotEmpty) {
+                          // Bagikan Gambar + Teks
+                          await Share.shareXFiles(
+                            [filePaths.first], // Hanya membagikan gambar pertama agar rapi
+                            text: waText, // Text akan otomatis menjadi Caption Gambar di WhatsApp
+                          );
+                        } else {
+                          // Jika anehnya tidak ada foto, bagikan teks saja
+                          await Share.share(waText);
+                        }
+
+                        // Setelah share system tray tertutup, kembalikan user ke home
+                        if (mounted && ctx.mounted) {
+                          ctx.pop(); 
+                          _goToHomeByRole(context); 
+                        }
+                      } catch (e) {
+                        debugPrint('Gagal membagikan: $e');
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Terjadi kesalahan saat membagikan laporan.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  AppButton(
+                    text: 'Selesai',
+                    type: AppButtonType.outlined,
+                    onPressed: () {
+                      ctx.pop();
+                      _goToHomeByRole(context);
+                    },
                   ),
                 ],
               ),
@@ -155,12 +168,36 @@ Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk m
         );
       }
     } catch (e) {
-      // Error handling...
-      setState(() => _isSubmitting = false);
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Submit Gagal'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Text(e.toString()),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => ctx.pop(),
+                child: const Text('OK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
-  // (Kode build dan _buildRow sisanya tidak diubah, tetap biarkan bawaannya)
   @override
   Widget build(BuildContext context) {
     final draft = ref.watch(createTaskFormProvider);
