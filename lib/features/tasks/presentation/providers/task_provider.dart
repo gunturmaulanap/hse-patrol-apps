@@ -105,6 +105,7 @@ Map<String, dynamic> _toUiTaskMap(
     'date': task.date,
     'userId': task.userId,
     'user_id': task.userId,
+    'createdBy': task.userId,
     'created_by': task.userId,
     'staffName': _resolveStaffName(task),
     'photos': task.photos,
@@ -130,7 +131,9 @@ final supervisorOwnTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>
   final currentUserId = int.tryParse(currentUser?.id ?? '');
   if (currentUserId == null) return <Map<String, dynamic>>[];
 
-  return allReports.where((report) => _toInt(report['userId']) == currentUserId).toList();
+  // Filter hanya task milik supervisor yang sedang login.
+  // Guard mockDb dihapus: ID backend bisa berbeda dari ID mock.
+  return allReports.where((report) => _ownerId(report) == currentUserId).toList();
 });
 
 final supervisorStaffTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -138,9 +141,32 @@ final supervisorStaffTaskMapsProvider = FutureProvider<List<Map<String, dynamic>
   final allReports = await ref.watch(petugasTaskMapsProvider.future);
 
   final currentUserId = int.tryParse(currentUser?.id ?? '');
-  if (currentUserId == null) return allReports;
+  final nonSelfReports = currentUserId == null
+      ? allReports
+      : allReports.where((report) => _ownerId(report) != currentUserId).toList();
 
-  return allReports.where((report) => _toInt(report['userId']) != currentUserId).toList();
+  // Staff Task: semua task yang bukan milik supervisor login.
+  // Penyaringan per petugas dilakukan menggunakan created_by/user_id di UI.
+  return nonSelfReports;
+});
+
+/// Provider daftar staff (hse_staff/petugas) dari mock master data.
+/// Digunakan untuk menampilkan chip staff di tab Staff Task meskipun
+/// staff tersebut belum punya task.
+/// Ketika backend sudah expose endpoint GET /users?role=hse_staff,
+/// ganti dengan FutureProvider yang memanggil API tersebut.
+final staffMasterUsersProvider = Provider<List<({int id, String name})>>((ref) {
+  final mockDb = ref.read(mockDatabaseProvider);
+  final staffList = mockDb.users
+      .where((u) => _isHseStaffRole(u.role))
+      .map((u) {
+        final id = int.tryParse(u.id) ?? 0;
+        return (id: id, name: u.username);
+      })
+      .where((u) => u.id > 0)
+      .toList()
+    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  return staffList;
 });
 
 final supervisorAllVisibleTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -151,6 +177,7 @@ final supervisorAllVisibleTaskMapsProvider = FutureProvider<List<Map<String, dyn
 
 final supervisorStaffNamesProvider = FutureProvider<List<String>>((ref) async {
   final staffTasks = await ref.watch(supervisorStaffTaskMapsProvider.future);
+
   final names = staffTasks
       .map((task) => (task['staffName']?.toString().trim() ?? ''))
       .where((name) => name.isNotEmpty)
@@ -178,7 +205,9 @@ String _resolveAreaName(HseTaskModel report, Map<int, String> areaNameById) {
 }
 
 String _resolveStaffName(HseTaskModel report) {
-  return 'HSE Staff #${report.userId}';
+  final fromBackend = (report.userName ?? '').trim();
+  if (fromBackend.isNotEmpty) return fromBackend;
+  return 'User #${report.userId}';
 }
 
 String _resolveTitle(HseTaskModel report, String areaName) {
@@ -223,4 +252,17 @@ int _toInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+int _ownerId(Map<String, dynamic> report) {
+  return _toInt(report['created_by'] ?? report['createdBy'] ?? report['user_id'] ?? report['userId']);
+}
+
+bool _isHseStaffRole(String? role) {
+  final normalized = (role ?? '').trim().toLowerCase();
+  return normalized == 'hse_staff' ||
+      normalized == 'hse staff' ||
+      normalized == 'petugas' ||
+      normalized == 'petugashse' ||
+      normalized == 'petugas_hse';
 }

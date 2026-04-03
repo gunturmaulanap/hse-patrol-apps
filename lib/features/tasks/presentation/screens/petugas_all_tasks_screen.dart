@@ -64,7 +64,11 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
       );
     }
 
-    final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    final allReports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    final currentUserId = int.tryParse(user.id);
+    final reports = currentUserId == null
+        ? <Map<String, dynamic>>[]
+        : allReports.where((r) => _taskOwnerId(r) == currentUserId).toList();
 
     if (reportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
@@ -483,6 +487,13 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
       final dt = DateTime.parse(dateStr);
       return DateFormat('HH:mm').format(dt); 
     } catch (e) { return '-'; }
+  }
+
+  int _taskOwnerId(Map<String, dynamic> task) {
+    final raw = task['created_by'] ?? task['createdBy'] ?? task['userId'] ?? task['user_id'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '') ?? 0;
   }
 
   String _getReportTitle(Map<String, dynamic> report) {

@@ -425,14 +425,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     final rawStatus = status.toLowerCase();
     
     switch (rawStatus) {
-      case 'pending': bgColor = const Color(0xFFFDF0D5); break;
-      case 'follow up done': bgColor = const Color(0xFFD5E8FD); break;
+      case 'pending': bgColor = const Color(0xFFD4D8FF); break;
+      case 'follow up done': bgColor = const Color(0xFFFAFF9F); break;
+      case 'pending rejected': bgColor = const Color(0xFFFFCDD2); break;
       case 'completed': bgColor = const Color(0xFFC1F0D0); break;
-      case 'canceled': bgColor = const Color(0xFFFDE1D5); break;
+      case 'canceled': bgColor = const Color(0xFF1E1E1E); break;
       default: bgColor = const Color(0xFFFFFFFF);
     }
     
-    Color textColor = const Color(0xFF1E1E1E);
+    final bool isDark = rawStatus == 'canceled';
+    Color textColor = isDark ? Colors.white : const Color(0xFF1E1E1E);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -450,7 +452,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
@@ -556,85 +560,98 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           dotColor = Colors.redAccent;
         }
 
-        // Coba ambil nama PIC dari berbagai kemungkinan field
         final picName = log['pic_name']?.toString() ??
-                       log['pic']?.toString() ??
-                       log['user']?.toString() ??
-                       log['created_by']?.toString() ??
-                       log['staff_name']?.toString();
+            log['pic']?.toString() ??
+            log['user']?.toString() ??
+            log['created_by']?.toString() ??
+            log['staff_name']?.toString();
 
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Column(
-                children: [
-                  Container(width: 16, height: 16, decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor, border: Border.all(color: Colors.white, width: 3))),
-                  if (!isLast) Expanded(child: Container(width: 2, color: AppColors.border)),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatDate(log['date']?.toString()),
-                          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              isPicLog ? 'Respon PIC' : 'Review Petugas',
-                              style: AppTypography.body1.copyWith(fontWeight: FontWeight.bold, color: dotColor),
-                            ),
-                            if (isPicLog && picName != null && picName.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  picName,
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (action != null && action.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Status: ${action.toUpperCase()}',
-                            style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                          ),
-                        ],
-                        if (log['notes'] != null && log['notes'].toString().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(log['notes'].toString(), style: AppTypography.caption),
-                        ],
-                        if (isPicLog && log['photos'] != null && (log['photos'] as List).isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _buildPhotoGrid(List<String>.from(log['photos'] as List), height: 60),
-                        ]
-                      ],
-                    ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: dotColor,
+                    border: Border.all(color: Colors.white, width: 3),
                   ),
                 ),
-              )
-            ],
-          ),
+                if (!isLast) Container(width: 2, height: 72, color: AppColors.border),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatDate(log['date']?.toString()),
+                        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            isPicLog ? 'Respon PIC' : 'Review Petugas',
+                            style: AppTypography.body1.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: dotColor,
+                            ),
+                          ),
+                          if (isPicLog && picName != null && picName.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                picName,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (action != null && action.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Status: ${action.toUpperCase()}',
+                          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                      if (log['notes'] != null && log['notes'].toString().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(log['notes'].toString(), style: AppTypography.caption),
+                      ],
+                      if (isPicLog && log['photos'] != null && (log['photos'] as List).isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildPhotoGrid(List<String>.from(log['photos'] as List), height: 60),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       }),
     );

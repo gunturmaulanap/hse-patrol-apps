@@ -237,6 +237,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
                  (json['followUps'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ??
                  [],
       date: json['date']?.toString() ?? json['created_at']?.toString(),
+      userName: json['user']?.toString() ?? json['user_name']?.toString() ?? json['username']?.toString(),
     );
   }
 

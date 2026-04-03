@@ -25,7 +25,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   DateTime? _dateTo;
   String _searchQuery = '';
   String _scope = 'own';
-  String? _selectedStaffName;
+  int? _selectedStaffId;
 
   @override
   void dispose() {
@@ -38,7 +38,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     final user = ref.watch(currentUserProvider);
     final ownAsync = ref.watch(supervisorOwnTaskMapsProvider);
     final staffAsync = ref.watch(supervisorStaffTaskMapsProvider);
-    final staffNamesAsync = ref.watch(supervisorStaffNamesProvider);
+    final masterStaff = ref.watch(staffMasterUsersProvider);
 
     if (user == null || user.role != 'supervisor') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -52,19 +52,19 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
     final ownTasks = ownAsync.valueOrNull ?? <Map<String, dynamic>>[];
     final staffTasks = staffAsync.valueOrNull ?? <Map<String, dynamic>>[];
-    final staffNames = staffNamesAsync.valueOrNull ?? <String>[];
+    final staffEntries = _buildStaffEntries(staffTasks, masterStaff);
 
-    final selectedStaff = _selectedStaffName ?? staffNames.firstOrNull;
+    final selectedStaffId = _selectedStaffId ?? staffEntries.firstOrNull?.id;
     final sourceList = _scope == 'own'
         ? ownTasks
-        : selectedStaff == null
+        : selectedStaffId == null
             ? <Map<String, dynamic>>[]
-            : staffTasks.where((e) => (e['staffName']?.toString() ?? '') == selectedStaff).toList();
+            : staffTasks.where((e) => _taskOwnerId(e) == selectedStaffId).toList();
 
-    if ((_scope == 'staff') && _selectedStaffName == null && staffNames.isNotEmpty) {
+    if ((_scope == 'staff') && _selectedStaffId == null && staffEntries.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          setState(() => _selectedStaffName = staffNames.first);
+          setState(() => _selectedStaffId = staffEntries.first.id);
         }
       });
     }
@@ -78,7 +78,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     }
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
@@ -168,7 +168,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
               _buildScopeTabs(),
               if (_scope == 'staff') ...[
                 const SizedBox(height: 8),
-                _buildStaffSelector(staffNames),
+                _buildStaffSelector(staffEntries),
               ],
               const SizedBox(height: 12),
               TabBar(
@@ -333,8 +333,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     );
   }
 
-  Widget _buildStaffSelector(List<String> staffNames) {
-    if (staffNames.isEmpty) {
+  Widget _buildStaffSelector(List<_StaffEntry> staffEntries) {
+    if (staffEntries.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Text('Belum ada data staff.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
@@ -345,15 +345,50 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
-        children: staffNames.map((name) {
-          final isSelected = (_selectedStaffName ?? staffNames.firstOrNull) == name;
+        children: staffEntries.map((entry) {
+          final selectedId = _selectedStaffId ?? staffEntries.firstOrNull?.id;
+          final isSelected = selectedId == entry.id;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: _chip(name, isSelected, () => setState(() => _selectedStaffName = name)),
+            child: _chip(entry.name, isSelected, () => setState(() => _selectedStaffId = entry.id)),
           );
         }).toList(),
       ),
     );
+  }
+
+  List<_StaffEntry> _buildStaffEntries(
+    List<Map<String, dynamic>> staffTasks,
+    List<({int id, String name})> masterStaff,
+  ) {
+    final byId = <int, String>{};
+
+    for (final user in masterStaff) {
+      if (user.id > 0 && user.name.trim().isNotEmpty) {
+        byId[user.id] = user.name.trim();
+      }
+    }
+
+    // Build dari data API report: grouping berdasarkan created_by/user_id.
+    for (final task in staffTasks) {
+      final id = _taskOwnerId(task);
+      final name = (task['staffName']?.toString().trim() ?? '');
+      if (id > 0 && name.isNotEmpty) {
+        byId[id] = name;
+      }
+    }
+
+    return byId.entries
+        .map((e) => _StaffEntry(id: e.key, name: e.value))
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  int _taskOwnerId(Map<String, dynamic> task) {
+    final raw = task['created_by'] ?? task['createdBy'] ?? task['userId'] ?? task['user_id'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '') ?? 0;
   }
 
   Widget _chip(String text, bool selected, VoidCallback onTap) {
@@ -573,32 +608,39 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Icon(PhosphorIcons.user(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
-                      const SizedBox(width: 4),
+                      if (_scope == 'staff') ...[
+                        Icon(PhosphorIcons.user(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            staffName,
+                            style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(
-                        child: Text(
-                          staffName,
-                          style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _formatIndonesianDate(dateString),
+                                style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          _formatIndonesianDate(dateString),
-                          style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
                       const SizedBox(width: 4),
                       Text(
@@ -685,6 +727,13 @@ class _CardStripedPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _StaffEntry {
+  final int id;
+  final String name;
+
+  const _StaffEntry({required this.id, required this.name});
 }
 
 extension _ListFirstOrNullX<T> on List<T> {
