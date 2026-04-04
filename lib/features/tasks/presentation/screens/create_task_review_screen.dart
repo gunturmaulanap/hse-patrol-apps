@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart'; // <--- IMPORT PACKAGE BARU
+import 'package:share_plus/share_plus.dart'; 
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/utils/share_helper.dart'; // <--- IMPORT HELPER
 import '../providers/create_task_form_provider.dart';
 
 class CreateTaskReviewScreen extends ConsumerStatefulWidget {
@@ -52,7 +53,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
       if (createdTask != null && createdTask is! bool && mounted) {
         
-        // Format Teks Caption WA (Sangat bersih tanpa link gambar aneh)
+        // Format Teks Caption WA
         final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
 
 📍 *Area:* ${draft.area}
@@ -117,20 +118,14 @@ Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk m
                     ),
                     onPressed: () async {
                       try {
-                        // REFACTOR UTAMA: Menggunakan Sistem Share Intent OS
-                        // Kita mengirimkan FILE FOTO FISIK dari cache lokal Flutter
-                        // beserta Teks Laporan sebagai caption-nya.
-                        
-                        final filePaths = draft.photos.map((path) => XFile(path)).toList();
-                        
-                        if (filePaths.isNotEmpty) {
-                          // Bagikan Gambar + Teks
-                          await Share.shareXFiles(
-                            [filePaths.first], // Hanya membagikan gambar pertama agar rapi
-                            text: waText, // Text akan otomatis menjadi Caption Gambar di WhatsApp
+                        // Menggunakan Share Helper untuk Local File
+                        if (draft.photos.isNotEmpty) {
+                          await ShareHelper.shareLocalImage(
+                            imagePath: draft.photos.first,
+                            caption: waText,
                           );
                         } else {
-                          // Jika anehnya tidak ada foto, bagikan teks saja
+                          // Fallback jika anehnya tidak ada foto
                           await Share.share(waText);
                         }
 

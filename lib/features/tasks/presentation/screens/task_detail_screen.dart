@@ -3,20 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/mock_api/mock_database.dart';
 import '../../../../app/router/route_names.dart';
+import '../../../../core/utils/share_helper.dart';
 import '../../../pic/presentation/providers/pic_follow_up_provider.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
 import '../providers/task_provider.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   final String taskId;
-  final String? picToken; // Parameter tambahan untuk deep link WhatsApp
+  final String? picToken; 
   const TaskDetailScreen({super.key, required this.taskId, this.picToken});
 
   @override
@@ -29,41 +32,32 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   @override
   bool get wantKeepAlive => true;
 
-  // Cek apakah taskId adalah picToken (untuk deep link) atau ID biasa
   bool get _isPicToken {
-    // picToken biasanya string alphanumerik yang lebih panjang, bukan angka murni
     final idNum = int.tryParse(widget.taskId);
-    return idNum == null; // Jika tidak bisa di-parse sebagai int, berarti ini picToken
+    return idNum == null; 
   }
 
-  // Helper untuk mendapatkan ID numerik yang aman dari taskId
   int? _getTaskId() {
-    if (_isPicToken) return null; // picToken bukan ID numerik
+    if (_isPicToken) return null; 
     return int.tryParse(widget.taskId);
   }
 
-  // Fungsi untuk Mengecek Kepemilikan Laporan
   bool _canCancelTask(Map<String, dynamic> rpt, dynamic user) {
     if (user == null || rpt.isEmpty) return false;
     
     final status = (rpt['status']?.toString() ?? '').toLowerCase();
-    // Hanya bisa dibatalkan jika statusnya masih pending
     if (status != 'pending') return false;
 
     final role = user.role;
     final currentUserId = int.tryParse(user.id ?? '');
     final reportOwnerId = int.tryParse(rpt['userId']?.toString() ?? '');
 
-    // Supervisor bisa cancel semua laporan bawahannya atau miliknya sendiri yang masih pending
     if (role == 'supervisor') return true;
-
-    // Petugas (HSE Staff) HANYA bisa cancel laporannya sendiri
     if (role == 'petugas' && currentUserId == reportOwnerId) return true;
 
     return false;
   }
 
-  // Modal Penolakan Modern / Pembatalan / Persetujuan
   void _handlePetugasReview(Map<String, dynamic> rpt, String action) async {
     if (_isSubmitting) return;
 
@@ -73,7 +67,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     if (action == 'Rejected' || action == 'Canceled') {
       final isCancel = action == 'Canceled';
       final controller = TextEditingController();
-      
+
       reason = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -91,15 +85,49 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                     style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
                   ),
                 ),
+              // Label dengan indikator wajib
+              if (isCancel)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Alasan Pembatalan',
+                        style: AppTypography.body1.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const Text(
+                        ' *',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Alasan Penolakan',
+                    style: AppTypography.body1.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
               TextField(
                 controller: controller,
                 style: AppTypography.body1,
                 decoration: InputDecoration(
-                  hintText: isCancel ? 'Tuliskan alasan pembatalan (opsional)...' : 'Misal: Pagar pembatas tidak dilas permanen...',
+                  hintText: isCancel
+                      ? 'Wajib diisi. Tuliskan alasan pembatalan...'
+                      : 'Misal: Pagar pembatas tidak dilas permanen...',
                   hintStyle: AppTypography.caption,
                   filled: true,
                   fillColor: AppColors.background,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.medium), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.medium),
+                    borderSide: BorderSide.none,
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.medium),
+                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                  ),
                 ),
                 maxLines: 3,
               ),
@@ -107,7 +135,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx), 
+              onPressed: () => Navigator.pop(ctx),
               child: Text('Kembali', style: AppTypography.body1.copyWith(color: AppColors.textSecondary))
             ),
             ElevatedButton(
@@ -116,22 +144,31 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
               ),
               onPressed: () {
-                if (!isCancel && controller.text.trim().isEmpty) {
-                  AppSnackBar.warning(ctx, message: 'Alasan penolakan wajib diisi!');
+                // Validasi: Notes wajib diisi untuk CANCEL dan REJECT
+                if (controller.text.trim().isEmpty) {
+                  AppToast.warning(
+                    ctx,
+                    message: isCancel
+                        ? 'Alasan pembatalan wajib diisi!'
+                        : 'Alasan penolakan wajib diisi!',
+                  );
                   return;
                 }
-                Navigator.pop(ctx, controller.text.trim());
+
+                // Konfirmasi tambahan untuk cancel
+                if (isCancel) {
+                  Navigator.pop(ctx, controller.text.trim());
+                } else {
+                  Navigator.pop(ctx, controller.text.trim());
+                }
               },
               child: Text(isCancel ? 'Ya, Batalkan' : 'Tolak', style: AppTypography.body1.copyWith(color: Colors.white, fontWeight: FontWeight.bold))
             ),
           ],
         ),
       );
-      
-      // Jika user klik 'Kembali' atau tap di luar dialog
-      if (reason == null && isCancel == false) return; 
-      // Untuk cancel, reason boleh kosong, tapi jika null berarti dialog ditutup tanpa aksi
-      if (action == 'Canceled' && reason == null) return;
+
+      if (reason == null || reason!.trim().isEmpty) return;
       
     } else if (action == 'Approved') {
       isConfirm = await showDialog<bool>(
@@ -161,7 +198,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
       final followUps = rpt['followUps'] as List<dynamic>? ?? [];
 
       if (followUps.isNotEmpty && (action == 'Approved' || action == 'Rejected')) {
-        // Proses persetujuan Follow-Up
         final latestFollowUp = followUps.last as Map<String, dynamic>;
         final followUpId = latestFollowUp['id'] as int?;
 
@@ -169,7 +205,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           final followUpRepo = ref.read(followUpRepositoryProvider);
           final approval = action.toLowerCase();
 
-          // Gunakan ID dari response API (rpt['id']) yang valid untuk kedua kasus
           final taskId = rpt['id'] as int?;
           if (taskId == null) {
             throw Exception('Task ID tidak ditemukan dalam response API');
@@ -183,21 +218,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           );
         }
       } else if (action == 'Canceled') {
-        // PROSES PEMBATALAN LAPORAN
         final taskRepo = ref.read(taskRepositoryProvider);
-
-        // Gunakan ID dari response API (rpt['id']) yang valid untuk kedua kasus:
-        // - ID numerik biasa
-        // - PicToken dari deep link WhatsApp
         final taskId = rpt['id'] as int?;
         if (taskId == null) {
           throw Exception('Task ID tidak ditemukan dalam response API');
         }
-
         await taskRepo.cancelTask(taskId);
       }
 
-      // Refresh Data Laporan
       if (_isPicToken) {
         ref.invalidate(taskDetailByPicTokenProvider(widget.taskId));
       } else {
@@ -210,24 +238,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
       ref.invalidate(supervisorAllVisibleTaskMapsProvider);
 
       if (!mounted) return;
-      
-      final snackBarMsg = action == 'Approved' 
-          ? 'Tugas Selesai!' 
+
+      final toastMsg = action == 'Approved'
+          ? 'Tugas Selesai!'
           : (action == 'Rejected' ? 'Perbaikan ditolak!' : 'Laporan berhasil dibatalkan!');
 
       if (action == 'Approved') {
-        AppSnackBar.success(context, message: snackBarMsg);
+        AppToast.success(context, message: toastMsg);
       } else if (action == 'Rejected') {
-        AppSnackBar.error(context, message: snackBarMsg);
+        AppToast.error(context, message: toastMsg);
       } else {
-        // Navigasi mundur jika dibatalkan agar tidak nyangkut di halaman kosong
-        AppSnackBar.success(context, message: snackBarMsg);
-        context.pop(); 
+        AppToast.success(context, message: toastMsg);
+        context.pop();
       }
       
     } catch (e) {
       if (!mounted) return;
-      AppSnackBar.error(context, message: 'Gagal memproses aksi: ${e.toString()}');
+      AppToast.error(context, message: 'Gagal memproses aksi: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() {
@@ -241,7 +268,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
 
-    // Gunakan provider yang sesuai berdasarkan tipe taskId
     final detailAsync = _isPicToken
         ? ref.watch(taskDetailByPicTokenProvider(widget.taskId))
         : ref.watch(taskDetailMapProvider(widget.taskId));
@@ -304,12 +330,39 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20), onPressed: () => context.pop()),
         title: Text('Task Detail', style: AppTypography.h3),
         centerTitle: true,
+        actions: [
+          // TOMBOL SHARE IMPLEMENTASI BARU
+          IconButton(
+            icon: const Icon(Icons.share, color: AppColors.primary),
+            onPressed: () {
+              final waText = '''🚨 *DETAIL TEMUAN HSE* 🚨
+📍 *Area:* ${rpt['area'] ?? '-'}
+⚠️ *Tingkat Risiko:* ${rpt['riskLevel'] ?? '-'}
+💬 *Catatan:* ${rpt['notes'] ?? '-'}
+
+🔗 Buka di Aplikasi: https://mes.aksamala.co.id/share/report/${widget.picToken ?? widget.taskId}''';
+
+              final photos = rpt['photos'] as List?;
+              if (photos != null && photos.isNotEmpty) {
+                // Share menggunakan network helper untuk gambar dari backend API
+                ShareHelper.shareNetworkImage(
+                  context: context,
+                  imageUrl: photos.first.toString(), 
+                  caption: waText,
+                );
+              } else {
+                // Jika laporan tidak memiliki gambar, share text biasa
+                Share.share(waText);
+              }
+            },
+          )
+        ],
       ),
       body: SafeArea(
         child: Stack(
           children: [
             SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 140), // Ruang lega untuk action area
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 140),
               physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -350,7 +403,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
             ),
             
             // ACTION BUTTON AREA
-            if (rawStatusLower != 'canceled') // Sembunyikan semua aksi jika sudah dibatalkan
+            if (rawStatusLower != 'canceled') 
               Positioned(
                 bottom: 0, left: 0, right: 0,
                 child: Container(
@@ -362,7 +415,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ==== TOMBOL CANCEL (Untuk Pembuat & Supervisor) ====
                       if (canCancel)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -374,7 +426,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           ),
                         ),
 
-                      // ==== TOMBOL AKSI PIC ====
                       if (isPic && (rawStatusLower == 'pending' || rawStatusLower == 'rejected'))
                         AppButton(
                           text: 'Mulai Tindak Lanjut',
@@ -385,7 +436,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           },
                         )
                       
-                      // ==== TOMBOL AKSI HSE/SUPERVISOR (REVIEW PIC) ====
                       else if ((isPetugas || isSupervisor) && rawStatusLower == 'follow up done')
                         Row(
                           children: [
@@ -408,12 +458,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           ],
                         )
                         
-                      // JIKA TIDAK ADA AKSI YANG BISA DILAKUKAN SAAT INI (TAPI BELUM CANCELED)
                       else if (!canCancel)
                         AppButton(
                           text: rawStatusLower == 'completed' ? 'Laporan Selesai' : 'Menunggu Respon',
                           type: AppButtonType.outlined,
-                          onPressed: null, // Disabled
+                          onPressed: null, 
                         ),
                     ],
                   ),
@@ -425,7 +474,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     );
   }
 
-  // Komponen UI Pelengkap
   Widget _buildHeroCard(Map<String, dynamic> rpt, String status) {
     Color bgColor;
     final rawStatus = status.toLowerCase();
@@ -671,12 +719,5 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     } catch (_) {
       return raw;
     }
-  }
-
-  bool _isSupervisorTaskOwner(Map<String, dynamic> rpt, dynamic user) {
-    if (user == null || user.role != 'supervisor') return false;
-    final currentUserId = int.tryParse(user.id ?? '');
-    final reportOwnerId = int.tryParse(rpt['userId']?.toString() ?? '');
-    return currentUserId != null && currentUserId == reportOwnerId;
   }
 }
