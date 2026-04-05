@@ -5,7 +5,7 @@ import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
 
@@ -82,7 +82,7 @@ class _PicFollowUpNotesScreenState extends ConsumerState<PicFollowUpNotesScreen>
                       text: 'Lanjutkan',
                       onPressed: () {
                         if (_notesController.text.trim().isEmpty) {
-                          AppSnackBar.warning(
+                          AppToast.warning(
                             context,
                             message: 'Catatan tidak boleh kosong!',
                           );

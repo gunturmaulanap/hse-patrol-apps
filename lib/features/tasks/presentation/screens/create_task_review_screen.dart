@@ -2,16 +2,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart'; 
+import 'package:share_plus/share_plus.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/mock_api/mock_database.dart';
-import '../../../../core/utils/share_helper.dart'; // <--- IMPORT HELPER
+import '../../../../core/utils/share_helper.dart';
 import '../providers/create_task_form_provider.dart';
 
 class CreateTaskReviewScreen extends ConsumerStatefulWidget {
@@ -42,7 +42,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
     if (draft.buildingType == null || draft.area == null || draft.riskLevel == null ||
         draft.photos.isEmpty || draft.notes == null || draft.rootCause == null) {
-      AppSnackBar.warning(context, message: 'Harap lengkapi semua data laporan.');
+      AppToast.warning(context, message: 'Harap lengkapi semua data laporan.');
       return;
     }
 

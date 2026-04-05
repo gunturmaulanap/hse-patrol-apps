@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../app/router/route_names.dart';
 import '../providers/pic_follow_up_provider.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
@@ -66,7 +66,7 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
         // Return to PIC Home explicitly (popping off the wizard + detail screen)
         context.goNamed(RouteNames.picHome);
 
-        AppSnackBar.success(
+        AppToast.success(
           context,
           message: 'Tindak Lanjut Anda berhasil disubmit untuk direview oleh Petugas.',
         );
@@ -74,7 +74,7 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        AppSnackBar.error(
+        AppToast.error(
           context,
           message: 'Gagal submit follow-up: ${e.toString()}',
         );
