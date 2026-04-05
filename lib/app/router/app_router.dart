@@ -21,6 +21,7 @@ import '../../features/tasks/presentation/screens/create_task_notes_screen.dart'
 import '../../features/tasks/presentation/screens/create_task_root_cause_screen.dart';
 import '../../features/tasks/presentation/screens/create_task_review_screen.dart';
 import '../../features/tasks/presentation/screens/task_detail_screen.dart';
+import '../../features/tasks/presentation/screens/deep_link_handler_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_photos_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_notes_screen.dart';
 import '../../features/pic/presentation/screens/pic_follow_up_review_screen.dart';
@@ -47,6 +48,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/share/report/:token',
+        name: RouteNames.deepLinkHandler,
+        builder: (context, state) {
+          final token = state.pathParameters['token']!;
+          return DeepLinkHandlerScreen(token: token);
+        },
+      ),
+      GoRoute(
         path: '/task/:id',
         name: RouteNames.taskDetail,
         builder: (context, state) {
@@ -65,6 +74,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Untuk sekarang, kita redirect langsung ke task detail dengan picToken sebagai parameter
 
           return TaskDetailScreen(taskId: picToken, picToken: picToken);
+        },
+      ),
+      // Deep Link Route untuk Redirect dari Backend (api-hse-reports)
+      GoRoute(
+        path: '/api/hse-reports/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          // Backend redirect ke URL ini, langsung tampilkan task detail
+          return TaskDetailScreen(taskId: id);
         },
       ),
       GoRoute(

@@ -55,7 +55,7 @@ class _PetugasCreateTaskPageState extends ConsumerState<PetugasCreateTaskPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const PopScope(
+      builder: (context) => PopScope(
         canPop: false,
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

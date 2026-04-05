@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:getwidget/getwidget.dart';
 
 import '../../../areas/data/models/area_model.dart';
-import '../../../reports/presentation/providers/task_provider.dart';
+import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicAreaDetailPage extends ConsumerWidget {
   final AreaModel area;

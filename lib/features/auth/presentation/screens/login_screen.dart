@@ -94,15 +94,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
           ref.read(currentUserProvider.notifier).state = mockUser;
 
-          // Navigate based on role
-          final targetRoute = user.role == UserRole.pic
-              ? RouteNames.picHome
-              : user.role == UserRole.hseSupervisor
-                  ? RouteNames.supervisorHome
-                  : RouteNames.petugasHome;
-          debugPrint('[LoginScreen] before redirect/router decision -> go $targetRoute');
           if (!mounted) return;
-          context.goNamed(targetRoute);
+
+          // ==========================================
+          // REDIRECT LOGIC UNTUK DEEP LINK
+          // ==========================================
+          final state = GoRouterState.of(context);
+          final redirectUrl = state.uri.queryParameters['redirect'];
+
+          if (redirectUrl != null && redirectUrl.isNotEmpty) {
+            // Jika ada request redirect (dari Deep Link Handler), prioritaskan ke sana
+            debugPrint('[LoginScreen] redirecting to deep link: $redirectUrl');
+            context.go(redirectUrl);
+          } else {
+            // Navigate based on role default
+            final targetRoute = user.role == UserRole.pic
+                ? RouteNames.picHome
+                : user.role == UserRole.hseSupervisor
+                    ? RouteNames.supervisorHome
+                    : RouteNames.petugasHome;
+                    
+            debugPrint('[LoginScreen] redirecting to home -> go $targetRoute');
+            context.goNamed(targetRoute);
+          }
+          
         } else {
           final errorState = ref.read(authNotifierProvider);
           setState(() {

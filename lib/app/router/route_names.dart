@@ -1,7 +1,8 @@
 class RouteNames {
   static const String splash = 'splash';
   static const String login = 'login';
-  
+  static const String deepLinkHandler = 'deeplink-handler';
+
   // Petugas Routes
   static const String petugasCalendar = 'petugas_calendar';
   static const String petugasPatrol = 'petugas_patrol';
@@ -22,13 +23,16 @@ class RouteNames {
   static const String supervisorHome = 'supervisor_home';
   static const String supervisorAllTasks = 'supervisor_all_tasks';
   static const String supervisorDashboard = 'supervisor_dashboard';
-  
+  static const String supervisorProfile = 'supervisor_profile';
+
   // PIC Routes
   static const String picHome = 'pic_home';
   static const String picFinding = 'pic_finding';
   static const String picProfile = 'pic_profile';
   static const String picTasks = 'pic_tasks';
   static const String picCreateTask = 'pic_create_task';
+  static const String picPendingTasks = 'pic_pending_tasks';
+  static const String picAllTasks = 'pic_all_tasks';
   static const String picFollowUpPhotos = 'pic_follow_up_photos';
   static const String picFollowUpNotes = 'pic_follow_up_notes';
   static const String picFollowUpReview = 'pic_follow_up_review';
