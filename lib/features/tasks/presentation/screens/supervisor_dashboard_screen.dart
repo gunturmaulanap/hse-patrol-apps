@@ -66,9 +66,10 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
 
     // Calculate stats
     final totalTasks = filteredTasks.length;
-    final pendingTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'pending').length;
-    final completedTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'completed').length;
-    final followUpDoneTasks = filteredTasks.where((t) => t['status']?.toString().toLowerCase() == 'follow up done').length;
+    final pendingTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'pending').length;
+    final pendingRejectedTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'pending rejected').length;
+    final completedTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'completed').length;
+    final followUpDoneTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'follow up done').length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
@@ -77,55 +78,23 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 16, 24, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
-                  onPressed: () => context.goNamed(RouteNames.supervisorHome),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pushNamed(RouteNames.petugasProfile),
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: AppColors.surface, width: 2),
-                      ),
-                      child: Icon(PhosphorIcons.user(), color: AppColors.textPrimary, size: 28),
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
+                    onPressed: () => context.goNamed(RouteNames.supervisorHome),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Dashboard',
-                          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                        ),
-                        Text(
-                          user.username,
-                          style: AppTypography.h1.copyWith(color: Colors.white),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Dashboard',
+                    style: AppTypography.h1.copyWith(color: Colors.white),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Stats Cards Row
+            // Stats Cards Row 1
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -134,15 +103,18 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                   const SizedBox(width: 12),
                   Expanded(child: _statCard('Pending', '$pendingTasks', const Color(0xFFD4D8FF))),
                   const SizedBox(width: 12),
-                  Expanded(child: _statCard('Completed', '$completedTasks', const Color(0xFFC1F0D0))),
+                  Expanded(child: _statCard('Pending Rejected', '$pendingRejectedTasks', const Color(0xFFFFB3BA))),
                 ],
               ),
             ),
             const SizedBox(height: 12),
+            // Stats Cards Row 2
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
+                  Expanded(child: _statCard('Completed', '$completedTasks', const Color(0xFFC1F0D0))),
+                  const SizedBox(width: 12),
                   Expanded(child: _statCard('Follow Up Done', '$followUpDoneTasks', const Color(0xFFFAFF9F))),
                   const SizedBox(width: 12),
                   Expanded(child: _statCard('Avg per Day', '${totalTasks > 0 ? (totalTasks / 7).toStringAsFixed(1) : '0'}', AppColors.secondary)),
@@ -327,19 +299,37 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (group) => const Color(0xFF1E1E1E),
-              tooltipPadding: const EdgeInsets.all(8),
-              tooltipMargin: 8,
+              getTooltipColor: (group) => const Color(0xFF1E1E1E).withValues(alpha: 0.95),
+              tooltipPadding: const EdgeInsets.all(12),
+              tooltipMargin: 12,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final date = sortedDates[groupIndex.toInt()];
-                final value = group.x.toInt();
+                final value = rod.toY.toInt();
                 return BarTooltipItem(
-                  '$date\n$value Tasks',
+                  '$date\n',
                   TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
+                  children: [
+                    TextSpan(
+                      text: '$value',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' Tasks',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -375,14 +365,29 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  if (value == meta.max) return const Text('');
-                  return Text(
-                    value.toInt().toString(),
-                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                  // Hide max value label for cleaner look
+                  if (value == meta.max) return const SizedBox.shrink();
+
+                  // Hide values that are too high or out of range
+                  if (value > yMax) return const SizedBox.shrink();
+
+                  final intValue = value.toInt();
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      intValue.toString(),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
                   );
                 },
-                reservedSize: 32,
-                interval: yMax > 20 ? 10 : 5,
+                reservedSize: 40,
+                interval: yMax > 20 ? (yMax / 5).ceilToDouble() : (yMax / 5).ceilToDouble() > 0 ? (yMax / 5).ceilToDouble() : 1,
               ),
             ),
             topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -392,8 +397,9 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
             show: true,
             drawVerticalLine: false,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: AppColors.primary.withValues(alpha: 0.15),
               strokeWidth: 1,
+              dashArray: [5, 5], // Dashed lines for better visual
             ),
           ),
           borderData: FlBorderData(show: false),
@@ -407,16 +413,21 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 barRods: [
                   BarChartRodData(
                     toY: value,
-                    color: AppColors.primary,
-                    width: 20,
-                    borderRadius: BorderRadius.circular(4),
+                    width: 24,
+                    borderRadius: BorderRadius.circular(6),
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.primary.withValues(alpha: 0.8),
-                        AppColors.primary.withValues(alpha: 0.4),
+                        AppColors.primary,
+                        AppColors.primary.withValues(alpha: 0.7),
+                        const Color(0xFF5E5CE6),
                       ],
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
+                      stops: const [0.0, 0.6, 1.0],
+                    ),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      width: 1,
                     ),
                   ),
                 ],
@@ -429,31 +440,78 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
   }
 
   Widget _buildLegend() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary.withValues(alpha: 0.8),
-                AppColors.primary.withValues(alpha: 0.4),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  const Color(0xFF5E5CE6),
+                ],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+              ),
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
               ],
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
             ),
-            borderRadius: BorderRadius.circular(3),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          'Total Tasks per Day',
-          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            'Total Tasks per Day',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  // Helper untuk menentukan status sebenarnya dari task
+  String _getActualStatus(Map<String, dynamic> task) {
+    // Cek follow-ups terakhir
+    final followUps = task['followUps'] as List<dynamic>? ??
+                      task['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status task adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+
+      // Jika follow-up terakhir approved, maka status task adalah "Follow Up Done"
+      if (lastStatus == 'approved') {
+        return 'Follow Up Done';
+      }
+    }
+
+    // Default ke status task
+    final status = task['status']?.toString() ?? 'Pending';
+    return status;
   }
 
   List<Map<String, dynamic>> _filterTasksByDate(List<Map<String, dynamic>> tasks) {
@@ -483,7 +541,9 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     // Count tasks per day
     for (final task in tasks) {
       final taskDate = _parseDate(task['date']?.toString());
-      final key = DateFormat('dd MMM yyyy').format(taskDate);
+      // Normalize to date only (remove time component)
+      final normalizedDate = DateTime(taskDate.year, taskDate.month, taskDate.day);
+      final key = DateFormat('dd MMM yyyy').format(normalizedDate);
       grouped[key] = (grouped[key] ?? 0) + 1;
     }
 
@@ -492,7 +552,12 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
 
   DateTime _parseDate(String? raw) {
     if (raw == null || raw.trim().isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
-    return DateTime.tryParse(raw) ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return DateTime.fromMillisecondsSinceEpoch(0);
+
+    // Convert to local time consistently
+    return parsed.toLocal();
   }
 
   String _formatDate(String? raw) {

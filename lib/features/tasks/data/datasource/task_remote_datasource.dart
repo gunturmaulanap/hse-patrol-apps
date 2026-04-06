@@ -61,28 +61,40 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   @override
   Future<HseTaskModel> getTaskByPicToken(String picToken) async {
     try {
-      final endpoint = '/hse-reports/pic/$picToken';
-      _log('Fetching task by picToken', {'endpoint': endpoint, 'token': picToken});
-      // Menggunakan API endpoint untuk mencari task berdasarkan picToken
-      final response = await _dio.get(endpoint);
-
-      _log('Response status', response.statusCode);
-
+      _log('Fetching task by picToken from ALL reports endpoint', {'token': picToken});
+      
+      // Fallback: Cari di endpoint list report secara manual
+      // Karena backend belum memiliki route khusus GET /hse-reports/pic/:picToken
+      final response = await _dio.get('/hse-reports');
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
-
-      if (data == null) {
-        _log('Task not found for picToken', response.data);
-        throw Exception('Task not found');
+          
+      List<dynamic> allReports = [];
+      if (data != null && data['data'] is List) {
+        allReports = data['data'];
+      } else if (data != null && data['reports'] is List) {
+        allReports = data['reports'];
+      } else if (response.data is List) {
+        allReports = response.data;
+      } else if (response.data is Map && response.data['data'] is List) {
+        allReports = response.data['data'];
+      } else if (response.data is Map && response.data['items'] is List) {
+        allReports = response.data['items'];
+      }
+      
+      for (final report in allReports) {
+        if (report is Map<String, dynamic>) {
+           final pt = report['pic_token']?.toString() ?? report['picToken']?.toString();
+           if (pt == picToken) {
+             _log('Task found by picToken in all reports', {'id': report['id']});
+             return _parseReportModel(report);
+           }
+        }
       }
 
-      _log('Task found by picToken', {
-        'id': data['id'],
-        'area_id': data['area_id'] ?? data['areaId'],
-        'created_by': data['created_by'] ?? data['createdBy'] ?? data['user_id'],
-      });
-      return _parseReportModel(data);
+      _log('Task not found for picToken in all reports');
+      throw Exception('Task not found');
     } catch (e) {
       _log('Error getting task by picToken: ${e.toString()}');
       throw Exception('Gagal mengambil task: ${e.toString()}');

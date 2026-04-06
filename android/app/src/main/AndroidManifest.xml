@@ -24,18 +24,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-
-            <!-- Public App Link ingress for PIC token deep-link -->
+            <!-- App Links Intent Filter -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="https"
-                    android:host="mes.aksamala.co.id"
-                    android:pathPrefix="/share/report/" />
+                <!-- Matches URL: https://mes.aksamala.co.id/share/report/xxx -->
+                <data android:scheme="https" android:host="mes.aksamala.co.id" android:pathPrefix="/share/report/" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

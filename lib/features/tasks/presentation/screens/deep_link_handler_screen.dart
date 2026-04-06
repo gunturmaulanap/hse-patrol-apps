@@ -92,97 +92,60 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         return;
       }
 
-      // 2. Validasi token via endpoint existing
-      final validation = await ref.read(picTokenValidationProvider(widget.token).future);
-      final tokenValid = _asBool(validation['tokenValid']) ?? false;
-      final authorized = _asBool(validation['authorized']) ?? false;
+      // 2. Cari task berdasarkan picToken dari list task yang sudah di-fetch
+      // Karena endpoint /hse-reports/pic/:picToken mungkin belum ada di backend
+      debugPrint('[DeepLinkHandler] attempt to resolve task from existing app data for token: ${widget.token}');
+      
+      final allTaskMaps = await ref.read(petugasTaskMapsProvider.future);
+      Map<String, dynamic>? foundTask;
 
-      debugPrint(
-        '[DeepLinkHandler] validation result => tokenValid: $tokenValid, authorized: $authorized, metadata: $validation',
-      );
+      for (final task in allTaskMaps) {
+        if (task['picToken']?.toString() == widget.token) {
+          foundTask = task;
+          break;
+        }
+      }
 
-      if (!tokenValid) {
+      if (foundTask == null) {
         _navigateBasedOnRoleWithCustomMessage(
           currentUser.role,
-          'Token laporan tidak valid atau sudah kedaluwarsa.',
+          'Token laporan tidak ditemukan atau sudah kedaluwarsa.',
         );
         return;
       }
 
-      if (!authorized) {
+      // 3. Validasi Role & Area Akses
+      final roleAllowed = _isRoleAllowedForTask(currentUser, foundTask);
+      final taskId = foundTask['id']?.toString() ?? '';
+      
+      debugPrint('[DeepLinkHandler] Task found => taskId: $taskId, roleAllowed: $roleAllowed');
+
+      if (!roleAllowed) {
         _navigateBasedOnRoleWithCustomMessage(
           currentUser.role,
-          'Anda tidak memiliki akses untuk membuka laporan ini.',
+          'Laporan valid, namun Anda tidak memiliki akses untuk task ini.',
         );
         return;
       }
 
-      // 3A. Strategi A: resolve langsung by token (jika endpoint existing mengembalikan task)
-      Map<String, dynamic>? resolvedTask;
-      try {
-        debugPrint('[DeepLinkHandler] attempt strategy A -> resolve direct task by token');
-        final taskMap = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
-        final roleAllowed = _isRoleAllowedForTask(currentUser, taskMap);
-        final taskId = taskMap['id']?.toString() ?? '';
-
-        debugPrint(
-          '[DeepLinkHandler] strategy A result => taskId: $taskId, roleAllowed: $roleAllowed',
-        );
-
-        if (taskId.isNotEmpty && roleAllowed) {
-          _navigateToTaskDetail(taskId, 'Melanjutkan tindakan follow-up task.');
-          return;
-        }
-
-        if (!roleAllowed) {
-          _navigateBasedOnRoleWithCustomMessage(
-            currentUser.role,
-            'Laporan valid, namun akses role Anda tidak sesuai untuk task ini.',
-          );
-          return;
-        }
-
-        resolvedTask = taskMap;
-      } catch (e) {
-        debugPrint('[DeepLinkHandler] strategy A failed: $e');
-      }
-
-      // 3B/3C. Fallback client-side resolve tanpa ubah backend
-      debugPrint('[DeepLinkHandler] attempt strategy B/C -> resolve from existing app data');
-      final fallbackTaskId = await _resolveTaskIdFromExistingData(
-        currentUser,
-        validation,
-        resolvedTask,
-      );
-
-      if (fallbackTaskId != null && fallbackTaskId.isNotEmpty) {
-        _navigateToTaskDetail(
-          fallbackTaskId,
-          'Token valid, task ditemukan dari data aplikasi.',
-        );
+      if (taskId.isNotEmpty) {
+        _navigateToTaskDetail(taskId, 'Melanjutkan tindakan ke detail laporan.');
         return;
       }
 
       _navigateToRelevantList(
         currentUser.role,
-        'Token valid, namun task spesifik tidak dapat ditentukan. Silakan pilih dari daftar task.',
+        'Token valid, namun ID task spesifik tidak dapat ditentukan.',
       );
 
     } catch (e, st) {
       debugPrint('[DeepLinkHandler] Error: $e');
       debugPrint('[DeepLinkHandler] StackTrace: $st');
 
-      // Cek apakah ini error 404 (task tidak ditemukan)
-      final errorMessage = e.toString().toLowerCase();
-      final isNotFoundError = errorMessage.contains('404') ||
-                              errorMessage.contains('not found') ||
-                              errorMessage.contains('task tidak ditemukan');
-
       // Navigate ke home berdasarkan role
       final role = ref.read(currentUserProvider)?.role ?? UserRole.petugasHse;
-
       if (mounted) {
-        _navigateBasedOnRoleWithError(role, isNotFoundError);
+        _navigateBasedOnRoleWithError(role, true);
       }
     } finally {
       _isProcessing = false;
