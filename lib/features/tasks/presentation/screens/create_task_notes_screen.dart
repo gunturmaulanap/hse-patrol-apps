@@ -21,25 +21,8 @@ class _CreateTaskNotesScreenState extends ConsumerState<CreateTaskNotesScreen> {
   @override
   void initState() {
     super.initState();
-    // Ambil notes dari provider
-    final rawNotes = ref.read(createTaskFormProvider).notes;
-
-    // Filter Sanitasi: Cegah teks random / log error masuk ke textfield
-    if (rawNotes != null && rawNotes.isNotEmpty) {
-      final isGarbageData = rawNotes.contains('.dart') || 
-                            rawNotes.contains('Exception') || 
-                            rawNotes.contains('lib\\') ||
-                            rawNotes.contains('datasource') ||
-                            rawNotes.contains('MXtask');
-                            
-      if (isGarbageData) {
-        _notesController.text = ''; // Kosongkan jika terdeteksi teks random
-      } else {
-        _notesController.text = rawNotes; // Tampilkan jika teks normal dari user
-      }
-    } else {
-      _notesController.text = '';
-    }
+    // Notes selalu dimulai kosong agar user mengisi manual.
+    _notesController.text = '';
   }
 
   @override

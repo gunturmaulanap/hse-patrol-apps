@@ -28,3 +28,8 @@ final areaByUserProvider = FutureProvider<List<AreaModel>>((ref) async {
   final repository = ref.watch(areaRepositoryProvider);
   return repository.getAreasByUser();
 });
+
+final buildingTypesProvider = FutureProvider<List<String>>((ref) async {
+  final repository = ref.watch(areaRepositoryProvider);
+  return repository.getBuildingTypes();
+});

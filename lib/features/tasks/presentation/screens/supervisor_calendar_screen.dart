@@ -6,7 +6,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class SupervisorCalendarScreen extends ConsumerStatefulWidget {
@@ -83,13 +86,13 @@ class _SupervisorCalendarScreenState extends ConsumerState<SupervisorCalendarScr
     final user = ref.watch(currentUserProvider);
     final reportsAsync = ref.watch(supervisorAllVisibleTaskMapsProvider);
 
-    if (user == null || user.role != 'supervisor') {
+    if (user == null || user.role != UserRole.hseSupervisor) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
       });
       return const Scaffold(
         backgroundColor: Color(0xFF111111),
-        body: Center(child: CircularProgressIndicator()),
+        body: _CalendarShimmer(),
       );
     }
 
@@ -330,8 +333,8 @@ class _SupervisorCalendarScreenState extends ConsumerState<SupervisorCalendarScr
                                         context,
                                         title: _getReportTitle(task),
                                         dateString: dateString,
-                                        rawStatus: task['status']?.toString() ?? 'Pending',
-                                        tag: _getStatusTag(task['status']?.toString()),
+                                        rawStatus: _getActualStatus(task),
+                                        tag: _getStatusTag(_getActualStatus(task)),
                                         reportId: task['id'].toString(),
                                         staffName: task['staffName']?.toString() ?? '-',
                                       ),
@@ -351,12 +354,33 @@ class _SupervisorCalendarScreenState extends ConsumerState<SupervisorCalendarScr
     );
   }
 
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di all tasks screen)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
   Color _getColorByStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
         return const Color(0xFFD4D8FF);
       case 'follow up done':
         return const Color(0xFFFAFF9F);
+      case 'pending rejected':
+        return const Color(0xFFFFCDD2);
       case 'completed':
         return const Color(0xFFC1F0D0);
       case 'canceled':
@@ -540,7 +564,9 @@ class _SupervisorCalendarScreenState extends ConsumerState<SupervisorCalendarScr
       case 'pending':
         return 'Pending';
       case 'follow up done':
-        return 'Waiting Review';
+        return 'Follow Up Done';
+      case 'pending rejected':
+        return 'Pending Rejected';
       case 'completed':
         return 'Completed';
       case 'canceled':
@@ -570,4 +596,88 @@ class _CardStripedPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _CalendarShimmer extends StatelessWidget {
+  const _CalendarShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: BaseShimmer(
+              child: Column(
+                children: [
+                  const ShimmerBox(width: 200, height: 24),
+                  const SizedBox(height: 16),
+                  const ShimmerBox(width: 150, height: 20),
+                ],
+              ),
+            ),
+          ),
+          // Date selector
+          SizedBox(
+            height: 72,
+            child: BaseShimmer(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: 7,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      width: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Task list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: BaseShimmer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShimmerBox(width: 80, height: 24),
+                          SizedBox(height: 12),
+                          ShimmerBox(width: double.infinity, height: 20),
+                          SizedBox(height: 8),
+                          ShimmerBox(width: 150, height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

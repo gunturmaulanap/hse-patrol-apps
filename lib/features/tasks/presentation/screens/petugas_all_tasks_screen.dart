@@ -7,7 +7,10 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class PetugasAllTasksScreen extends ConsumerStatefulWidget {
@@ -22,6 +25,16 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.read(petugasTaskMapsProvider.future);
+    });
+  }
 
   @override
   void dispose() {
@@ -50,7 +63,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     }
 
     // FIX: Redirect ke login jika role bukan petugas
-    if (user.role != 'petugas') {
+    if (user.role != UserRole.petugasHse) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           context.goNamed(RouteNames.login);
@@ -65,15 +78,13 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     }
 
     final allReports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
-    final currentUserId = int.tryParse(user.id);
-    final reports = currentUserId == null
-        ? <Map<String, dynamic>>[]
-        : allReports.where((r) => _taskOwnerId(r) == currentUserId).toList();
+    final currentUserId = user.id;
+    final reports = allReports.where((r) => _taskOwnerId(r) == currentUserId).toList();
 
-    if (reportsAsync.isLoading && reports.isEmpty) {
+    if ((reportsAsync.isLoading && reports.isEmpty) || !reportsAsync.hasValue) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: _TaskListShimmer(),
       );
     }
 
@@ -536,4 +547,71 @@ class _CardStripedPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TaskListShimmer extends StatelessWidget {
+  const _TaskListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: BaseShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ShimmerBox(width: 200, height: 28),
+                    const SizedBox(height: 8),
+                    const ShimmerBox(width: 300, height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: BaseShimmer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShimmerBox(width: 80, height: 24),
+                        SizedBox(height: 12),
+                        ShimmerBox(width: double.infinity, height: 20),
+                        SizedBox(height: 8),
+                        ShimmerBox(width: 150, height: 16),
+                        SizedBox(height: 12),
+                        Row(
+                          children: [
+                            ShimmerBox(width: 60, height: 14),
+                            Spacer(),
+                            ShimmerBox(width: 60, height: 14),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              childCount: 5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

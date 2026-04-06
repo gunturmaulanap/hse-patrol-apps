@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../../../../core/storage/session_manager.dart';
 import '../../../../core/utils/system_ui_helper.dart';
 import '../../../../shared/enums/user_role.dart';
@@ -73,18 +72,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       final me = await authRepository.getMe();
       debugPrint('[Splash] /me result: ${me.toJson()}');
 
-      ref.read(currentUserProvider.notifier).state = MockUser(
-            id: me.id.toString(),
-            username: me.name,
-            email: me.email,
-            password: '',
-            role: me.role == UserRole.pic
-                ? 'pic'
-                : me.role == UserRole.hseSupervisor
-                    ? 'supervisor'
-                    : 'petugas',
-            areaAccess: me.areaAccess,
-          );
+      ref.read(authNotifierProvider.notifier).setHydratedUser(me);
 
       final route = me.role == UserRole.pic
           ? RouteNames.picHome

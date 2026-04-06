@@ -46,4 +46,19 @@ class AuthRepositoryImpl implements AuthRepository {
     debugPrint('[AuthRepository] before call getMe()');
     return _remoteDataSource.getMe();
   }
+
+  @override
+  Future<String> changePassword(
+    String currentPassword,
+    String newPassword,
+    String confirmPassword,
+  ) async {
+    debugPrint('[AuthRepository] changePassword() start');
+
+    return _remoteDataSource.changePassword(
+      currentPassword: currentPassword,
+      password: newPassword,
+      passwordConfirmation: confirmPassword,
+    );
+  }
 }

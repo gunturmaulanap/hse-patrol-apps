@@ -11,6 +11,11 @@ abstract class AuthRemoteDataSource {
   Future<LoginResponse> login(LoginRequest request);
   Future<void> logout();
   Future<UserModel> getMe();
+  Future<String> changePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -163,6 +168,76 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       _log('getMe() unexpected error', e);
       _log('getMe() stacktrace', st);
       throw Exception('Gagal mengambil data user: $e');
+    }
+  }
+
+  @override
+  Future<String> changePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    try {
+      _log('changePassword() request payload', {
+        'current_password_length': currentPassword.length,
+        'password_length': password.length,
+        'password_confirmation_length': passwordConfirmation.length,
+      });
+
+      final response = await _dio.post(
+        '/change-password',
+        data: {
+          'current_password': currentPassword,
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          responseType: ResponseType.json,
+        ),
+      );
+
+      _log('changePassword() raw response', response.data);
+
+      final root = _asMap(
+        response.data,
+        fallbackMessage: 'Format response change password tidak valid',
+      );
+
+      final payload = _unwrapData(root);
+      final status =
+          (payload['status'] ?? root['status'])?.toString().trim().toLowerCase();
+      final message =
+          (payload['message'] ?? root['message'])?.toString().trim();
+
+      if (status != null &&
+          status.isNotEmpty &&
+          status != 'success' &&
+          status != 'ok') {
+        throw Exception(
+          message?.isNotEmpty == true
+              ? message
+              : 'Gagal mengubah password',
+        );
+      }
+
+      return message?.isNotEmpty == true
+          ? message!
+          : 'Password berhasil diubah';
+    } on DioException catch (e) {
+      _log('changePassword() DioException', e);
+      _log('changePassword() DioException response', e.response?.data);
+
+      final backendMessage = _extractErrorMessage(e.response?.data);
+      throw Exception(
+        backendMessage ??
+            e.message ??
+            'Terjadi kesalahan pada server saat mengubah password',
+      );
+    } catch (e, st) {
+      _log('changePassword() unexpected error', e);
+      _log('changePassword() stacktrace', st);
+      throw Exception('Gagal mengubah password: $e');
     }
   }
 

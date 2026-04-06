@@ -9,7 +9,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class SupervisorDashboardScreen extends ConsumerStatefulWidget {
@@ -37,7 +38,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     final user = ref.watch(currentUserProvider);
     final tasksAsync = ref.watch(supervisorAllVisibleTaskMapsProvider);
 
-    if (user == null || user.role != 'supervisor') {
+    if (user == null || user.role != UserRole.hseSupervisor) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
       });

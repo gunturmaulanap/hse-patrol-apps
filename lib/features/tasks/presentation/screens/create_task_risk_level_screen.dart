@@ -56,29 +56,29 @@ class CreateTaskRiskLevelScreen extends ConsumerWidget {
                 children: [
                   _RiskCard(
                     title: 'Kurang dari 1 Jam',
-                    color: AppColors.riskLevel1, // Biru
+                    color: AppColors.riskLevel4, // Merah
                     icon: HugeIcons.strokeRoundedTimer01,
                     isSelected: form.riskLevel == '1',
                     onTap: () => selectRisk(1),
                   ),
                   _RiskCard(
                     title: 'Kurang dari 24 Jam',
-                    color: AppColors.riskLevel2, // Kuning
+                    color: AppColors.riskLevel3, // Orange
                     icon: HugeIcons.strokeRoundedTime01,
                     isSelected: form.riskLevel == '2',
                     onTap: () => selectRisk(2),
                   ),
                   _RiskCard(
                     title: 'Kurang dari 3 Hari',
-                    color: AppColors.riskLevel3, // Orange
+                    color: AppColors.riskLevel2, // Kuning
                     icon: HugeIcons.strokeRoundedCalendar03,
                     isSelected: form.riskLevel == '3',
                     onTap: () => selectRisk(3),
                   ),
                   _RiskCard(
                     title: 'Kurang dari 2 Minggu',
-                    color: AppColors.riskLevel4, // Merah
-                    icon: HugeIcons.strokeRoundedDanger,
+                    color: AppColors.riskLevel1, // Biru
+                    icon: HugeIcons.strokeRoundedCalendar03,
                     isSelected: form.riskLevel == '4',
                     onTap: () => selectRisk(4),
                   ),

@@ -175,24 +175,44 @@ class PicFindingScreen extends ConsumerWidget {
       case 'pending': return const Color(0xFFD4D8FF); // Ungu Muda
       case 'follow up done': return const Color(0xFFFAFF9F); // Kuning Muda
       case 'approved': return const Color(0xFFC1F0D0); // Hijau Muda (Completed)
-      case 'rejected': return const Color(0xFFFFD4D4); // Merah Muda
+      case 'pending rejected': return const Color(0xFFFFCDD2); // Merah Muda (Pink)
       default: return const Color(0xFFFFFFFF);
     }
   }
 
-  String _getPicStatusTag(Map<String, dynamic> report) {
-    final status = report['status']?.toString() ?? 'Pending';
-    
-    // Logika POV PIC: Jika status Pending tapi ada history rejected, tampilkan Rejected
-    if (status == 'Pending') {
-      final followUps = report['followUps'] as List<dynamic>? ?? [];
-      final isRejected = followUps.any((f) => f['action'] == 'Rejected');
-      if (isRejected) return 'Rejected';
-      return 'Pending';
-    } else if (status == 'Completed') {
-      return 'Approved'; // POV PIC melihatnya sebagai Approved
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
     }
-    return status; // Follow Up Done
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
+  String _getPicStatusTag(Map<String, dynamic> report) {
+    // Gunakan actual status yang sama dengan petugas/supervisor
+    final actualStatus = _getActualStatus(report);
+
+    // Penamaan POV PIC
+    if (actualStatus == 'Pending Rejected') {
+      return 'Pending Rejected';
+    } else if (actualStatus == 'Completed') {
+      return 'Approved'; // POV PIC melihat Completed sebagai Approved
+    } else if (actualStatus == 'Follow Up Done') {
+      return 'Follow Up Done';
+    }
+
+    return actualStatus; // Pending
   }
 
   Widget _buildExactTaskCard(
@@ -245,7 +265,7 @@ class PicFindingScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(tag, style: AppTypography.caption.copyWith(
-                          color: tag == 'Rejected' ? Colors.redAccent : const Color(0xFF6B6E94), 
+                          color: tag == 'Pending Rejected' ? Colors.redAccent : const Color(0xFF6B6E94),
                           fontWeight: FontWeight.w700
                         )),
                       )

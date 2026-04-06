@@ -7,7 +7,9 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
@@ -62,10 +64,14 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       return areaAccess.contains(r['area']) && r['status'] != 'Canceled';
     }).toList();
 
-    if (reportsAsync.isLoading && picReports.isEmpty) {
+    final isInitialLoading =
+        (reportsAsync.isLoading && !reportsAsync.hasValue) ||
+        (areasAsync.isLoading && !areasAsync.hasValue);
+
+    if (isInitialLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: _TaskListShimmer(),
       );
     }
 
@@ -148,7 +154,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                 indicator: BoxDecoration(color: const Color(0xFFD4D8FF), borderRadius: BorderRadius.circular(AppRadius.pill)),
                 labelColor: const Color(0xFF1E1E1E), unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: AppTypography.body1.copyWith(fontWeight: FontWeight.bold), indicatorPadding: EdgeInsets.zero,
-                tabs: [ _buildTab('All'), _buildTab('Pending'), _buildTab('Follow Up Done'), _buildTab('Rejected'), _buildTab('Approved') ],
+                tabs: [ _buildTab('All'), _buildTab('Pending'), _buildTab('Follow Up Done'), _buildTab('Pending Rejected'), _buildTab('Approved') ],
               ),
               const SizedBox(height: 12),
 
@@ -159,7 +165,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                     _buildTaskList(picReports, 'All'),
                     _buildTaskList(picReports, 'Pending'),
                     _buildTaskList(picReports, 'Follow Up Done'),
-                    _buildTaskList(picReports, 'Rejected'),
+                    _buildTaskList(picReports, 'Pending Rejected'),
                     _buildTaskList(picReports, 'Approved'),
                   ],
                 ),
@@ -229,21 +235,40 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   }
 
   // --- Logika Filter POV PIC ---
-  String _getPicStatusTag(Map<String, dynamic> report) {
-    final status = report['status']?.toString() ?? 'Pending';
-    if (status == 'Pending') {
-      final followUps = report['followUps'] as List<dynamic>? ?? [];
-      final isRejected = followUps.any((f) {
-        final action = (f['action']?.toString() ?? '').toLowerCase();
-        final status = (f['status']?.toString() ?? '').toLowerCase();
-        return action == 'rejected' || status == 'rejected';
-      });
-      if (isRejected) return 'Rejected';
-      return 'Pending';
-    } else if (status == 'Completed') {
-      return 'Approved'; 
+
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
     }
-    return status; 
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
+  String _getPicStatusTag(Map<String, dynamic> report) {
+    // Gunakan actual status yang sama dengan petugas/supervisor
+    final actualStatus = _getActualStatus(report);
+
+    // Penamaan POV PIC
+    if (actualStatus == 'Pending Rejected') {
+      return 'Pending Rejected';
+    } else if (actualStatus == 'Completed') {
+      return 'Approved'; // POV PIC melihat Completed sebagai Approved
+    } else if (actualStatus == 'Follow Up Done') {
+      return 'Follow Up Done';
+    }
+
+    return actualStatus; // Pending
   }
 
   Widget _buildTaskList(List<Map<String, dynamic>> allReports, String filter) {
@@ -336,7 +361,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       case 'pending': return const Color(0xFFD4D8FF); // Ungu
       case 'follow up done': return const Color(0xFFFAFF9F); // Kuning
       case 'approved': return const Color(0xFFC1F0D0); // Hijau (Completed)
-      case 'rejected': return const Color(0xFFFFD4D4); // Merah Muda
+      case 'pending rejected': return const Color(0xFFFFCDD2); // Merah Muda (Pink)
       default: return const Color(0xFFFFFFFF);
     }
   }
@@ -391,7 +416,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(tag, style: AppTypography.caption.copyWith(
-                          color: tag == 'Rejected' ? Colors.redAccent : const Color(0xFF6B6E94),
+                          color: tag == 'Pending Rejected' ? Colors.redAccent : const Color(0xFF6B6E94),
                           fontWeight: FontWeight.w700, fontSize: 9
                         )),
                       )
@@ -469,4 +494,71 @@ class _CardStripedPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TaskListShimmer extends StatelessWidget {
+  const _TaskListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: BaseShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ShimmerBox(width: 200, height: 28),
+                    const SizedBox(height: 8),
+                    const ShimmerBox(width: 300, height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: BaseShimmer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShimmerBox(width: 80, height: 24),
+                        SizedBox(height: 12),
+                        ShimmerBox(width: double.infinity, height: 20),
+                        SizedBox(height: 8),
+                        ShimmerBox(width: 150, height: 16),
+                        SizedBox(height: 12),
+                        Row(
+                          children: [
+                            ShimmerBox(width: 60, height: 14),
+                            Spacer(),
+                            ShimmerBox(width: 60, height: 14),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              childCount: 5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

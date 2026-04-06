@@ -10,7 +10,6 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../providers/auth_provider.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../../data/models/user_model.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -79,21 +78,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             return;
           }
 
-          // Set mock user for compatibility with existing UI
-          final mockUser = MockUser(
-            id: user.id.toString(),
-            username: user.name,
-            email: user.email,
-            password: '', // Not needed from backend
-            role: user.role == UserRole.pic
-                ? 'pic'
-                : user.role == UserRole.hseSupervisor
-                    ? 'supervisor'
-                    : 'petugas',
-            areaAccess: user.areaAccess,
-          );
-          ref.read(currentUserProvider.notifier).state = mockUser;
-
           if (!mounted) return;
 
           // ==========================================
@@ -101,11 +85,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // ==========================================
           final state = GoRouterState.of(context);
           final redirectUrl = state.uri.queryParameters['redirect'];
+          final redirectTarget = redirectUrl?.trim();
 
-          if (redirectUrl != null && redirectUrl.isNotEmpty) {
+          if (redirectTarget != null && redirectTarget.isNotEmpty) {
+            final isInternalPath = redirectTarget.startsWith('/');
+
             // Jika ada request redirect (dari Deep Link Handler), prioritaskan ke sana
-            debugPrint('[LoginScreen] redirecting to deep link: $redirectUrl');
-            context.go(redirectUrl);
+            debugPrint(
+              '[LoginScreen] redirect requested: $redirectTarget, isInternalPath: $isInternalPath',
+            );
+
+            if (isInternalPath) {
+              context.go(redirectTarget);
+            } else {
+              debugPrint('[LoginScreen] ignore non-internal redirect target: $redirectTarget');
+              final targetRoute = user.role == UserRole.pic
+                  ? RouteNames.picHome
+                  : user.role == UserRole.hseSupervisor
+                      ? RouteNames.supervisorHome
+                      : RouteNames.petugasHome;
+              context.goNamed(targetRoute);
+            }
           } else {
             // Navigate based on role default
             final targetRoute = user.role == UserRole.pic
@@ -178,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
-                  'Gunakan akun backend production.',
+                  'Gunakan akun berdasarkan role Anda yang sudah dibuat dari MES Aksamala.',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -233,18 +233,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: authState.isLoading ? null : _handleLogin,
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.surfaceVariant),
-                    borderRadius: BorderRadius.circular(AppRadius.borderMd),
-                  ),
-                  child: const Text(
-                    'Login menggunakan endpoint backend production.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  ),
-                )
               ],
             ),
           ),

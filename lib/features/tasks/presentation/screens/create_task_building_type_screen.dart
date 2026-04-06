@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../app/router/route_names.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
 import '../providers/create_task_form_provider.dart';
 
 class CreateTaskBuildingTypeScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
     }
 
     final form = ref.watch(createTaskFormProvider);
+    final buildingTypesAsync = ref.watch(buildingTypesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -65,7 +67,7 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
                 border: Border.all(color: AppColors.primary.withOpacity(0.3)),
               ),
               child: Text(
-                'ℹ️ Informasi: Untuk saat ini pemilihan jenis bangunan bersifat formalitas. Nanti akan ada filter area berdasarkan jenis bangunan.',
+                'ℹ️ Informasi: Pilihan jenis bangunan diambil dari server dan akan digunakan untuk memfilter daftar area pada langkah berikutnya.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.primary,
                     ),
@@ -74,28 +76,44 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
             ),
             const SizedBox(height: AppSpacing.xl),
             Expanded(
-              child: _BuildingTypeCard(
-                icon: HugeIcons.strokeRoundedFactory,
-                title: 'Fasilitas Produksi',
-                description: 'Area pabrik, gudang bahan baku, dll',
-                isSelected: form.buildingType == 'Fasilitas Produksi',
-                onTap: () {
-                  ref.read(createTaskFormProvider.notifier).setBuildingType('Fasilitas Produksi');
-                  context.pushNamed(RouteNames.petugasCreateTaskLocation);
+              child: buildingTypesAsync.when(
+                data: (types) {
+                  if (types.isEmpty) {
+                    return const Center(
+                      child: Text('Jenis bangunan belum tersedia.'),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: types.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+                    itemBuilder: (context, index) {
+                      final type = types[index];
+                      final isProduction = type.toLowerCase().contains('produksi') && !type.toLowerCase().contains('non');
+
+                      return AppCard(
+                        child: _BuildingTypeCard(
+                          icon: isProduction
+                              ? HugeIcons.strokeRoundedFactory
+                              : HugeIcons.strokeRoundedTree02,
+                          title: type,
+                          description: isProduction
+                              ? 'Area pabrik, gudang bahan baku, dan area operasional produksi.'
+                              : 'Kantor umum, area parkir, kantin, dan area non produksi.',
+                          isSelected: form.buildingType == type,
+                          onTap: () {
+                            ref.read(createTaskFormProvider.notifier).setBuildingType(type);
+                            context.pushNamed(RouteNames.petugasCreateTaskLocation);
+                          },
+                        ),
+                      );
+                    },
+                  );
                 },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: _BuildingTypeCard(
-                icon: HugeIcons.strokeRoundedTree02,
-                title: 'Fasilitas Non-Produksi',
-                description: 'Kantor umum, area parkir, kantin, dll',
-                isSelected: form.buildingType == 'Fasilitas Non-Produksi',
-                onTap: () {
-                  ref.read(createTaskFormProvider.notifier).setBuildingType('Fasilitas Non-Produksi');
-                  context.pushNamed(RouteNames.petugasCreateTaskLocation);
-                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(
+                  child: Text('Gagal memuat jenis bangunan: $error'),
+                ),
               ),
             ),
           ],

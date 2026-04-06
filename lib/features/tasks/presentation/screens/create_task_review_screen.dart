@@ -10,8 +10,9 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../app/router/route_names.dart';
-import '../../../../core/mock_api/mock_database.dart';
 import '../../../../core/utils/share_helper.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/create_task_form_provider.dart';
 
 class CreateTaskReviewScreen extends ConsumerStatefulWidget {
@@ -24,13 +25,42 @@ class CreateTaskReviewScreen extends ConsumerStatefulWidget {
 class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen> {
   bool _isSubmitting = false;
 
+  String? _normalizePicToken(String? raw) {
+    if (raw == null) return null;
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+
+    // Kasus 1: token polos
+    if (!value.contains('://') && !value.contains('/')) {
+      return value;
+    }
+
+    // Kasus 2: URL API legacy atau URL publik
+    final uri = Uri.tryParse(value);
+    if (uri != null) {
+      final segments = uri.pathSegments;
+      if (segments.length >= 2 && segments[0] == 'share' && segments[1] == 'report') {
+        return segments.isNotEmpty ? segments.last : null;
+      }
+
+      if (segments.length >= 4 && segments[0] == 'api' && segments[1] == 'hse' && segments[2] == 'reports' && segments[3] == 'pic') {
+        return segments.isNotEmpty ? segments.last : null;
+      }
+    }
+
+    // Fallback aman: ambil segmen terakhir non-kosong
+    final parts = value.split('/').where((e) => e.trim().isNotEmpty).toList();
+    if (parts.isEmpty) return null;
+    return parts.last.trim();
+  }
+
   void _goToHomeByRole(BuildContext context) {
     final user = ref.read(currentUserProvider);
     final role = user?.role;
 
-    if (role == 'supervisor') {
+    if (role == UserRole.hseSupervisor) {
       context.goNamed(RouteNames.supervisorHome);
-    } else if (role == 'pic') {
+    } else if (role == UserRole.pic) {
       context.goNamed(RouteNames.picHome);
     } else {
       context.goNamed(RouteNames.petugasHome);
@@ -52,9 +82,14 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
       final createdTask = await ref.read(createTaskFormProvider.notifier).submitTask();
 
       if (createdTask != null && createdTask is! bool && mounted) {
+        final picToken = _normalizePicToken(createdTask.picToken?.toString());
+        final deepLinkUrl = (picToken != null && picToken.isNotEmpty)
+            ? 'https://mes.aksamala.co.id/share/report/$picToken'
+            : 'Link belum tersedia';
+        debugPrint('[CreateTaskReviewScreen] share deep-link url: $deepLinkUrl');
         
         // Format Teks Caption WA
-        final waText = '''🚨 *LAPORAN TEMUAN HSE BARU* 🚨
+        final waText = '''🚨 *LAPORAN TEMUAN HSE* 🚨
 
 📍 *Area:* ${draft.area}
 🏢 *Bangunan:* ${draft.buildingType}
@@ -63,7 +98,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 💬 *Keterangan:* ${draft.notes}
 
 Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk membuka aplikasi:
-🔗 ${createdTask.picToken ?? 'Link belum tersedia'}''';
+🔗 $deepLinkUrl''';
 
         if (!mounted) return;
         

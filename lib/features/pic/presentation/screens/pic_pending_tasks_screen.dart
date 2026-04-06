@@ -7,7 +7,9 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
@@ -42,23 +44,24 @@ class PicPendingTasksScreen extends ConsumerWidget {
 
     // Filter Task:
     // 1. Hanya Area yang dimiliki PIC
-    // 2. Status Pending (Termasuk Rejected yang revert ke Pending)
+    // 2. Status yang butuh action PIC: "Pending" atau "Pending Rejected" (Follow Up Done yg di-reject)
     final pendingTasks = reports.where((r) {
       final isMyArea = areaAccess.contains(r['area']);
-      final isPending = r['status'] == 'Pending';
-      return isMyArea && isPending;
+      final picStatusTag = _getPicStatusTag(r);
+      final needsAction = picStatusTag == 'Pending' || picStatusTag == 'Pending Rejected';
+      return isMyArea && needsAction;
     }).toList()
       ..sort((a, b) => _safeParseDate(b['date']?.toString()).compareTo(_safeParseDate(a['date']?.toString())));
 
     if (reportsAsync.isLoading && pendingTasks.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: _PendingTasksShimmer(),
       );
     }
 
-    // Pisahkan mana yang benar-benar baru, mana yang Rejected (urgent)
-    final rejectedTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Rejected').toList();
+    // Pisahkan mana yang benar-benar baru, mana yang Pending Rejected (urgent)
+    final rejectedTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Pending Rejected').toList();
     final newTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Pending').toList();
 
     return Scaffold(
@@ -129,7 +132,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text('Ditolak (Perlu Revisi)', style: AppTypography.h3),
+                    Text('Pending Rejected (Perlu Revisi)', style: AppTypography.h3),
                     const SizedBox(height: 16),
                     ...rejectedTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -138,7 +141,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
                           title: _getReportTitle(task),
                           area: task['area']?.toString() ?? '-',
                           dateString: task['date']?.toString(),
-                          tag: 'Rejected',
+                          tag: 'Pending Rejected',
                         reportId: task['id'].toString(),
                       ),
                     )),
@@ -179,22 +182,44 @@ class PicPendingTasksScreen extends ConsumerWidget {
   }
 
   // --- Helpers ---
-  String _getPicStatusTag(Map<String, dynamic> report) {
-    final status = report['status']?.toString() ?? 'Pending';
-    if (status == 'Pending') {
-      final followUps = report['followUps'] as List<dynamic>? ?? [];
-      final isRejected = followUps.any((f) {
-        final action = (f['action']?.toString() ?? '').toLowerCase();
-        final followStatus = (f['status']?.toString() ?? '').toLowerCase();
-        return action == 'rejected' || followStatus == 'rejected';
-      });
-      if (isRejected) return 'Rejected';
+
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
     }
-    return 'Pending';
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
+  String _getPicStatusTag(Map<String, dynamic> report) {
+    // Gunakan actual status yang sama dengan petugas/supervisor
+    final actualStatus = _getActualStatus(report);
+
+    // Penamaan POV PIC
+    if (actualStatus == 'Pending Rejected') {
+      return 'Pending Rejected';
+    } else if (actualStatus == 'Completed') {
+      return 'Approved'; // POV PIC melihat Completed sebagai Approved
+    } else if (actualStatus == 'Follow Up Done') {
+      return 'Follow Up Done';
+    }
+
+    return actualStatus; // Pending
   }
 
   Color _getColorByPicStatus(String statusTag) {
-    if (statusTag == 'Rejected') return const Color(0xFFFFD4D4); // Merah Muda
+    if (statusTag == 'Pending Rejected') return const Color(0xFFFFCDD2); // Merah Muda (Pink)
     return const Color(0xFFD4D8FF); // Ungu Muda (Pending biasa)
   }
 
@@ -248,7 +273,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(tag, style: AppTypography.caption.copyWith(
-                          color: tag == 'Rejected' ? Colors.redAccent : const Color(0xFF6B6E94), 
+                          color: tag == 'Pending Rejected' ? Colors.redAccent : const Color(0xFF6B6E94),
                           fontWeight: FontWeight.w700
                         )),
                       )
@@ -351,4 +376,85 @@ class _CardStripedPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PendingTasksShimmer extends StatelessWidget {
+  const _PendingTasksShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: BaseShimmer(
+              child: Column(
+                children: [
+                  const ShimmerBox(width: 200, height: 28),
+                  const SizedBox(height: 8),
+                  const ShimmerBox(width: 300, height: 16),
+                ],
+              ),
+            ),
+          ),
+          // Alert banner
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: BaseShimmer(
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Task list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: BaseShimmer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShimmerBox(width: 80, height: 24),
+                          SizedBox(height: 12),
+                          ShimmerBox(width: double.infinity, height: 20),
+                          SizedBox(height: 8),
+                          ShimmerBox(width: 150, height: 16),
+                          SizedBox(height: 12),
+                          Row(
+                            children: [
+                              ShimmerBox(width: 60, height: 14),
+                              Spacer(),
+                              ShimmerBox(width: 60, height: 14),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

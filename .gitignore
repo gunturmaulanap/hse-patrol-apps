@@ -1,45 +1,92 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# =========================
+# OS / Editor
+# =========================
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.log
 
-# IntelliJ related
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
+.atom/
+.history/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# =========================
+# Dart / Flutter
+# =========================
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
-.pub-cache/
+.packages
 .pub/
-/build/
-/coverage/
+.pub-cache/
+build/
+coverage/
+**/doc/api/
+.metadata
 
-# Symbolication related
+# =========================
+# Generated / temporary
+# =========================
+*.class
+*.pyc
+.build/
+.buildlog/
+migrate_working_dir/
+
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# =========================
+# Android
+# =========================
+android/.gradle/
+android/local.properties
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# Keystore / signing secrets
+android/key.properties
+android/*.jks
+android/*.keystore
+android/app/*.jks
+android/app/*.keystore
+
+# =========================
+# iOS / macOS
+# =========================
+**/ios/Flutter/.last_build_id
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+macos/Flutter/ephemeral/
+
+# =========================
+# Linux / Windows generated
+# =========================
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# =========================
+# Web generated
+# =========================
+web/.dart_tool/
+
+# =========================
+# Environment / secret files
+# =========================
+.env
+.env.*
+*.pem
+*.p12
+*.mobileprovision

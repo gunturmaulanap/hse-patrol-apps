@@ -6,6 +6,10 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class PatrolListScreen extends ConsumerStatefulWidget {
@@ -22,7 +26,7 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
     final reportsAsync = ref.watch(petugasTaskMapsProvider);
 
     // Redirect ke login jika user null atau bukan petugas
-    if (user == null || user.role != 'petugas') {
+    if (user == null || user.role != UserRole.petugasHse) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           context.goNamed('login');
@@ -39,7 +43,7 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
     if (reportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: _PatrolListShimmer(),
       );
     }
 
@@ -175,5 +179,65 @@ class _PatrolListScreenState extends ConsumerState<PatrolListScreen> {
     if (value.contains('kritis') || value == '4') return AppColors.riskCritical;
 
     return AppColors.riskLow;
+  }
+}
+
+class _PatrolListShimmer extends StatelessWidget {
+  const _PatrolListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: BaseShimmer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ShimmerBox(width: 200, height: 28),
+                  const SizedBox(height: 8),
+                  const ShimmerBox(width: 300, height: 16),
+                ],
+              ),
+            ),
+          ),
+          // Patrol list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: 5,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: BaseShimmer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShimmerBox(width: 80, height: 24),
+                          SizedBox(height: 12),
+                          ShimmerBox(width: double.infinity, height: 20),
+                          SizedBox(height: 8),
+                          ShimmerBox(width: 150, height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

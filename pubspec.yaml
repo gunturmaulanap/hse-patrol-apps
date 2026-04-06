@@ -39,6 +39,7 @@ dependencies:
   http: ^1.6.0
   path_provider: ^2.1.5
   cross_file: ^0.3.5+2
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

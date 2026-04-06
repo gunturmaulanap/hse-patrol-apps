@@ -60,29 +60,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteNames.taskDetail,
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return TaskDetailScreen(taskId: id);
+          final picToken = state.uri.queryParameters['picToken'];
+          return TaskDetailScreen(taskId: id, picToken: picToken);
         },
       ),
-      // Deep Link Route untuk WhatsApp PIC Token
+      // Legacy API deep link (deprecated): redirect ke public deep-link route.
       GoRoute(
         path: '/api/hse/reports/pic/:picToken',
-        builder: (context, state) {
+        redirect: (context, state) {
           final picToken = state.pathParameters['picToken']!;
-
-          // Cek apakah user sudah login
-          // Jika belum login, bisa redirect ke login atau simpan token untuk diproses setelah login
-          // Untuk sekarang, kita redirect langsung ke task detail dengan picToken sebagai parameter
-
-          return TaskDetailScreen(taskId: picToken, picToken: picToken);
+          return '/share/report/$picToken';
         },
       ),
-      // Deep Link Route untuk Redirect dari Backend (api-hse-reports)
+
+      // Legacy API deep link (deprecated): redirect ke task route.
       GoRoute(
         path: '/api/hse-reports/:id',
-        builder: (context, state) {
+        redirect: (context, state) {
           final id = state.pathParameters['id']!;
-          // Backend redirect ke URL ini, langsung tampilkan task detail
-          return TaskDetailScreen(taskId: id);
+          return '/task/$id';
         },
       ),
       GoRoute(

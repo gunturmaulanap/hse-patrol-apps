@@ -4,7 +4,8 @@ import '../../data/datasource/task_remote_datasource.dart';
 import '../../data/repositories/task_repository_impl.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../../data/models/hse_task_model.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../data/models/hse_staff_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 
 final taskRemoteDataSourceProvider = Provider<TaskRemoteDataSource>((ref) {
@@ -39,6 +40,12 @@ final taskDetailByPicTokenProvider = FutureProvider.family<Map<String, dynamic>,
   final task = await repository.getTaskByPicToken(picToken);
   final areaNameById = await _buildAreaNameByIdMap(ref);
   return _toUiTaskMap(task, areaNameById: areaNameById);
+});
+
+/// Provider validasi picToken via endpoint existing tanpa ubah backend contract.
+final picTokenValidationProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
+  final remote = ref.watch(taskRemoteDataSourceProvider);
+  return remote.validatePicToken(picToken);
 });
 
 final petugasTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -96,13 +103,17 @@ Map<String, dynamic> _toUiTaskMap(
 
   return <String, dynamic>{
     'id': task.id.toString(),
+    'taskId': task.id,
+    'picToken': task.picToken,
     'title': title,
     'area': areaName,
+    'areaId': task.areaId.toString(),
     'rootCause': task.rootCause,
     'notes': task.notes,
     'riskLevel': task.riskLevel,
     'status': _normalizeStatus(task.status),
     'date': task.date,
+    'authorId': task.userId,
     'userId': task.userId,
     'user_id': task.userId,
     'createdBy': task.userId,
@@ -128,7 +139,7 @@ final supervisorOwnTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>
   final currentUser = ref.watch(currentUserProvider);
   final allReports = await ref.watch(petugasTaskMapsProvider.future);
 
-  final currentUserId = int.tryParse(currentUser?.id ?? '');
+  final currentUserId = currentUser?.id;
   if (currentUserId == null) return <Map<String, dynamic>>[];
 
   // Filter hanya task milik supervisor yang sedang login.
@@ -140,7 +151,7 @@ final supervisorStaffTaskMapsProvider = FutureProvider<List<Map<String, dynamic>
   final currentUser = ref.watch(currentUserProvider);
   final allReports = await ref.watch(petugasTaskMapsProvider.future);
 
-  final currentUserId = int.tryParse(currentUser?.id ?? '');
+  final currentUserId = currentUser?.id;
   final nonSelfReports = currentUserId == null
       ? allReports
       : allReports.where((report) => _ownerId(report) != currentUserId).toList();
@@ -148,25 +159,6 @@ final supervisorStaffTaskMapsProvider = FutureProvider<List<Map<String, dynamic>
   // Staff Task: semua task yang bukan milik supervisor login.
   // Penyaringan per petugas dilakukan menggunakan created_by/user_id di UI.
   return nonSelfReports;
-});
-
-/// Provider daftar staff (hse_staff/petugas) dari mock master data.
-/// Digunakan untuk menampilkan chip staff di tab Staff Task meskipun
-/// staff tersebut belum punya task.
-/// Ketika backend sudah expose endpoint GET /users?role=hse_staff,
-/// ganti dengan FutureProvider yang memanggil API tersebut.
-final staffMasterUsersProvider = Provider<List<({int id, String name})>>((ref) {
-  final mockDb = ref.read(mockDatabaseProvider);
-  final staffList = mockDb.users
-      .where((u) => _isHseStaffRole(u.role))
-      .map((u) {
-        final id = int.tryParse(u.id) ?? 0;
-        return (id: id, name: u.username);
-      })
-      .where((u) => u.id > 0)
-      .toList()
-    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-  return staffList;
 });
 
 final supervisorAllVisibleTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -194,6 +186,12 @@ final supervisorStaffTaskByNameProvider =
   return staffTasks
       .where((task) => (task['staffName']?.toString().trim() ?? '') == staffName)
       .toList();
+});
+
+// Provider untuk mengambil list staff dari API /hse/staffs
+final staffListProvider = FutureProvider<List<HseStaffModel>>((ref) async {
+  final repository = ref.watch(taskRepositoryProvider);
+  return repository.getStaffs();
 });
 
 String _resolveAreaName(HseTaskModel report, Map<int, String> areaNameById) {
@@ -256,13 +254,4 @@ int _toInt(dynamic value) {
 
 int _ownerId(Map<String, dynamic> report) {
   return _toInt(report['created_by'] ?? report['createdBy'] ?? report['user_id'] ?? report['userId']);
-}
-
-bool _isHseStaffRole(String? role) {
-  final normalized = (role ?? '').trim().toLowerCase();
-  return normalized == 'hse_staff' ||
-      normalized == 'hse staff' ||
-      normalized == 'petugas' ||
-      normalized == 'petugashse' ||
-      normalized == 'petugas_hse';
 }

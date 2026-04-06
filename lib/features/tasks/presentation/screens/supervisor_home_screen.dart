@@ -8,7 +8,9 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/shimmers/home_dashboard_shimmer.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class SupervisorHomeScreen extends ConsumerWidget {
@@ -29,7 +31,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
       );
     }
 
-    if (user.role != 'supervisor') {
+    if (user.role != UserRole.hseSupervisor) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
       });
@@ -45,7 +47,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
       final reportOwnerId = report['userId']?.toString() ??
                            report['created_by']?.toString() ??
                            report['user_id']?.toString();
-      return reportOwnerId == user.id;
+      return reportOwnerId == user.id.toString();
     }).toList();
 
     final reports = [...myReports]
@@ -56,7 +58,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
     if (ownReportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: HomeDashboardShimmer(),
       );
     }
 
@@ -160,29 +162,31 @@ class SupervisorHomeScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: () => context.pushNamed(RouteNames.supervisorAllTasks),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'View all',
-                              style: AppTypography.caption.copyWith(
-                                color: const Color(0xFFD4D8FF),
-                                fontWeight: FontWeight.bold,
-                              ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => context.pushNamed(RouteNames.supervisorAllTasks),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'View all',
+                                  style: AppTypography.caption.copyWith(
+                                    color: const Color(0xFFD4D8FF),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  PhosphorIcons.caretRight(PhosphorIconsStyle.bold),
+                                  size: 14,
+                                  color: const Color(0xFFD4D8FF),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              PhosphorIcons.caretRight(PhosphorIconsStyle.bold),
-                              size: 14,
-                              color: const Color(0xFFD4D8FF),
-                            ),
-                          ],
+                          ),
                         ),
                       )
                     ],
@@ -198,6 +202,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final task = latestFourTasks[index];
+                  final actualStatus = _getActualStatus(task);
                   return Align(
                     heightFactor: index == latestFourTasks.length - 1 ? 1.0 : 0.92,
                     alignment: Alignment.topCenter,
@@ -205,8 +210,8 @@ class SupervisorHomeScreen extends ConsumerWidget {
                       context,
                       title: _getReportTitle(task),
                       dateString: task['date']?.toString(),
-                      rawStatus: task['status']?.toString() ?? 'Pending',
-                      tag: _getStatusTag(task['status']?.toString()),
+                      rawStatus: actualStatus,
+                      tag: _getStatusTag(actualStatus),
                       reportId: task['id'].toString(),
                     ),
                   );
@@ -336,12 +341,33 @@ class SupervisorHomeScreen extends ConsumerWidget {
     );
   }
 
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di all tasks screen)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
   Color _getColorByStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
         return const Color(0xFFD4D8FF);
       case 'follow up done':
         return const Color(0xFFFAFF9F);
+      case 'pending rejected':
+        return const Color(0xFFFFCDD2);
       case 'completed':
         return const Color(0xFFC1F0D0);
       case 'canceled':
@@ -481,7 +507,9 @@ class SupervisorHomeScreen extends ConsumerWidget {
       case 'pending':
         return 'Pending';
       case 'follow up done':
-        return 'Waiting Review';
+        return 'Follow Up Done';
+      case 'pending rejected':
+        return 'Pending Rejected';
       case 'completed':
         return 'Completed';
       case 'canceled':

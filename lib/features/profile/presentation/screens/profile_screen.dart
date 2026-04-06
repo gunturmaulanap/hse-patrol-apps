@@ -6,7 +6,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -26,6 +27,81 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
+  bool _isUpdatingPassword = false;
+
+  String _cleanErrorMessage(Object error) {
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.replaceFirst('Exception: ', '').trim();
+    }
+    return raw;
+  }
+
+  Future<void> _submitChangePassword() async {
+    if (_isUpdatingPassword) return;
+
+    final currentPassword = _currentPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (currentPassword.isEmpty ||
+        newPassword.isEmpty ||
+        confirmPassword.isEmpty) {
+      AppSnackBar.warning(
+        context,
+        message: 'Semua field password wajib diisi.',
+      );
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      AppSnackBar.warning(
+        context,
+        message: 'Konfirmasi password baru tidak cocok.',
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdatingPassword = true;
+    });
+
+    try {
+      debugPrint('[ProfileScreen] before call changePassword()');
+
+      final authRepository = ref.read(authRepositoryProvider);
+      final message = await authRepository.changePassword(
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      );
+
+      if (!mounted) return;
+
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      FocusScope.of(context).unfocus();
+
+      AppSnackBar.success(
+        context,
+        message: message,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      AppSnackBar.error(
+        context,
+        message: _cleanErrorMessage(e),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPassword = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -55,8 +131,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     }
 
-    final isPetugas = user.role == 'petugas';
-    final isSupervisor = user.role == 'supervisor';
+    final isPetugas = user.role == UserRole.petugasHse;
+    final isSupervisor = user.role == UserRole.hseSupervisor;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -117,7 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               
               // Nama User
               Text(
-                user.username.toUpperCase(),
+                user.name.toUpperCase(),
                 style: AppTypography.h1.copyWith(fontSize: 26, letterSpacing: -0.5),
               ),
               const SizedBox(height: 12),
@@ -131,7 +207,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
                 ),
                 child: Text(
-                  user.role.toUpperCase(),
+                  user.role.name.toUpperCase(),
                   style: AppTypography.caption.copyWith(
                     color: const Color(0xFF1E1E1E),
                     fontWeight: FontWeight.bold,
@@ -194,16 +270,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                   onPressed: () {
-                    // TODO: Tambahkan logic untuk memvalidasi dan update password ke API
-                    // Contoh baca text: _newPasswordController.text
+                    _submitChangePassword();
                   },
-                  child: Text(
-                    'Update Password',
-                    style: AppTypography.body1.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isUpdatingPassword
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          'Update Password',
+                          style: AppTypography.body1.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               
@@ -229,7 +315,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       await authNotifier.logout();
 
                       if (!context.mounted) return;
-                      ref.read(currentUserProvider.notifier).state = null;
                       context.goNamed(RouteNames.login);
                     } catch (e) {
                       if (!context.mounted) return;
@@ -239,7 +324,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           backgroundColor: AppColors.statusRejected,
                         ),
                       );
-                      ref.read(currentUserProvider.notifier).state = null;
                       context.goNamed(RouteNames.login);
                     }
                   },

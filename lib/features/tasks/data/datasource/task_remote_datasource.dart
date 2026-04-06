@@ -4,14 +4,17 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/hse_task_model.dart';
 import '../models/create_hse_task_request.dart';
+import '../models/hse_staff_model.dart';
 
 abstract class TaskRemoteDataSource {
   Future<List<HseTaskModel>> fetchTasks({int? areaId, String? status});
   Future<HseTaskModel> getTaskById(int id);
   Future<HseTaskModel> getTaskByPicToken(String picToken);
+  Future<Map<String, dynamic>> validatePicToken(String picToken);
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos);
   Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request, {List<File>? photos, String? mode});
   Future<void> cancelTask(int id);
+  Future<List<HseStaffModel>> fetchStaffs();
 }
 
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
@@ -58,26 +61,123 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   @override
   Future<HseTaskModel> getTaskByPicToken(String picToken) async {
     try {
-      _log('Fetching task by picToken: $picToken');
+      final endpoint = '/hse-reports/pic/$picToken';
+      _log('Fetching task by picToken', {'endpoint': endpoint, 'token': picToken});
       // Menggunakan API endpoint untuk mencari task berdasarkan picToken
-      final response = await _dio.get('/hse-reports/pic/$picToken');
+      final response = await _dio.get(endpoint);
 
-      _log('Response status: ${response.statusCode}');
+      _log('Response status', response.statusCode);
 
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
       if (data == null) {
-        _log('Task not found for picToken');
+        _log('Task not found for picToken', response.data);
         throw Exception('Task not found');
       }
 
-      _log('Task found with ID: ${data['id']}');
+      _log('Task found by picToken', {
+        'id': data['id'],
+        'area_id': data['area_id'] ?? data['areaId'],
+        'created_by': data['created_by'] ?? data['createdBy'] ?? data['user_id'],
+      });
       return _parseReportModel(data);
     } catch (e) {
       _log('Error getting task by picToken: ${e.toString()}');
       throw Exception('Gagal mengambil task: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> validatePicToken(String picToken) async {
+    final endpoint = '/hse-reports/pic/$picToken';
+
+    try {
+      _log('Validating picToken (existing endpoint)', {
+        'endpoint': endpoint,
+        'token': picToken,
+      });
+
+      final response = await _dio.get(endpoint);
+      final raw = response.data;
+      final map = raw is Map<String, dynamic>
+          ? raw
+          : raw is Map
+              ? Map<String, dynamic>.from(raw)
+              : <String, dynamic>{};
+
+      final data = map['data'] is Map
+          ? Map<String, dynamic>.from(map['data'] as Map)
+          : map;
+
+      final tokenValid = _resolveBool(
+            data['token_valid'] ??
+                data['valid'] ??
+                data['is_valid'] ??
+                map['token_valid'] ??
+                map['valid'] ??
+                map['is_valid'],
+          ) ??
+          true;
+
+      final authorized = _resolveBool(
+            data['authorized'] ??
+                data['is_authorized'] ??
+                data['allowed'] ??
+                map['authorized'] ??
+                map['is_authorized'] ??
+                map['allowed'],
+          ) ??
+          true;
+
+      final result = <String, dynamic>{
+        'tokenValid': tokenValid,
+        'authorized': authorized,
+        'taskId': data['task_id'] ?? data['taskId'] ?? data['id'] ?? map['task_id'] ?? map['taskId'] ?? map['id'],
+        'reportId': data['report_id'] ?? data['reportId'] ?? map['report_id'] ?? map['reportId'],
+        'areaId': data['area_id'] ?? data['areaId'] ?? map['area_id'] ?? map['areaId'],
+        'authorId': data['author_id'] ?? data['authorId'] ?? data['created_by'] ?? data['createdBy'],
+        'reason': data['reason'] ?? data['message'] ?? map['message'] ?? '',
+        'raw': map,
+      };
+
+      _log('Validation result (normalized)', {
+        'tokenValid': result['tokenValid'],
+        'authorized': result['authorized'],
+        'taskId': result['taskId'],
+        'areaId': result['areaId'],
+      });
+
+      return result;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      final responseData = e.response?.data;
+      final payload = responseData is Map
+          ? Map<String, dynamic>.from(responseData as Map)
+          : <String, dynamic>{};
+
+      final tokenValid = status != 404;
+      final authorized = status != 401 && status != 403;
+
+      final result = <String, dynamic>{
+        'tokenValid': tokenValid,
+        'authorized': authorized,
+        'taskId': payload['task_id'] ?? payload['taskId'] ?? payload['id'],
+        'reportId': payload['report_id'] ?? payload['reportId'],
+        'areaId': payload['area_id'] ?? payload['areaId'],
+        'authorId': payload['author_id'] ?? payload['authorId'],
+        'reason': payload['message']?.toString() ?? e.message ?? '',
+        'raw': payload,
+      };
+
+      _log('Validation result (from error response)', {
+        'status': status,
+        'tokenValid': result['tokenValid'],
+        'authorized': result['authorized'],
+      });
+
+      return result;
     }
   }
 
@@ -282,6 +382,20 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  bool? _resolveBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = value?.toString().trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) return null;
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'valid' || normalized == 'authorized') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no' || normalized == 'invalid' || normalized == 'unauthorized') {
+      return false;
+    }
+    return null;
+  }
+
   List<String> _parsePhotos(dynamic raw) {
     if (raw is List) {
       return raw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
@@ -312,5 +426,27 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       if (reports is List) return reports;
     }
     return <dynamic>[];
+  }
+
+  @override
+  Future<List<HseStaffModel>> fetchStaffs() async {
+    try {
+      _log('Fetching staffs list');
+      final response = await _dio.get('/hse/staffs');
+
+      _log('Staffs response status', response.statusCode);
+
+      final List<dynamic> data = _extractListData(response.data);
+
+      final staffs = data.map((json) {
+        return HseStaffModel.fromJson(json as Map<String, dynamic>);
+      }).toList();
+
+      _log('Staffs fetched successfully', {'count': staffs.length});
+      return staffs;
+    } catch (e) {
+      _log('Error fetching staffs: ${e.toString()}');
+      throw Exception('Gagal mengambil data staff: ${e.toString()}');
+    }
   }
 }

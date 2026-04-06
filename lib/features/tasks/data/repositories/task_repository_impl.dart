@@ -3,6 +3,7 @@ import '../../domain/repositories/task_repository.dart';
 import '../datasource/task_remote_datasource.dart';
 import '../models/hse_task_model.dart';
 import '../models/create_hse_task_request.dart';
+import '../models/hse_staff_model.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
   final TaskRemoteDataSource _remoteDataSource;
@@ -37,5 +38,10 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Future<void> cancelTask(int id) async {
     return _remoteDataSource.cancelTask(id);
+  }
+
+  @override
+  Future<List<HseStaffModel>> getStaffs() async {
+    return _remoteDataSource.fetchStaffs();
   }
 }

@@ -8,7 +8,11 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/models/hse_staff_model.dart';
 import '../providers/task_provider.dart';
 
 class SupervisorAllTasksScreen extends ConsumerStatefulWidget {
@@ -28,6 +32,20 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   int? _selectedStaffId;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(supervisorOwnTaskMapsProvider);
+      ref.invalidate(supervisorStaffTaskMapsProvider);
+      ref.invalidate(staffListProvider);
+      ref.read(supervisorOwnTaskMapsProvider.future);
+      ref.read(supervisorStaffTaskMapsProvider.future);
+      ref.read(staffListProvider.future);
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -38,8 +56,9 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     final user = ref.watch(currentUserProvider);
     final ownAsync = ref.watch(supervisorOwnTaskMapsProvider);
     final staffAsync = ref.watch(supervisorStaffTaskMapsProvider);
+    final staffListAsync = ref.watch(staffListProvider);
 
-    if (user == null || user.role != 'supervisor') {
+    if (user == null || user.role != UserRole.hseSupervisor) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
       });
@@ -51,7 +70,13 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
     final ownTasks = ownAsync.valueOrNull ?? <Map<String, dynamic>>[];
     final staffTasks = staffAsync.valueOrNull ?? <Map<String, dynamic>>[];
-    final staffEntries = _buildStaffEntries(staffTasks);
+    final staffList = staffListAsync.valueOrNull ?? <HseStaffModel>[];
+
+    // Build staff entries dari API staff list
+    final staffEntries = staffList
+        .map((staff) => _StaffEntry(id: staff.id, name: staff.name))
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     final selectedStaffId = _selectedStaffId ?? staffEntries.firstOrNull?.id;
     final sourceList = _scope == 'own'
@@ -68,11 +93,29 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
       });
     }
 
-    if ((_scope == 'own' && ownAsync.isLoading && ownTasks.isEmpty) ||
-        (_scope == 'staff' && staffAsync.isLoading && sourceList.isEmpty)) {
+    final isInitialOwnLoading =
+        _scope == 'own' && ((ownAsync.isLoading && !ownAsync.hasValue) || !ownAsync.hasValue);
+    final isInitialStaffLoading =
+        _scope == 'staff' &&
+        ((staffAsync.isLoading && !staffAsync.hasValue) ||
+            (staffListAsync.isLoading && !staffListAsync.hasValue) ||
+            !staffAsync.hasValue ||
+            !staffListAsync.hasValue);
+
+    final isTransitionOwnLoading =
+        _scope == 'own' && ownAsync.isLoading && sourceList.isEmpty;
+    final isTransitionStaffLoading =
+        _scope == 'staff' &&
+        (staffAsync.isLoading || staffListAsync.isLoading) &&
+        sourceList.isEmpty;
+
+    if (isInitialOwnLoading ||
+        isInitialStaffLoading ||
+        isTransitionOwnLoading ||
+        isTransitionStaffLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: _TaskListShimmer(),
       );
     }
 
@@ -354,26 +397,6 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         }).toList(),
       ),
     );
-  }
-
-  List<_StaffEntry> _buildStaffEntries(
-    List<Map<String, dynamic>> staffTasks,
-  ) {
-    final byId = <int, String>{};
-
-    // Build dari data API report: grouping berdasarkan created_by/user_id.
-    for (final task in staffTasks) {
-      final id = _taskOwnerId(task);
-      final name = (task['staffName']?.toString().trim() ?? '');
-      if (id > 0 && name.isNotEmpty) {
-        byId[id] = name;
-      }
-    }
-
-    return byId.entries
-        .map((e) => _StaffEntry(id: e.key, name: e.value))
-        .toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   int _taskOwnerId(Map<String, dynamic> task) {
@@ -730,4 +753,71 @@ class _StaffEntry {
 
 extension _ListFirstOrNullX<T> on List<T> {
   T? get firstOrNull => isEmpty ? null : first;
+}
+
+class _TaskListShimmer extends StatelessWidget {
+  const _TaskListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: BaseShimmer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ShimmerBox(width: 200, height: 28),
+                    const SizedBox(height: 8),
+                    const ShimmerBox(width: 300, height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: BaseShimmer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShimmerBox(width: 80, height: 24),
+                        SizedBox(height: 12),
+                        ShimmerBox(width: double.infinity, height: 20),
+                        SizedBox(height: 8),
+                        ShimmerBox(width: 150, height: 16),
+                        SizedBox(height: 12),
+                        Row(
+                          children: [
+                            ShimmerBox(width: 60, height: 14),
+                            Spacer(),
+                            ShimmerBox(width: 60, height: 14),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              childCount: 5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

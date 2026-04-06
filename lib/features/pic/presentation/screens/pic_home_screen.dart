@@ -6,7 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 import '../providers/active_area_filter_provider.dart';

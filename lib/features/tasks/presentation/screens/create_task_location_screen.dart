@@ -20,33 +20,10 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
   AreaModel? _selectedArea;
 
   @override
-  void initState() {
-    super.initState();
-    // TODO: Nanti jika sudah ada API building type, filter areas by building type di sini
-    // final buildingType = ref.read(createTaskFormProvider).buildingType;
-    // Untuk sekarang, tampilkan semua areas tanpa filter
-
-    // Load selected area dari state provider jika ada
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final draft = ref.read(createTaskFormProvider);
-      final areasAsync = ref.read(areaProvider);
-      final areas = areasAsync.valueOrNull ?? [];
-
-      if (draft.areaId != null && areas.isNotEmpty) {
-        final existingArea = areas.firstWhere(
-          (area) => area.id == draft.areaId,
-          orElse: () => areas.first,
-        );
-        setState(() {
-          _selectedArea = existingArea;
-        });
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final areasAsync = ref.watch(areaProvider);
+    final draft = ref.watch(createTaskFormProvider);
+    final selectedBuildingType = draft.buildingType;
 
     return Scaffold(
       appBar: AppBar(
@@ -81,6 +58,35 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
             // Dropdown from Backend API
             areasAsync.when(
               data: (areas) {
+                final filteredAreas = selectedBuildingType == null || selectedBuildingType.isEmpty
+                    ? areas
+                    : areas
+                        .where(
+                          (area) => area.buildingType.toLowerCase().trim() ==
+                              selectedBuildingType.toLowerCase().trim(),
+                        )
+                        .toList();
+
+                final AreaModel? effectiveSelectedArea;
+                if (_selectedArea != null &&
+                    filteredAreas.any((area) => area.id == _selectedArea!.id)) {
+                  effectiveSelectedArea = _selectedArea;
+                } else if (draft.areaId != null) {
+                  final matched = filteredAreas.where((area) => area.id == draft.areaId);
+                  effectiveSelectedArea = matched.isNotEmpty ? matched.first : null;
+                } else {
+                  effectiveSelectedArea = null;
+                }
+
+                if (_selectedArea?.id != effectiveSelectedArea?.id) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    setState(() {
+                      _selectedArea = effectiveSelectedArea;
+                    });
+                  });
+                }
+
                 return DropdownButtonFormField<AreaModel>(
                   decoration: InputDecoration(
                     labelText: 'Nama Area / Lokasi',
@@ -88,8 +94,8 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  initialValue: _selectedArea,
-                  items: areas.map((area) {
+                  value: effectiveSelectedArea,
+                  items: filteredAreas.map((area) {
                     return DropdownMenuItem(
                       value: area,
                       child: Text(area.name),

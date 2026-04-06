@@ -5,6 +5,7 @@ import '../models/area_model.dart';
 abstract class AreaRemoteDataSource {
   Future<List<AreaModel>> fetchAreas();
   Future<List<AreaModel>> fetchAreasByUser();
+  Future<List<String>> fetchBuildingTypes();
 }
 
 class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
@@ -39,6 +40,24 @@ class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
       return data.map((json) => AreaModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
       throw Exception('Gagal mengambil data areas by user: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<List<String>> fetchBuildingTypes() async {
+    try {
+      final response = await _dio.get('/areas/building-types');
+
+      final List<dynamic> data = response.data is Map
+          ? (response.data['data'] as List<dynamic>? ?? [])
+          : (response.data as List<dynamic>? ?? []);
+
+      return data
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil data building types: ${e.toString()}');
     }
   }
 }

@@ -69,9 +69,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     debugPrint('[AuthNotifier] before update auth state -> logout success');
     state = const AuthState(isLoading: false, user: null);
   }
+
+  void setHydratedUser(UserModel user) {
+    debugPrint('[AuthNotifier] before update auth state -> hydrate user');
+    state = AuthState(isLoading: false, user: user);
+  }
 }
 
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.read(authRepositoryProvider);
   return AuthNotifier(repository);
+});
+
+// Provider untuk user yang sedang login (replacing currentUserProvider dari mock_database)
+final currentUserProvider = Provider<UserModel?>((ref) {
+  return ref.watch(authNotifierProvider).user;
 });

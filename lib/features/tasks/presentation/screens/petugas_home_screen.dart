@@ -7,7 +7,9 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock_api/mock_database.dart';
+import '../../../../core/widgets/shimmer/shimmers/home_dashboard_shimmer.dart';
+import '../../../../shared/enums/user_role.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 
 class PetugasHomeScreen extends ConsumerWidget {
@@ -34,7 +36,7 @@ class PetugasHomeScreen extends ConsumerWidget {
     }
 
     // FIX: Redirect ke login jika role bukan petugas
-    if (user.role != 'petugas') {
+    if (user.role != UserRole.petugasHse) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           context.goNamed(RouteNames.login);
@@ -54,7 +56,7 @@ class PetugasHomeScreen extends ConsumerWidget {
       final reportOwnerId = report['userId']?.toString() ??
                            report['created_by']?.toString() ??
                            report['user_id']?.toString();
-      return reportOwnerId == user.id;
+      return reportOwnerId == user.id.toString();
     }).toList();
 
     final reports = [...myReports]
@@ -64,7 +66,7 @@ class PetugasHomeScreen extends ConsumerWidget {
     if (reportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: HomeDashboardShimmer(),
       );
     }
 
@@ -160,15 +162,21 @@ class PetugasHomeScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: () => context.pushNamed(RouteNames.petugasAllTasks),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Row(
-                          children: [
-                            Text('View all', style: AppTypography.caption.copyWith(color: const Color(0xFFD4D8FF), fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 4),
-                            Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), size: 14, color: const Color(0xFFD4D8FF)),
-                          ],
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => context.pushNamed(RouteNames.petugasAllTasks),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            child: Row(
+                              children: [
+                                Text('View all', style: AppTypography.caption.copyWith(color: const Color(0xFFD4D8FF), fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 4),
+                                Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), size: 14, color: const Color(0xFFD4D8FF)),
+                              ],
+                            ),
+                          ),
                         ),
                       )
                     ],
@@ -186,16 +194,19 @@ class PetugasHomeScreen extends ConsumerWidget {
                   final rpt = latestReports[index];
                   final isLast = index == latestReports.length - 1;
 
+                  // Gunakan actual status yang mengecek follow-up terakhir
+                  final actualStatus = _getActualStatus(rpt);
+
                   return Align(
-                    heightFactor: isLast ? 1.0 : 0.85, 
+                    heightFactor: isLast ? 1.0 : 0.85,
                     alignment: Alignment.topCenter,
                     child: _buildExactTaskCard(
                       context,
                       index: index,
                       title: _getReportTitle(rpt),
-                      dateString: rpt['date']?.toString(), 
-                      rawStatus: rpt['status']?.toString() ?? 'Pending',
-                      tag: _getStatusTag(rpt['status']?.toString()),
+                      dateString: rpt['date']?.toString(),
+                      rawStatus: actualStatus,
+                      tag: _getStatusTag(actualStatus),
                       reportId: rpt['id'].toString(),
                     ),
                   );
@@ -210,10 +221,30 @@ class PetugasHomeScreen extends ConsumerWidget {
     );
   }
 
+  // Helper untuk menentukan status sebenarnya dari report (sama seperti di all tasks screen)
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+                      report['follow_ups'] as List<dynamic>? ?? [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+
+      // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    // Default ke status report
+    return report['status']?.toString() ?? 'Pending';
+  }
+
   Color _getColorByStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending': return const Color(0xFFD4D8FF); // Soft Purple
       case 'follow up done': return const Color(0xFFFAFF9F); // Soft Yellow
+      case 'pending rejected': return const Color(0xFFFFCDD2); // Soft Pink (Merah Muda)
       case 'completed': return const Color(0xFFC1F0D0); // Soft Mint Green
       case 'canceled': return const Color(0xFF1E1E1E); // Solid Black
       default: return const Color(0xFFFFFFFF);
@@ -370,7 +401,8 @@ class PetugasHomeScreen extends ConsumerWidget {
     if (status == null) return null;
     switch (status.toLowerCase()) {
       case 'pending': return 'Pending';
-      case 'follow up done': return 'Waiting Review';
+      case 'follow up done': return 'Follow Up Done';
+      case 'pending rejected': return 'Pending Rejected';
       case 'completed': return 'Completed';
       case 'canceled': return 'Canceled';
       default: return null;

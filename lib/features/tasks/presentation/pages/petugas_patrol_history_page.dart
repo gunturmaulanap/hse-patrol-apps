@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../core/widgets/shimmer/base_shimmer.dart';
+import '../../../../core/widgets/shimmer/shimmer_box.dart';
 import '../providers/task_provider.dart';
 
 class PetugasPatrolHistoryPage extends ConsumerWidget {
@@ -155,7 +157,7 @@ class PetugasPatrolHistoryPage extends ConsumerWidget {
               );
             },
             loading: () => const SliverToBoxAdapter(
-              child: Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
+              child: _PatrolHistoryShimmer(),
             ),
             error: (error, stack) => SliverToBoxAdapter(
               child: Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Error: $error'))),
@@ -172,6 +174,65 @@ class PetugasPatrolHistoryPage extends ConsumerWidget {
         icon: const Icon(Icons.add_a_photo, color: Colors.white),
         label: const Text('Lapor Cepat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
       ),
+    );
+  }
+}
+
+class _PatrolHistoryShimmer extends StatelessWidget {
+  const _PatrolHistoryShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            child: BaseShimmer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ShimmerBox(width: 200, height: 24),
+                  const SizedBox(height: 16),
+                  const ShimmerBox(width: double.infinity, height: 60),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(20),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: BaseShimmer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShimmerBox(width: 80, height: 24),
+                        SizedBox(height: 12),
+                        ShimmerBox(width: double.infinity, height: 20),
+                        SizedBox(height: 8),
+                        ShimmerBox(width: 150, height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              childCount: 5,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -89,6 +89,8 @@ class UserModel {
       areaAccess: areaAccess ?? this.areaAccess,
     );
   }
+
+  String get username => name;
 }
 
 UserRole _parseUserRole({

@@ -146,6 +146,7 @@ class PetugasHomePage extends ConsumerWidget {
   Widget _buildStatusBadge(String status) {
     Color bgColor;
     Color textColor;
+    String displayStatus = status;
 
     switch (status.toLowerCase()) {
       case 'pending':
@@ -153,11 +154,19 @@ class PetugasHomePage extends ConsumerWidget {
         textColor = AppColors.textInverse;
         break;
       case 'rejected':
+      case 'pending rejected':
         bgColor = AppColors.statusRejected;
         textColor = AppColors.textInverse;
+        displayStatus = 'Pending Rejected';
         break;
       case 'approved':
+      case 'follow up done':
         bgColor = AppColors.statusApproved;
+        textColor = AppColors.textInverse;
+        displayStatus = status.toLowerCase() == 'follow up done' ? 'Follow Up Done' : status;
+        break;
+      case 'completed':
+        bgColor = const Color(0xFFC1F0D0);
         textColor = AppColors.textInverse;
         break;
       default:
@@ -172,7 +181,7 @@ class PetugasHomePage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
-        status.toUpperCase(),
+        displayStatus.toUpperCase(),
         style: AppTypography.caption.copyWith(
           color: textColor,
           fontWeight: FontWeight.w600,

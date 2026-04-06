@@ -22,7 +22,8 @@ class _PicFollowUpNotesScreenState extends ConsumerState<PicFollowUpNotesScreen>
   @override
   void initState() {
     super.initState();
-    _notesController.text = ref.read(picFollowUpFormProvider).notes ?? '';
+    // Mulai dari kosong agar user selalu input catatan manual.
+    _notesController.text = '';
   }
 
   @override
