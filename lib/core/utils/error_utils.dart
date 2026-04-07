@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../error/app_exception.dart';
+import '../error/error_handler.dart';
 import 'logger.dart';
 
 /// Helper utilities for error handling in UI

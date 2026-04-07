@@ -28,6 +28,7 @@ class DeepLinkHandlerScreen extends ConsumerStatefulWidget {
 }
 
 class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
+  static bool _globalProcessing = false;
   bool _isProcessing = false;
   bool _hasNavigated = false;
 
@@ -41,8 +42,9 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
   }
 
   Future<void> _processDeepLink() async {
-    if (_isProcessing) return;
+    if (_isProcessing || _globalProcessing) return;
     _isProcessing = true;
+    _globalProcessing = true;
 
     try {
       debugPrint('[DeepLinkHandler] incoming token: ${widget.token}');
@@ -97,12 +99,40 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       debugPrint('[DeepLinkHandler] attempt to resolve task from Backend API for token: ${widget.token}');
 
       Map<String, dynamic>? foundTask;
+      Map<String, dynamic>? validationSnapshot;
       try {
         foundTask = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
         debugPrint('[DeepLinkHandler] Task fetched successfully => ${foundTask != null ? 'ID: ${foundTask['id']}, Area: ${foundTask['area']}, AreaId: ${foundTask['areaId']}' : 'null'}');
       } catch (e) {
         debugPrint('[DeepLinkHandler] failed to fetch from backend: $e');
         final errorMsg = e.toString().toLowerCase();
+
+        // Fallback kritis: validasi token + ambil task id minimal dari endpoint validasi
+        // Berguna saat endpoint detail by token mengembalikan format non-standar.
+        try {
+          final validation = await ref.read(picTokenValidationProvider(widget.token).future);
+          validationSnapshot = validation;
+          final tokenValid = validation['tokenValid'] == true;
+          final fallbackTaskId = validation['taskId'] ?? validation['reportId'] ?? validation['id'];
+
+          if (tokenValid && fallbackTaskId != null) {
+            foundTask = <String, dynamic>{
+              'id': fallbackTaskId.toString(),
+              'taskId': fallbackTaskId,
+              'areaId': validation['areaId'],
+              'authorId': validation['authorId'],
+              'area': validation['area'] ?? '',
+            };
+            debugPrint('[DeepLinkHandler] fallback validation success => taskId: ${foundTask['id']}');
+          }
+        } catch (fallbackError) {
+          debugPrint('[DeepLinkHandler] fallback validation failed: $fallbackError');
+        }
+
+        if (foundTask != null) {
+          debugPrint('[DeepLinkHandler] continue with fallback resolved task');
+          // lanjut ke alur normal setelah blok catch
+        } else {
 
         // PERBAIKAN: Handle 401 Unauthorized (token expired)
         if (errorMsg.contains('401') || errorMsg.contains('unauthorized') || errorMsg.contains('tidak memiliki akses')) {
@@ -126,24 +156,49 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
           return;
         }
 
-        if (errorMsg.contains('403') || errorMsg.contains('forbidden')) {
-          _navigateBasedOnRoleWithCustomMessage(
-            currentUser.role,
-            'Laporan valid, namun di luar tanggung jawab area Anda.',
-          );
-          return;
-        }
+          if (errorMsg.contains('403') || errorMsg.contains('forbidden')) {
+            _navigateBasedOnRoleWithCustomMessage(
+              currentUser.role,
+              'Laporan valid, namun di luar tanggung jawab area Anda.',
+            );
+            return;
+          }
 
-        if (errorMsg.contains('404') || errorMsg.contains('not found')) {
-          _navigateBasedOnRoleWithCustomMessage(
-            currentUser.role,
-            'Laporan tidak ditemukan, sudah dihapus, atau token kedaluwarsa.',
-          );
-          return;
+          if (errorMsg.contains('404') || errorMsg.contains('not found')) {
+            _navigateBasedOnRoleWithCustomMessage(
+              currentUser.role,
+              'Laporan tidak ditemukan, sudah dihapus, atau token kedaluwarsa.',
+            );
+            return;
+          }
         }
       }
 
       if (foundTask == null) {
+        // Fallback lanjutan untuk supervisor/petugas:
+        // jika token valid tetapi detail endpoint belum sinkron, gunakan cache daftar task
+        // untuk resolve task id lalu langsung buka detail.
+        if (currentUser.role == UserRole.hseSupervisor ||
+            currentUser.role == UserRole.petugasHse) {
+          try {
+            final taskIdFromFallback = await _resolveTaskIdFromExistingData(
+              currentUser,
+              validationSnapshot ?? <String, dynamic>{},
+              foundTask,
+            );
+
+            if (taskIdFromFallback != null && taskIdFromFallback.isNotEmpty) {
+              _navigateToTaskDetail(
+                taskIdFromFallback,
+                'Laporan ditemukan melalui fallback data lokal.',
+              );
+              return;
+            }
+          } catch (fallbackError) {
+            debugPrint('[DeepLinkHandler] resolve fallback task id failed: $fallbackError');
+          }
+        }
+
         _navigateBasedOnRoleWithCustomMessage(
           currentUser.role,
           'Gagal membuka laporan. Laporan mungkin tidak valid atau koneksi bermasalah.',
@@ -249,6 +304,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       }
     } finally {
       _isProcessing = false;
+      _globalProcessing = false;
     }
   }
 

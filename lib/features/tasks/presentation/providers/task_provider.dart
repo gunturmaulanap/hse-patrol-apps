@@ -33,7 +33,12 @@ final taskDetailMapProvider =
   final repository = ref.watch(taskRepositoryProvider);
   final task = await repository.getTaskById(id);
   final areaNameById = await _buildAreaNameByIdMap(ref);
-  return _toUiTaskMap(task, areaNameById: areaNameById);
+  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
+  return _toUiTaskMap(
+    task,
+    areaNameById: areaNameById,
+    areaBuildingTypeById: areaBuildingTypeById,
+  );
 });
 
 // Provider untuk mencari task berdasarkan picToken (untuk Deep Link dari WhatsApp)
@@ -42,7 +47,12 @@ final taskDetailByPicTokenProvider =
   final repository = ref.watch(taskRepositoryProvider);
   final task = await repository.getTaskByPicToken(picToken);
   final areaNameById = await _buildAreaNameByIdMap(ref);
-  return _toUiTaskMap(task, areaNameById: areaNameById);
+  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
+  return _toUiTaskMap(
+    task,
+    areaNameById: areaNameById,
+    areaBuildingTypeById: areaBuildingTypeById,
+  );
 });
 
 /// Provider validasi picToken via endpoint existing tanpa ubah backend contract.
@@ -56,18 +66,25 @@ final petugasTaskMapsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final tasks = await ref.watch(tasksFutureProvider.future);
   final areaNameById = await _buildAreaNameByIdMap(ref);
+  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
 
   return tasks
-      .map((task) => _toUiTaskMap(task, areaNameById: areaNameById))
+      .map((task) => _toUiTaskMap(
+            task,
+            areaNameById: areaNameById,
+            areaBuildingTypeById: areaBuildingTypeById,
+          ))
       .toList();
 });
 
 Map<String, dynamic> _toUiTaskMap(
   HseTaskModel task, {
   required Map<int, String> areaNameById,
+  required Map<int, String> areaBuildingTypeById,
 }) {
   final areaName = _resolveAreaName(task, areaNameById);
   final title = _resolveTitle(task, areaName);
+  final buildingType = areaBuildingTypeById[task.areaId] ?? '';
 
   final followUps = task.followUps.map((item) {
     final map = Map<String, dynamic>.from(item);
@@ -114,6 +131,7 @@ Map<String, dynamic> _toUiTaskMap(
     'picToken': task.picToken,
     'title': title,
     'area': areaName,
+    'buildingType': buildingType,
     'areaId': task.areaId.toString(),
     'rootCause': task.rootCause,
     'notes': task.notes,
@@ -136,6 +154,17 @@ Future<Map<int, String>> _buildAreaNameByIdMap(Ref ref) async {
     final areas = await ref.read(areaRepositoryProvider).getAreas();
     return {
       for (final area in areas) area.id: area.name,
+    };
+  } catch (_) {
+    return <int, String>{};
+  }
+}
+
+Future<Map<int, String>> _buildAreaBuildingTypeByIdMap(Ref ref) async {
+  try {
+    final areas = await ref.read(areaRepositoryProvider).getAreas();
+    return {
+      for (final area in areas) area.id: area.buildingType,
     };
   } catch (_) {
     return <int, String>{};

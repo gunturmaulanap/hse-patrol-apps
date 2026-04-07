@@ -30,6 +30,7 @@ abstract class TaskRemoteDataSource {
 
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   final Dio _dio = DioClient.instance;
+  static const String _picTokenEndpoint = '/hse-reports/pic';
 
   @override
   Future<List<HseTaskModel>> fetchTasks({int? areaId, String? status}) async {
@@ -116,13 +117,13 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         allTasks.addAll(pageTasks);
 
         log.debug('Page fetched', data: {
-          'page': currentPage,
+          'page': requestedPage,
           'count': pageTasks.length,
           'total_so_far': allTasks.length
         }, tag: 'TaskRemoteDataSource');
 
-        currentPage++;
-      } while (currentPage <= totalPages && currentPage <= maxPages);
+        requestedPage++;
+      } while (requestedPage <= totalPages && requestedPage <= maxPages);
 
       log.info('All tasks fetched successfully', data: {'total': allTasks.length}, tag: 'TaskRemoteDataSource');
       return allTasks;
@@ -160,24 +161,75 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     try {
       log.info('Fetching task by picToken', tag: 'TaskRemoteDataSource');
 
-      // Step 1: Hit API /hse/reports/pic/{token}
-      final validateResponse = await _dio.get('/hse/reports/pic/$picToken');
+      // Step 1: Hit API /hse-reports/pic/{token}
+      final validateResponse = await _dio.get('$_picTokenEndpoint/$picToken');
 
-      final data = validateResponse.data;
-      if (data is! Map ||
-          data['status'] != 'success' ||
-          data['redirect_to'] == null) {
+      final raw = validateResponse.data;
+      final map = raw is Map<String, dynamic>
+          ? raw
+          : raw is Map
+              ? Map<String, dynamic>.from(raw)
+              : <String, dynamic>{};
+
+      // Format baru backend: { token_valid, authorized, data: {...report...} }
+      final tokenValid = _resolveBool(
+            map['token_valid'] ?? map['valid'] ?? map['is_valid'],
+          ) ??
+          true;
+      if (!tokenValid) {
         throw ErrorHandler.handleException(
           ValidationException.invalidInput(
-            message: 'Token tidak valid atau tidak menemukan redirect_to_url',
+            message: 'Token laporan tidak valid atau sudah kedaluwarsa.',
           ),
         );
       }
 
-      final String redirectTo = data['redirect_to'];
-      log.debug('Got redirect URL', data: {'redirect_to': redirectTo}, tag: 'TaskRemoteDataSource');
+      final data = map['data'];
+      if (data is Map<String, dynamic>) {
+        log.debug(
+          'Resolved report directly from picToken endpoint',
+          data: {'id': data['id'], 'source': 'direct_data'},
+          tag: 'TaskRemoteDataSource',
+        );
+        return _parseReportModel(data);
+      }
+      if (data is Map) {
+        final report = Map<String, dynamic>.from(data);
+        log.debug(
+          'Resolved report directly from picToken endpoint',
+          data: {'id': report['id'], 'source': 'direct_data'},
+          tag: 'TaskRemoteDataSource',
+        );
+        return _parseReportModel(report);
+      }
 
-      // Step 2: Extract ID from redirect_to
+      // Format alternatif backend: object report langsung di root response
+      final hasDirectReportId = map['id'] != null || map['report_id'] != null;
+      if (hasDirectReportId) {
+        log.debug(
+          'Resolved report from root payload',
+          data: {'id': map['id'] ?? map['report_id'], 'source': 'root_payload'},
+          tag: 'TaskRemoteDataSource',
+        );
+        return _parseReportModel(map);
+      }
+
+      // Format lama backend: { status: success, redirect_to: ... }
+      final redirectTo = map['redirect_to']?.toString();
+      if (redirectTo == null || redirectTo.trim().isEmpty) {
+        throw ErrorHandler.handleException(
+          ValidationException.invalidInput(
+            message: 'Token valid tetapi data laporan tidak ditemukan.',
+          ),
+        );
+      }
+
+      log.debug(
+        'Got redirect URL from picToken endpoint',
+        data: {'redirect_to': redirectTo},
+        tag: 'TaskRemoteDataSource',
+      );
+
       final uri = Uri.tryParse(redirectTo);
       if (uri == null || uri.pathSegments.isEmpty) {
         throw ErrorHandler.handleException(
@@ -189,7 +241,6 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
       final idStr = uri.pathSegments.last;
       final int? id = int.tryParse(idStr);
-
       if (id == null) {
         throw ErrorHandler.handleException(
           ValidationException.invalidInput(
@@ -198,8 +249,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         );
       }
 
-      // Step 3: Panggil getTaskById yang sudah ada
-      log.debug('Extracted task ID from redirect URL', data: {'id': id}, tag: 'TaskRemoteDataSource');
+      log.debug('Extracted task ID from redirect URL', data: {'id': id, 'source': 'redirect_to'}, tag: 'TaskRemoteDataSource');
       return await getTaskById(id);
     } catch (e) {
       log.error('Error getting task by picToken', error: e, tag: 'TaskRemoteDataSource');
@@ -209,7 +259,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> validatePicToken(String picToken) async {
-    final endpoint = '/hse-reports/pic/$picToken';
+    final endpoint = '$_picTokenEndpoint/$picToken';
 
     try {
       log.info('Validating picToken', data: {'token': picToken}, tag: 'TaskRemoteDataSource');
@@ -225,6 +275,10 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       final data = map['data'] is Map
           ? Map<String, dynamic>.from(map['data'] as Map)
           : map;
+
+      final redirectTo =
+          (data['redirect_to'] ?? map['redirect_to'])?.toString();
+      final redirectedTaskId = _extractTaskIdFromRedirect(redirectTo);
 
       final tokenValid = _resolveBool(
             data['token_valid'] ??
@@ -252,6 +306,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'taskId': data['task_id'] ??
             data['taskId'] ??
             data['id'] ??
+            redirectedTaskId ??
             map['task_id'] ??
             map['taskId'] ??
             map['id'],
@@ -285,13 +340,19 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           ? Map<String, dynamic>.from(responseData as Map)
           : <String, dynamic>{};
 
+      final redirectTo = payload['redirect_to']?.toString();
+      final redirectedTaskId = _extractTaskIdFromRedirect(redirectTo);
+
       final tokenValid = status != 404;
       final authorized = status != 401 && status != 403;
 
       final result = <String, dynamic>{
         'tokenValid': tokenValid,
         'authorized': authorized,
-        'taskId': payload['task_id'] ?? payload['taskId'] ?? payload['id'],
+        'taskId': payload['task_id'] ??
+            payload['taskId'] ??
+            payload['id'] ??
+            redirectedTaskId,
         'reportId': payload['report_id'] ?? payload['reportId'],
         'areaId': payload['area_id'] ?? payload['areaId'],
         'authorId': payload['author_id'] ?? payload['authorId'],
@@ -307,6 +368,13 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
       return result;
     }
+  }
+
+  int? _extractTaskIdFromRedirect(String? redirectTo) {
+    if (redirectTo == null || redirectTo.trim().isEmpty) return null;
+    final uri = Uri.tryParse(redirectTo);
+    if (uri == null || uri.pathSegments.isEmpty) return null;
+    return int.tryParse(uri.pathSegments.last);
   }
 
   @override

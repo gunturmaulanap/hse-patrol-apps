@@ -25,6 +25,34 @@ class CreateTaskReviewScreen extends ConsumerStatefulWidget {
 class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen> {
   bool _isSubmitting = false;
 
+  String _locationTypeLabel(String? buildingType) {
+    final value = (buildingType ?? '').toLowerCase().trim();
+    if (value.isEmpty) return '-';
+    if (value.contains('non') && value.contains('produksi')) return 'Non Produksi';
+    if (value.contains('produksi')) return 'Produksi';
+    return '-';
+  }
+
+  String _safeText(String? value, {String fallback = '-'}) {
+    final text = value?.trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  String _riskLevelLabel(String? level) {
+    switch (level?.trim()) {
+      case '1':
+        return 'Kurang dari 1 jam';
+      case '2':
+        return 'Kurang dari 24 jam';
+      case '3':
+        return 'Kurang dari 3 hari';
+      case '4':
+        return 'Kurang dari 2 minggu';
+      default:
+        return level?.trim().isNotEmpty == true ? 'Level ${level!.trim()}' : '-';
+    }
+  }
+
   String? _normalizePicToken(String? raw) {
     if (raw == null) return null;
     final value = raw.trim();
@@ -89,16 +117,17 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
         debugPrint('[CreateTaskReviewScreen] share deep-link url: $deepLinkUrl');
         
         // Format Teks Caption WA
+        final areaLabel = _safeText(draft.area);
         final waText = '''🚨 *LAPORAN TEMUAN HSE* 🚨
 
-📍 *Area:* ${draft.area}
-🏢 *Bangunan:* ${draft.buildingType}
-⚠️ *Tingkat Risiko:* Level ${draft.riskLevel}
+📍 *Area:* $areaLabel
+🏭 *Tipe Lokasi:* ${_locationTypeLabel(draft.buildingType)}
+⚠️ *Tingkat Risiko:* ${_riskLevelLabel(draft.riskLevel)}
 📝 *Akar Masalah:* ${draft.rootCause}
 💬 *Keterangan:* ${draft.notes}
 
-Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk membuka aplikasi:
-🔗 $deepLinkUrl''';
+Untuk proses tindak lanjut, silakan klik link berikut:
+🔗 Buka Aplikasi: $deepLinkUrl''';
 
         if (!mounted) return;
         
@@ -255,7 +284,7 @@ Untuk proses tindak lanjut, silakan klik link khusus (Deep Link) berikut untuk m
                   const Divider(height: 32),
                   _buildRow('Jenis Bangunan', draft.buildingType ?? '-'),
                   _buildRow('Lokasi Area', draft.area ?? '-'),
-                  _buildRow('Tingkat Risiko', draft.riskLevel ?? '-'),
+                  _buildRow('Tingkat Risiko', _riskLevelLabel(draft.riskLevel)),
                   _buildRow('Total Foto', '${draft.photos.length} Foto'),
                   _buildRow('Keterangan', draft.notes ?? '-'),
                   _buildRow('Akar Masalah', draft.rootCause ?? '-'),

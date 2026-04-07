@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../app/env/app_env.dart';
 import '../storage/session_manager.dart';
@@ -9,7 +8,6 @@ class DioClient {
   DioClient._();
 
   static bool _interceptorsInitialized = false;
-  static bool _isRefreshing = false;
 
   static final Dio instance = Dio(
     BaseOptions(
@@ -38,12 +36,27 @@ class DioClient {
           // Add authorization token if available
           final token = await sessionManager.getToken();
 
-          // DEBUGGING: Log token presence
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
-            debugPrint('[DioClient] Token added to request: Bearer ${token.substring(0, 20)}...${token.length > 20 ? '' : token}');
+            log.debug(
+              'Authorization header attached',
+              data: {
+                'method': options.method,
+                'path': options.path,
+                'hasToken': true,
+              },
+              tag: 'DioClient',
+            );
           } else {
-            debugPrint('[DioClient] WARNING: No token available for request to ${options.path}');
+            log.warning(
+              'No authorization token available',
+              data: {
+                'method': options.method,
+                'path': options.path,
+                'hasToken': false,
+              },
+              tag: 'DioClient',
+            );
           }
 
           // Log request WITHOUT accessing data directly (data might be FormData)
@@ -67,11 +80,33 @@ class DioClient {
           return handler.next(options);
         },
         onError: (error, handler) async {
+          final statusCode = error.response?.statusCode;
+          final request = error.requestOptions;
+
+          log.warning(
+            'HTTP error intercepted',
+            data: {
+              'statusCode': statusCode,
+              'method': request.method,
+              'path': request.path,
+            },
+            tag: 'DioClient',
+          );
+
           // Handle token expiration
-          if (error.response?.statusCode == 401) {
+          if (statusCode == 401) {
             // Token expired or invalid, clear session
             await sessionManager.clearToken();
             await sessionManager.clearRole();
+
+            log.warning(
+              'Session cleared after 401 response',
+              data: {
+                'method': request.method,
+                'path': request.path,
+              },
+              tag: 'DioClient',
+            );
           }
           return handler.next(error);
         },

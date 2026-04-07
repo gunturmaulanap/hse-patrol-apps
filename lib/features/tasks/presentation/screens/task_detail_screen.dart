@@ -142,6 +142,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
     }
   }
 
+  String _locationTypeLabelFromReport(Map<String, dynamic> rpt) {
+    final raw = (rpt['buildingType'] ?? rpt['area'] ?? rpt['title'])?.toString();
+    final value = (raw ?? '').toLowerCase().trim();
+    if (value.isEmpty) return '-';
+    if (value.contains('non') && value.contains('produksi')) return 'Non Produksi';
+    if (value.contains('produksi')) return 'Produksi';
+    return '-';
+  }
+
   IconData _getRiskLevelIcon(String? riskLevel) {
     if (riskLevel == null || riskLevel.trim().isEmpty) {
       return Icons.warning_amber;
@@ -602,25 +611,35 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
                 );
               }
 
-              final waText = '''🚨 *DETAIL TEMUAN HSE* 🚨
+              final appDeepLink =
+                  'https://mes.aksamala.co.id/share/report/${resolvedPicToken ?? widget.taskId}';
+              final webDeepLink = appDeepLink;
+
+              final waText = '''🚨 *LAPORAN TEMUAN HSE* 🚨
 
 📍 *Area:* ${rpt['area'] ?? '-'}
-⚠️ *Tingkat Risiko:* ${_getRiskLevelLabel(rpt['riskLevel']?.toString())} ${_getRiskLevelIcon(rpt['riskLevel']?.toString())}
-💬 *Catatan:* ${rpt['notes'] ?? '-'}
+🏭 *Tipe Lokasi:* ${_locationTypeLabelFromReport(rpt)}
+⚠️ *Tingkat Risiko:* ${_getRiskLevelLabel(rpt['riskLevel']?.toString())}
+📝 *Akar Masalah:* ${rpt['rootCause'] ?? '-'}
+💬 *Keterangan:* ${rpt['notes'] ?? '-'}
 
-🔗 Buka di Aplikasi: https://mes.aksamala.co.id/share/report/${resolvedPicToken ?? widget.taskId}''';
+🔗 Buka Aplikasi: $webDeepLink''';
 
               final photos = _extractPhotoUrls(rpt['photos']);
+              final plainText = waText.replaceAllMapped(
+                RegExp(r'IconData\([^\)]*\)'),
+                (_) => '',
+              );
               if (photos.isNotEmpty) {
                 // Share menggunakan network helper untuk gambar dari backend API
                 ShareHelper.shareNetworkImage(
                   context: context,
                   imageUrl: photos.first,
-                  caption: waText,
+                  caption: plainText,
                 );
               } else {
                 // Jika laporan tidak memiliki gambar, share text biasa
-                Share.share(waText);
+                Share.share(plainText);
               }
             },
           )
