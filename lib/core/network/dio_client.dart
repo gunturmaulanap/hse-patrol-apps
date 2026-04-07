@@ -37,8 +37,13 @@ class DioClient {
         onRequest: (options, handler) async {
           // Add authorization token if available
           final token = await sessionManager.getToken();
+
+          // DEBUGGING: Log token presence
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
+            debugPrint('[DioClient] Token added to request: Bearer ${token.substring(0, 20)}...${token.length > 20 ? '' : token}');
+          } else {
+            debugPrint('[DioClient] WARNING: No token available for request to ${options.path}');
           }
 
           // Log request WITHOUT accessing data directly (data might be FormData)
