@@ -104,6 +104,28 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         debugPrint('[DeepLinkHandler] failed to fetch from backend: $e');
         final errorMsg = e.toString().toLowerCase();
 
+        // PERBAIKAN: Handle 401 Unauthorized (token expired)
+        if (errorMsg.contains('401') || errorMsg.contains('unauthorized') || errorMsg.contains('tidak memiliki akses')) {
+          debugPrint('[DeepLinkHandler] Token expired or unauthorized, redirecting to login');
+          if (mounted) {
+            final intendedPath = '/share/report/${widget.token}';
+            final encodedRedirect = Uri.encodeComponent(intendedPath);
+            final loginPath = '/login?redirect=$encodedRedirect';
+
+            context.go(loginPath);
+
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                AppToast.error(
+                  context,
+                  message: 'Sesi Anda telah berakhir. Silakan login kembali untuk membuka laporan.',
+                );
+              }
+            });
+          }
+          return;
+        }
+
         if (errorMsg.contains('403') || errorMsg.contains('forbidden')) {
           _navigateBasedOnRoleWithCustomMessage(
             currentUser.role,
@@ -168,6 +190,29 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
           debugPrint('[DeepLinkHandler] Final PIC roleAllowed: $roleAllowed (byId: $hasAreaById, byName: $hasAreaByName)');
         } catch (e) {
           debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
+          final errorMsg = e.toString().toLowerCase();
+
+          // PERBAIKAN: Handle 401 Unauthorized (token expired)
+          if (errorMsg.contains('401') || errorMsg.contains('unauthorized') || errorMsg.contains('tidak memiliki akses')) {
+            debugPrint('[DeepLinkHandler] Token expired while fetching PIC areas, redirecting to login');
+            if (mounted) {
+              final intendedPath = '/share/report/${widget.token}';
+              final encodedRedirect = Uri.encodeComponent(intendedPath);
+              final loginPath = '/login?redirect=$encodedRedirect';
+
+              context.go(loginPath);
+
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (mounted) {
+                  AppToast.error(
+                    context,
+                    message: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                  );
+                }
+              });
+            }
+            return;
+          }
         }
       }
 
