@@ -54,6 +54,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           final token = state.pathParameters['token']!;
           return DeepLinkHandlerScreen(token: token);
         },
+        // Add redirect to handle navigation after token validation
+        redirect: (context, state) {
+          // The redirect will be called by DeepLinkHandlerScreen after validation
+          // Return null to show the handler screen initially
+          return null;
+        },
       ),
       GoRoute(
         path: '/task/:id',

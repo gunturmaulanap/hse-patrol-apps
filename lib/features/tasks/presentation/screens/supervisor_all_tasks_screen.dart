@@ -10,6 +10,7 @@ import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/shimmer/base_shimmer.dart';
 import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../core/utils/progressive_pagination.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/hse_staff_model.dart';
@@ -19,10 +20,12 @@ class SupervisorAllTasksScreen extends ConsumerStatefulWidget {
   const SupervisorAllTasksScreen({super.key});
 
   @override
-  ConsumerState<SupervisorAllTasksScreen> createState() => _SupervisorAllTasksScreenState();
+  ConsumerState<SupervisorAllTasksScreen> createState() =>
+      _SupervisorAllTasksScreenState();
 }
 
-class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScreen> {
+class _SupervisorAllTasksScreenState
+    extends ConsumerState<SupervisorAllTasksScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   DateTime? _dateFrom;
@@ -30,6 +33,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   String _searchQuery = '';
   String _scope = 'own';
   int? _selectedStaffId;
+  final Map<String, int> _visibleCountPerArea = {};
+
 
   @override
   void initState() {
@@ -83,9 +88,13 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         ? ownTasks
         : selectedStaffId == null
             ? <Map<String, dynamic>>[]
-            : staffTasks.where((e) => _taskOwnerId(e) == selectedStaffId).toList();
+            : staffTasks
+                .where((e) => _taskOwnerId(e) == selectedStaffId)
+                .toList();
 
-    if ((_scope == 'staff') && _selectedStaffId == null && staffEntries.isNotEmpty) {
+    if ((_scope == 'staff') &&
+        _selectedStaffId == null &&
+        staffEntries.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() => _selectedStaffId = staffEntries.first.id);
@@ -93,10 +102,9 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
       });
     }
 
-    final isInitialOwnLoading =
-        _scope == 'own' && ((ownAsync.isLoading && !ownAsync.hasValue) || !ownAsync.hasValue);
-    final isInitialStaffLoading =
-        _scope == 'staff' &&
+    final isInitialOwnLoading = _scope == 'own' &&
+        ((ownAsync.isLoading && !ownAsync.hasValue) || !ownAsync.hasValue);
+    final isInitialStaffLoading = _scope == 'staff' &&
         ((staffAsync.isLoading && !staffAsync.hasValue) ||
             (staffListAsync.isLoading && !staffListAsync.hasValue) ||
             !staffAsync.hasValue ||
@@ -104,8 +112,7 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
     final isTransitionOwnLoading =
         _scope == 'own' && ownAsync.isLoading && sourceList.isEmpty;
-    final isTransitionStaffLoading =
-        _scope == 'staff' &&
+    final isTransitionStaffLoading = _scope == 'staff' &&
         (staffAsync.isLoading || staffListAsync.isLoading) &&
         sourceList.isEmpty;
 
@@ -129,16 +136,20 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
-                  onPressed: () => context.pop(),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new,
+                          color: AppColors.textPrimary, size: 20),
+                      onPressed: () => context.pop(),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Supervisor Tasks',
+                        style: AppTypography.h3.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold)),
+                  ],
                 ),
-              ),
-
-              // Compact Title
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Supervisor Tasks', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
               ),
 
               const SizedBox(height: 8),
@@ -168,7 +179,9 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                         ),
                         if (_dateFrom != null || _dateTo != null)
                           IconButton(
-                            icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), size: 20),
+                            icon: Icon(
+                                PhosphorIcons.xCircle(PhosphorIconsStyle.fill),
+                                size: 20),
                             onPressed: () => setState(() {
                               _dateFrom = null;
                               _dateTo = null;
@@ -181,15 +194,23 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                     // Search Bar
                     TextField(
                       controller: _searchController,
-                      style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
-                      onChanged: (value) => setState(() => _searchQuery = value),
+                      style: AppTypography.body1
+                          .copyWith(color: AppColors.textPrimary),
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
                       decoration: InputDecoration(
                         hintText: 'Search...',
-                        hintStyle: AppTypography.body1.copyWith(color: AppColors.textSecondary),
-                        prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppColors.textSecondary, size: 18),
+                        hintStyle: AppTypography.body1
+                            .copyWith(color: AppColors.textSecondary),
+                        prefixIcon: Icon(PhosphorIcons.magnifyingGlass(),
+                            color: AppColors.textSecondary, size: 18),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
-                                icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), color: AppColors.textSecondary, size: 18),
+                                icon: Icon(
+                                    PhosphorIcons.xCircle(
+                                        PhosphorIconsStyle.fill),
+                                    color: AppColors.textSecondary,
+                                    size: 18),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
@@ -198,8 +219,11 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                             : null,
                         filled: true,
                         fillColor: AppColors.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 16),
                         isDense: true,
                       ),
                     ),
@@ -220,12 +244,15 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 labelPadding: const EdgeInsets.symmetric(horizontal: 6),
                 indicator: BoxDecoration(
-                  color: _scope == 'staff' ? AppColors.primary : const Color(0xFFD4D8FF),
+                  color: _scope == 'staff'
+                      ? AppColors.primary
+                      : const Color(0xFFD4D8FF),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 labelColor: const Color(0xFF1E1E1E),
                 unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: AppTypography.body1.copyWith(fontWeight: FontWeight.bold),
+                labelStyle:
+                    AppTypography.body1.copyWith(fontWeight: FontWeight.bold),
                 tabs: [
                   _buildTab('All'),
                   _buildTab('Pending'),
@@ -256,7 +283,11 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   }
 
   Widget _buildTab(String text) {
-    return Tab(height: 36, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(text, style: TextStyle(fontSize: 13))));
+    return Tab(
+        height: 36,
+        child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(text, style: TextStyle(fontSize: 13))));
   }
 
   Widget _dateFilterButton({
@@ -273,7 +304,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         side: BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      icon: Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 16, color: AppColors.textSecondary),
+      icon: Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold),
+          size: 16, color: AppColors.textSecondary),
       label: Text(
         date == null ? label : DateFormat('dd MMM').format(date),
         style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
@@ -349,7 +381,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     required bool selected,
     required VoidCallback onTap,
   }) {
-    final Color selectedColor = _scope == 'staff' ? AppColors.primary : const Color(0xFFD4D8FF);
+    final Color selectedColor =
+        _scope == 'staff' ? AppColors.primary : const Color(0xFFD4D8FF);
 
     return InkWell(
       onTap: onTap,
@@ -367,7 +400,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
             label,
             style: AppTypography.body1.copyWith(
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? const Color(0xFF1E1E1E) : AppColors.textSecondary,
+              color:
+                  selected ? const Color(0xFF1E1E1E) : AppColors.textSecondary,
             ),
           ),
         ),
@@ -379,7 +413,9 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     if (staffEntries.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Text('Belum ada data staff.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+        child: Text('Belum ada data staff.',
+            style:
+                AppTypography.body1.copyWith(color: AppColors.textSecondary)),
       );
     }
 
@@ -392,7 +428,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
           final isSelected = selectedId == entry.id;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: _chip(entry.name, isSelected, () => setState(() => _selectedStaffId = entry.id)),
+            child: _chip(entry.name, isSelected,
+                () => setState(() => _selectedStaffId = entry.id)),
           );
         }).toList(),
       ),
@@ -400,14 +437,18 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   }
 
   int _taskOwnerId(Map<String, dynamic> task) {
-    final raw = task['created_by'] ?? task['createdBy'] ?? task['userId'] ?? task['user_id'];
+    final raw = task['created_by'] ??
+        task['createdBy'] ??
+        task['userId'] ??
+        task['user_id'];
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '') ?? 0;
   }
 
   Widget _chip(String text, bool selected, VoidCallback onTap) {
-    final Color selectedColor = _scope == 'staff' ? AppColors.primary : const Color(0xFFD4D8FF);
+    final Color selectedColor =
+        _scope == 'staff' ? AppColors.primary : const Color(0xFFD4D8FF);
 
     return InkWell(
       onTap: onTap,
@@ -433,7 +474,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   String _getActualStatus(Map<String, dynamic> report) {
     // Cek follow-ups terakhir
     final followUps = report['followUps'] as List<dynamic>? ??
-                      report['follow_ups'] as List<dynamic>? ?? [];
+        report['follow_ups'] as List<dynamic>? ??
+        [];
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
@@ -450,7 +492,9 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
   }
 
   Widget _buildTaskList(List<Map<String, dynamic>> source, String filter) {
-    var filtered = filter == 'All' ? source : source.where((r) => _getActualStatus(r) == filter).toList();
+    var filtered = filter == 'All'
+        ? source
+        : source.where((r) => _getActualStatus(r) == filter).toList();
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
@@ -482,11 +526,15 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 48, color: AppColors.surfaceLight),
+            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin),
+                size: 48, color: AppColors.surfaceLight),
             const SizedBox(height: 12),
             Text(
-              _searchQuery.isNotEmpty ? 'No tasks found for "$_searchQuery"' : 'No $filter tasks yet.',
-              style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
+              _searchQuery.isNotEmpty
+                  ? 'No tasks found for "$_searchQuery"'
+                  : 'No $filter tasks yet.',
+              style:
+                  AppTypography.body1.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -502,41 +550,82 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
 
     final sortedAreas = grouped.keys.toList()..sort();
 
-    return ListView.builder(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: sortedAreas.length,
-      itemBuilder: (context, index) {
-        final area = sortedAreas[index];
+    final List<Widget> listItems = [];
+
+    for (int i = 0; i < sortedAreas.length; i++) {
+        final area = sortedAreas[i];
         final tasks = grouped[area]!;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('${index + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontSize: 14)),
-            ),
-            ...tasks.asMap().entries.map((entry) {
-              final task = entry.value;
-              final actualStatus = _getActualStatus(task);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildExactTaskCard(
-                  context,
-                  title: _getReportTitle(task),
-                  dateString: task['date']?.toString(),
-                  rawStatus: actualStatus,
-                  tag: _getStatusTag(actualStatus),
-                  reportId: task['id'].toString(),
-                  staffName: task['staffName']?.toString() ?? '-',
-                ),
-              );
-            }),
-            const SizedBox(height: 12),
-          ],
+        final visibleCount = _visibleCountPerArea[area] ?? ProgressivePagination.getNextVisibleCount(0);
+        final hasMore = ProgressivePagination.hasMore(visibleCount, tasks.length);
+        final visibleTasks = tasks.take(visibleCount).toList();
+
+        // 1. Area Header
+        listItems.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('${i + 1}. $area',
+                style: AppTypography.h3
+                    .copyWith(color: AppColors.textPrimary, fontSize: 14)),
+          )
         );
-      },
+
+        // 2. Tasks
+        for (final entry in visibleTasks.asMap().entries) {
+          final task = entry.value;
+          final actualStatus = _getActualStatus(task);
+          listItems.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExactTaskCard(
+                context,
+                title: _getReportTitle(task),
+                dateString: task['date']?.toString(),
+                rawStatus: actualStatus,
+                tag: _getStatusTag(actualStatus),
+                reportId: task['id'].toString(),
+                staffName: task['staffName']?.toString() ?? '-',
+              ),
+            )
+          );
+        }
+
+        // 3. Load More / Footer Spacer
+        if (hasMore) {
+          final nextCount = ProgressivePagination.getNextVisibleCount(visibleCount);
+          listItems.add(
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: TextButton(
+                onPressed: () {
+                   setState(() {
+                     _visibleCountPerArea[area] = nextCount;
+                   });
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                ),
+                child: Text(
+                  ProgressivePagination.getButtonText(visibleCount, tasks.length),
+                  style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                ),
+              ),
+            )
+          );
+        } else {
+          listItems.add(const SizedBox(height: 12));
+        }
+    }
+
+    return ListView.builder(
+      key: PageStorageKey<String>('supervisor_all_$filter'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+      itemCount: listItems.length,
+      itemBuilder: (context, index) => listItems[index],
     );
   }
 
@@ -569,10 +658,13 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     final bool isDark = rawStatus.toLowerCase() == 'canceled';
     final Color bgColor = _getColorByStatus(rawStatus);
     final Color textColor = isDark ? Colors.white : const Color(0xFF1E1E1E);
-    final Color stripeColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05);
+    final Color stripeColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.05);
 
     return InkWell(
-      onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
+      onTap: () => context
+          .pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
@@ -585,7 +677,8 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
         child: Stack(
           children: [
             Positioned.fill(
-              child: CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
+              child:
+                  CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -600,21 +693,34 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                       Expanded(
                         child: Text(
                           title,
-                          style: AppTypography.body1.copyWith(color: textColor, fontSize: 14, fontWeight: FontWeight.w600, height: 1.2),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: AppTypography.body1.copyWith(
+                              color: textColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (tag != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             tag,
-                            style: AppTypography.caption.copyWith(color: isDark ? Colors.white : const Color(0xFF6B6E94), fontWeight: FontWeight.w600, fontSize: 9),
+                            style: AppTypography.caption.copyWith(
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF6B6E94),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 9),
                           ),
                         ),
                       ],
@@ -624,12 +730,16 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                   Row(
                     children: [
                       if (_scope == 'staff') ...[
-                        Icon(PhosphorIcons.user(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                        Icon(PhosphorIcons.user(PhosphorIconsStyle.bold),
+                            size: 13, color: textColor.withValues(alpha: 0.7)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             staffName,
-                            style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                            style: AppTypography.caption.copyWith(
+                                color: textColor.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 11),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -639,12 +749,19 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                       Expanded(
                         child: Row(
                           children: [
-                            Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                            Icon(
+                                PhosphorIcons.calendarBlank(
+                                    PhosphorIconsStyle.bold),
+                                size: 13,
+                                color: textColor.withValues(alpha: 0.7)),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 _formatIndonesianDate(dateString),
-                                style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                                style: AppTypography.caption.copyWith(
+                                    color: textColor.withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 11),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -656,11 +773,15 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
                   ),
                   Row(
                     children: [
-                      Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 13, color: textColor.withValues(alpha: 0.7)),
+                      Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold),
+                          size: 13, color: textColor.withValues(alpha: 0.7)),
                       const SizedBox(width: 4),
                       Text(
                         _formatTime(dateString),
-                        style: AppTypography.caption.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 11),
+                        style: AppTypography.caption.copyWith(
+                            color: textColor.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 11),
                       ),
                     ],
                   ),
@@ -677,8 +798,29 @@ class _SupervisorAllTasksScreenState extends ConsumerState<SupervisorAllTasksScr
     if (dateStr == null) return '-';
     try {
       final dt = DateTime.parse(dateStr);
-      final days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      final days = [
+        'Senin',
+        'Selasa',
+        'Rabu',
+        'Kamis',
+        'Jumat',
+        'Sabtu',
+        'Minggu'
+      ];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des'
+      ];
       return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
     } catch (_) {
       return '-';
@@ -736,7 +878,8 @@ class _CardStripedPainter extends CustomPainter {
 
     const double space = 8.0;
     for (double i = -size.height; i < size.width; i += space) {
-      canvas.drawLine(Offset(i, size.height), Offset(i + size.height, 0), paint);
+      canvas.drawLine(
+          Offset(i, size.height), Offset(i + size.height, 0), paint);
     }
   }
 

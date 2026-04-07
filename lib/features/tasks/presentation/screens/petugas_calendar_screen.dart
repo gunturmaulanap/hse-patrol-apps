@@ -14,14 +14,15 @@ class PetugasCalendarScreen extends ConsumerStatefulWidget {
   const PetugasCalendarScreen({super.key});
 
   @override
-  ConsumerState<PetugasCalendarScreen> createState() => _PetugasCalendarScreenState();
+  ConsumerState<PetugasCalendarScreen> createState() =>
+      _PetugasCalendarScreenState();
 }
 
 class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   late DateTime _selectedDate;
   late List<DateTime> _dateList;
   final ScrollController _scrollController = ScrollController();
-  
+
   bool _isSearchVisible = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -35,12 +36,15 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   void _initDate(DateTime baseDate) {
     _selectedDate = DateTime(baseDate.year, baseDate.month, baseDate.day);
     _dateList = List.generate(31, (index) {
-      return DateTime(baseDate.year, baseDate.month, baseDate.day).subtract(const Duration(days: 15)).add(Duration(days: index));
+      return DateTime(baseDate.year, baseDate.month, baseDate.day)
+          .subtract(const Duration(days: 15))
+          .add(Duration(days: index));
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(15 * 72.0 - (MediaQuery.of(context).size.width / 2) + 36);
+        _scrollController
+            .jumpTo(15 * 72.0 - (MediaQuery.of(context).size.width / 2) + 36);
       }
     });
   }
@@ -55,7 +59,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFFAFF9F), 
+              primary: Color(0xFFFAFF9F),
               onPrimary: Colors.black,
               surface: Color(0xFF1E1E1E),
             ),
@@ -65,7 +69,9 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
       },
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() { _initDate(picked); });
+      setState(() {
+        _initDate(picked);
+      });
     }
   }
 
@@ -140,10 +146,10 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
       if (rpt['date'] == null) return false;
       final rptDate = DateTime.tryParse(rpt['date'].toString());
       if (rptDate == null) return false;
-      
+
       final matchDate = rptDate.year == _selectedDate.year &&
-                        rptDate.month == _selectedDate.month &&
-                        rptDate.day == _selectedDate.day;
+          rptDate.month == _selectedDate.month &&
+          rptDate.day == _selectedDate.day;
       if (!matchDate) return false;
 
       if (_searchQuery.isNotEmpty) {
@@ -154,12 +160,13 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
       }
       return true;
     }).toList()
-      ..sort((a, b) => _tryParseDate(a['date']?.toString()).compareTo(_tryParseDate(b['date']?.toString())));
+      ..sort((a, b) => _tryParseDate(a['date']?.toString())
+          .compareTo(_tryParseDate(b['date']?.toString())));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF111111), 
+      backgroundColor: const Color(0xFF111111),
       body: SafeArea(
-        bottom: false, 
+        bottom: false,
         child: Column(
           children: [
             Padding(
@@ -173,10 +180,15 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       children: [
                         Text(
                           DateFormat('MMMM yyyy').format(_selectedDate),
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w500, letterSpacing: -0.5),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: -0.5),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white, size: 28),
                       ],
                     ),
                   ),
@@ -189,37 +201,45 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       });
                     },
                     child: Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1), shape: BoxShape.circle),
-                      child: const Icon(Icons.search, color: Colors.white, size: 24),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1),
+                          shape: BoxShape.circle),
+                      child: const Icon(Icons.search,
+                          color: Colors.white, size: 24),
                     ),
                   ),
                 ],
               ),
             ),
-
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               height: _isSearchVisible ? 70 : 0,
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: TextField(
                     controller: _searchController,
                     style: const TextStyle(color: Colors.black),
                     onChanged: (val) => setState(() => _searchQuery = val),
                     decoration: InputDecoration(
                       hintText: 'Search tasks...',
-                      filled: true, fillColor: Colors.white,
+                      filled: true,
+                      fillColor: Colors.white,
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none),
                     ),
                   ),
                 ),
               ),
             ),
-
             SizedBox(
               height: 85,
               child: ListView.builder(
@@ -229,9 +249,9 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                 itemCount: _dateList.length,
                 itemBuilder: (context, index) {
                   final date = _dateList[index];
-                  final isSelected = date.year == _selectedDate.year && 
-                                     date.month == _selectedDate.month && 
-                                     date.day == _selectedDate.day;
+                  final isSelected = date.year == _selectedDate.year &&
+                      date.month == _selectedDate.month &&
+                      date.day == _selectedDate.day;
 
                   return GestureDetector(
                     onTap: () => setState(() => _selectedDate = date),
@@ -239,15 +259,24 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       width: 66,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFFAFF9F) : Colors.white,
+                        color:
+                            isSelected ? const Color(0xFFFAFF9F) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(date.day.toString(), style: const TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w600)),
+                          Text(date.day.toString(),
+                              style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w600)),
                           const SizedBox(height: 2),
-                          Text(DateFormat('EEE').format(date), style: TextStyle(color: Colors.black.withValues(alpha: 0.6), fontSize: 14, fontWeight: FontWeight.w500)),
+                          Text(DateFormat('EEE').format(date),
+                              style: TextStyle(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -256,25 +285,37 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             Expanded(
               child: Container(
                 width: double.infinity,
                 // PERBAIKAN: Menambahkan clipBehavior agar Listview tidak menembus batas lengkungan atas.
-                clipBehavior: Clip.antiAlias, 
+                clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
                 child: tasksForSelectedDate.isEmpty
-                    ? Center(child: Text(_searchQuery.isNotEmpty ? 'No tasks found.' : 'No schedules for today.', style: const TextStyle(color: Colors.grey, fontSize: 16)))
+                    ? Center(
+                        child: Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No tasks found.'
+                                : 'No schedules for today.',
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 16)))
                     : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 32, 16, 120), 
+                        padding: const EdgeInsets.fromLTRB(16, 32, 16, 120),
                         itemCount: tasksForSelectedDate.length,
                         itemBuilder: (context, index) {
                           final task = tasksForSelectedDate[index];
-                          final isCurrentTimeLine = index == 1; 
-                          
+                          final dateString = task['date']?.toString();
+                          final currentPeriod = _getAmPm(dateString);
+                          final previousPeriod = index > 0
+                              ? _getAmPm(tasksForSelectedDate[index - 1]['date']
+                                  ?.toString())
+                              : currentPeriod;
+                          final showPeriodDivider =
+                              index > 0 && currentPeriod != previousPeriod;
+
                           return Column(
                             children: [
                               Row(
@@ -283,11 +324,21 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                                   SizedBox(
                                     width: 60,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
-                                        Text(_formatHourAMPM(task['date']?.toString()), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 13)),
+                                        Text(
+                                            _formatHourAMPM(
+                                                task['date']?.toString()),
+                                            style: const TextStyle(
+                                                color: Colors.black87,
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 13)),
                                         const SizedBox(height: 24),
-                                        Container(width: 8, height: 1.5, color: Colors.grey.shade400),
+                                        Container(
+                                            width: 8,
+                                            height: 1.5,
+                                            color: Colors.grey.shade400),
                                       ],
                                     ),
                                   ),
@@ -297,19 +348,37 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                                       title: _getReportTitle(task),
                                       dateString: task['date']?.toString(),
                                       rawStatus: _getActualStatus(task),
-                                      tag: _getStatusTag(_getActualStatus(task)),
+                                      tag:
+                                          _getStatusTag(_getActualStatus(task)),
                                       reportId: task['id'].toString(),
+                                      staffName:
+                                          task['staffName']?.toString() ?? '-',
                                     ),
                                   ),
                                 ],
                               ),
-                              if (isCurrentTimeLine)
+                              if (showPeriodDivider)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 24),
+                                  padding: const EdgeInsets.only(bottom: 14),
                                   child: Row(
                                     children: [
-                                      Transform.translate(offset: const Offset(-2, 0), child: const Icon(Icons.diamond, size: 10, color: Colors.black)),
-                                      Expanded(child: Container(height: 1.5, color: Colors.black)),
+                                      Container(
+                                        width: 44,
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          currentPeriod,
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                          child: Container(
+                                              height: 1.5,
+                                              color: Colors.black)),
                                     ],
                                   ),
                                 )
@@ -327,10 +396,18 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     );
   }
 
+  String _getAmPm(String? dateStr) {
+    if (dateStr == null) return 'AM';
+    final dt = DateTime.tryParse(dateStr);
+    if (dt == null) return 'AM';
+    return dt.hour >= 12 ? 'PM' : 'AM';
+  }
+
   // Helper untuk menentukan status sebenarnya dari report (sama seperti di all tasks screen)
   String _getActualStatus(Map<String, dynamic> report) {
     final followUps = report['followUps'] as List<dynamic>? ??
-                      report['follow_ups'] as List<dynamic>? ?? [];
+        report['follow_ups'] as List<dynamic>? ??
+        [];
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
@@ -348,12 +425,18 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
 
   Color _getColorByStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'pending': return const Color(0xFFD4D8FF);
-      case 'follow up done': return const Color(0xFFFAFF9F);
-      case 'pending rejected': return const Color(0xFFFFCDD2);
-      case 'completed': return const Color(0xFFC1F0D0);
-      case 'canceled': return const Color(0xFF1E1E1E);
-      default: return const Color(0xFFFFFFFF);
+      case 'pending':
+        return const Color(0xFFD4D8FF);
+      case 'follow up done':
+        return const Color(0xFFFAFF9F);
+      case 'pending rejected':
+        return const Color(0xFFFFCDD2);
+      case 'completed':
+        return const Color(0xFFC1F0D0);
+      case 'canceled':
+        return const Color(0xFF1E1E1E);
+      default:
+        return const Color(0xFFFFFFFF);
     }
   }
 
@@ -364,16 +447,18 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     required String rawStatus,
     String? tag,
     required String reportId,
+    required String staffName,
   }) {
     final bool isDark = rawStatus.toLowerCase() == 'canceled';
     final Color bgColor = _getColorByStatus(rawStatus);
     final Color textColor = isDark ? Colors.white : const Color(0xFF1E1E1E);
-    final Color stripeColor = isDark 
-        ? Colors.white.withValues(alpha: 0.05) 
+    final Color stripeColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
         : Colors.black.withValues(alpha: 0.05);
 
     return InkWell(
-      onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
+      onTap: () => context
+          .pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
@@ -386,7 +471,8 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
+              child:
+                  CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
             ),
             Padding(
               padding: const EdgeInsets.all(20),
@@ -401,38 +487,75 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       Expanded(
                         child: Text(
                           title,
-                          style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600, height: 1.2),
+                          style: TextStyle(
+                              color: textColor,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2),
                         ),
                       ),
                       if (tag != null) ...[
                         const SizedBox(width: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(tag, style: TextStyle(
-                            color: isDark ? Colors.white : const Color(0xFF6B6E94), 
-                            fontSize: 12, fontWeight: FontWeight.w600
-                          )),
+                          child: Text(tag,
+                              style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF6B6E94),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
                         )
                       ]
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(PhosphorIcons.user(PhosphorIconsStyle.bold),
+                          size: 16, color: textColor.withValues(alpha: 0.7)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          staffName,
+                          style: TextStyle(
+                              color: textColor.withValues(alpha: 0.8),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: Row(
                           children: [
-                            Icon(PhosphorIcons.calendarBlank(PhosphorIconsStyle.bold), size: 16, color: textColor.withValues(alpha: 0.7)),
+                            Icon(
+                                PhosphorIcons.calendarBlank(
+                                    PhosphorIconsStyle.bold),
+                                size: 16,
+                                color: textColor.withValues(alpha: 0.7)),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 _formatIndonesianDate(dateString),
-                                style: TextStyle(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13),
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: textColor.withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -441,11 +564,16 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       const SizedBox(width: 8),
                       Row(
                         children: [
-                          Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 16, color: textColor.withValues(alpha: 0.7)),
+                          Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold),
+                              size: 16,
+                              color: textColor.withValues(alpha: 0.7)),
                           const SizedBox(width: 6),
                           Text(
                             _formatTime(dateString),
-                            style: TextStyle(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13),
+                            style: TextStyle(
+                                color: textColor.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13),
                           ),
                         ],
                       ),
@@ -464,26 +592,53 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     if (dateStr == null) return '12 AM';
     try {
       final dt = DateTime.parse(dateStr);
-      return DateFormat('h a').format(dt); 
-    } catch (e) { return '12 AM'; }
+      return DateFormat('h a').format(dt);
+    } catch (e) {
+      return '12 AM';
+    }
   }
 
   String _formatIndonesianDate(String? dateStr) {
     if (dateStr == null) return '-';
     try {
       final dt = DateTime.parse(dateStr);
-      final days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      final days = [
+        'Senin',
+        'Selasa',
+        'Rabu',
+        'Kamis',
+        'Jumat',
+        'Sabtu',
+        'Minggu'
+      ];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des'
+      ];
       return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
-    } catch (e) { return '-'; }
+    } catch (e) {
+      return '-';
+    }
   }
 
   String _formatTime(String? dateStr) {
     if (dateStr == null) return '-';
     try {
       final dt = DateTime.parse(dateStr);
-      return DateFormat('HH:mm').format(dt); 
-    } catch (e) { return '-'; }
+      return DateFormat('HH:mm').format(dt);
+    } catch (e) {
+      return '-';
+    }
   }
 
   DateTime _tryParseDate(String? dateStr) {
@@ -506,12 +661,18 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   String? _getStatusTag(String? status) {
     if (status == null) return null;
     switch (status.toLowerCase()) {
-      case 'pending': return 'Pending';
-      case 'follow up done': return 'Follow Up Done';
-      case 'pending rejected': return 'Pending Rejected';
-      case 'completed': return 'Completed';
-      case 'canceled': return 'Canceled';
-      default: return null;
+      case 'pending':
+        return 'Pending';
+      case 'follow up done':
+        return 'Follow Up Done';
+      case 'pending rejected':
+        return 'Pending Rejected';
+      case 'completed':
+        return 'Completed';
+      case 'canceled':
+        return 'Canceled';
+      default:
+        return null;
     }
   }
 }
@@ -529,9 +690,11 @@ class _CardStripedPainter extends CustomPainter {
 
     const double space = 8.0;
     for (double i = -size.height; i < size.width; i += space) {
-      canvas.drawLine(Offset(i, size.height), Offset(i + size.height, 0), paint);
+      canvas.drawLine(
+          Offset(i, size.height), Offset(i + size.height, 0), paint);
     }
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

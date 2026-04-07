@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasource/area_remote_datasource.dart';
 import '../../data/repositories/area_repository_impl.dart';
 import '../../domain/repositories/area_repository.dart';
@@ -25,6 +26,7 @@ final areaProvider = FutureProvider<List<AreaModel>>((ref) async {
 });
 
 final areaByUserProvider = FutureProvider<List<AreaModel>>((ref) async {
+  ref.watch(currentUserProvider);
   final repository = ref.watch(areaRepositoryProvider);
   return repository.getAreasByUser();
 });

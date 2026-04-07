@@ -10,11 +10,18 @@ import '../../../../app/theme/app_typography.dart';
 import '../providers/active_area_filter_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
-class PicFindingScreen extends ConsumerWidget {
+class PicFindingScreen extends ConsumerStatefulWidget {
   const PicFindingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PicFindingScreen> createState() => _PicFindingScreenState();
+}
+
+class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
+  int _limit = 5;
+
+  @override
+  Widget build(BuildContext context) {
     final activeArea = ref.watch(activeAreaFilterProvider);
     final reportsAsync = ref.watch(petugasTaskMapsProvider);
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
@@ -143,13 +150,14 @@ class PicFindingScreen extends ConsumerWidget {
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(24),
-                      itemCount: tasksInArea.length,
-                      itemBuilder: (context, index) {
-                        final task = tasksInArea[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
+                  : (() {
+                      final visibleTasks = tasksInArea.take(_limit).toList();
+                      final hasMore = tasksInArea.length > _limit;
+                      return ListView(
+                        padding: const EdgeInsets.all(24),
+                        children: [
+                          ...visibleTasks.map((task) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
                             child: _buildExactTaskCard(
                               context,
                               title: _getReportTitle(task),
@@ -157,10 +165,32 @@ class PicFindingScreen extends ConsumerWidget {
                               rawStatus: task['status']?.toString() ?? 'Pending',
                               tag: _getPicStatusTag(task),
                               reportId: task['id'].toString(),
-                          ),
-                        );
-                      },
-                    ),
+                            ),
+                          )),
+                          if (hasMore)
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(top: 8),
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _limit = tasksInArea.length;
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                                ),
+                                child: Text(
+                                  'Tampilkan ${tasksInArea.length - _limit} Temuan Lainnya',
+                                  style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    })(),
             ),
           ],
         ),

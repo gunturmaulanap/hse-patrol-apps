@@ -224,17 +224,17 @@ class _ToastWidgetState extends State<_ToastWidget>
         return _ToastConfig(
           backgroundColor: AppColors.statusRejected,
           icon: Icons.warning,
-          iconColor: Colors.black,
-          iconBackgroundColor: Colors.white.withValues(alpha: 0.3),
-          textColor: Colors.black,
+          iconColor: Colors.white,
+          iconBackgroundColor: Colors.white.withValues(alpha: 0.2),
+          textColor: Colors.white,
         );
       case ToastType.info:
         return _ToastConfig(
           backgroundColor: AppColors.primary,
           icon: Icons.info,
-          iconColor: Colors.white,
-          iconBackgroundColor: Colors.white.withValues(alpha: 0.2),
-          textColor: Colors.white,
+          iconColor: Colors.black,
+          iconBackgroundColor: Colors.black.withValues(alpha: 0.1),
+          textColor: Colors.black,
         );
     }
   }

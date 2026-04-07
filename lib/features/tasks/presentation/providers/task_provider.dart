@@ -18,11 +18,13 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 });
 
 final tasksFutureProvider = FutureProvider<List<HseTaskModel>>((ref) async {
+  ref.watch(currentUserProvider); // Force re-fetch when user logs in/out
   final repository = ref.watch(taskRepositoryProvider);
   return repository.getTasks();
 });
 
-final taskDetailMapProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, taskId) async {
+final taskDetailMapProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, taskId) async {
   final id = int.tryParse(taskId);
   if (id == null) {
     throw Exception('ID task tidak valid: $taskId');
@@ -35,7 +37,8 @@ final taskDetailMapProvider = FutureProvider.family<Map<String, dynamic>, String
 });
 
 // Provider untuk mencari task berdasarkan picToken (untuk Deep Link dari WhatsApp)
-final taskDetailByPicTokenProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
+final taskDetailByPicTokenProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
   final repository = ref.watch(taskRepositoryProvider);
   final task = await repository.getTaskByPicToken(picToken);
   final areaNameById = await _buildAreaNameByIdMap(ref);
@@ -43,12 +46,14 @@ final taskDetailByPicTokenProvider = FutureProvider.family<Map<String, dynamic>,
 });
 
 /// Provider validasi picToken via endpoint existing tanpa ubah backend contract.
-final picTokenValidationProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
+final picTokenValidationProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, picToken) async {
   final remote = ref.watch(taskRemoteDataSourceProvider);
   return remote.validatePicToken(picToken);
 });
 
-final petugasTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final petugasTaskMapsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final tasks = await ref.watch(tasksFutureProvider.future);
   final areaNameById = await _buildAreaNameByIdMap(ref);
 
@@ -64,42 +69,44 @@ Map<String, dynamic> _toUiTaskMap(
   final areaName = _resolveAreaName(task, areaNameById);
   final title = _resolveTitle(task, areaName);
 
-  final followUps = task.followUps
-      .map((item) {
-        final map = Map<String, dynamic>.from(item);
-        final rawStatus = (map['status']?.toString() ?? '').toLowerCase();
-        final normalizedAction = rawStatus == 'approved'
-            ? 'Approved'
-            : rawStatus == 'rejected'
-                ? 'Rejected'
-                : rawStatus == 'canceled' || rawStatus == 'cancelled'
-                    ? 'Canceled'
-                    : (map['action']?.toString() ?? 'Follow Up');
+  final followUps = task.followUps.map((item) {
+    final map = Map<String, dynamic>.from(item);
+    final rawStatus = (map['status']?.toString() ?? '').toLowerCase();
+    final normalizedAction = rawStatus == 'approved'
+        ? 'Approved'
+        : rawStatus == 'rejected'
+            ? 'Rejected'
+            : rawStatus == 'canceled' || rawStatus == 'cancelled'
+                ? 'Canceled'
+                : (map['action']?.toString() ?? 'Follow Up');
 
-        final photosRaw = map['photos'];
-        final photos = photosRaw is Map
-            ? photosRaw.values
+    final photosRaw = map['photos'];
+    final photos = photosRaw is Map
+        ? photosRaw.values
+            .map((e) => e?.toString() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toList()
+        : photosRaw is List
+            ? photosRaw
                 .map((e) => e?.toString() ?? '')
                 .where((e) => e.isNotEmpty)
                 .toList()
-            : photosRaw is List
-                ? photosRaw
-                    .map((e) => e?.toString() ?? '')
-                    .where((e) => e.isNotEmpty)
-                    .toList()
-                : <String>[];
+            : <String>[];
 
-        return <String, dynamic>{
-          ...map,
-          'type': 'PIC_FOLLOW_UP',
-          'action': normalizedAction,
-          'notes': map['notes_hse']?.toString().isNotEmpty == true
-              ? map['notes_hse']?.toString()
-              : map['notes_pic']?.toString() ?? '',
-          'photos': photos,
-        };
-      })
-      .toList();
+    return <String, dynamic>{
+      ...map,
+      'type': 'PIC_FOLLOW_UP',
+      'action': normalizedAction,
+      // Pisahkan notes_hse dan notes_pic agar bisa ditampilkan terpisah di UI
+      'notes_hse': map['notes_hse']?.toString() ?? '',
+      'notes_pic': map['notes_pic']?.toString() ?? '',
+      // Field 'notes' untuk backward compatibility (fallback ke notes_pic)
+      'notes': map['notes_hse']?.toString().isNotEmpty == true
+          ? map['notes_hse']?.toString()
+          : map['notes_pic']?.toString() ?? '',
+      'photos': photos,
+    };
+  }).toList();
 
   return <String, dynamic>{
     'id': task.id.toString(),
@@ -135,7 +142,8 @@ Future<Map<int, String>> _buildAreaNameByIdMap(Ref ref) async {
   }
 }
 
-final supervisorOwnTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final supervisorOwnTaskMapsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final currentUser = ref.watch(currentUserProvider);
   final allReports = await ref.watch(petugasTaskMapsProvider.future);
 
@@ -144,24 +152,30 @@ final supervisorOwnTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>
 
   // Filter hanya task milik supervisor yang sedang login.
   // Guard mockDb dihapus: ID backend bisa berbeda dari ID mock.
-  return allReports.where((report) => _ownerId(report) == currentUserId).toList();
+  return allReports
+      .where((report) => _ownerId(report) == currentUserId)
+      .toList();
 });
 
-final supervisorStaffTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final supervisorStaffTaskMapsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final currentUser = ref.watch(currentUserProvider);
   final allReports = await ref.watch(petugasTaskMapsProvider.future);
 
   final currentUserId = currentUser?.id;
   final nonSelfReports = currentUserId == null
       ? allReports
-      : allReports.where((report) => _ownerId(report) != currentUserId).toList();
+      : allReports
+          .where((report) => _ownerId(report) != currentUserId)
+          .toList();
 
   // Staff Task: semua task yang bukan milik supervisor login.
   // Penyaringan per petugas dilakukan menggunakan created_by/user_id di UI.
   return nonSelfReports;
 });
 
-final supervisorAllVisibleTaskMapsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final supervisorAllVisibleTaskMapsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final own = await ref.watch(supervisorOwnTaskMapsProvider.future);
   final staff = await ref.watch(supervisorStaffTaskMapsProvider.future);
   return <Map<String, dynamic>>[...own, ...staff];
@@ -180,11 +194,13 @@ final supervisorStaffNamesProvider = FutureProvider<List<String>>((ref) async {
 });
 
 final supervisorStaffTaskByNameProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, staffName) async {
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, staffName) async {
   final staffTasks = await ref.watch(supervisorStaffTaskMapsProvider.future);
 
   return staffTasks
-      .where((task) => (task['staffName']?.toString().trim() ?? '') == staffName)
+      .where(
+          (task) => (task['staffName']?.toString().trim() ?? '') == staffName)
       .toList();
 });
 
@@ -212,14 +228,17 @@ String _resolveTitle(HseTaskModel report, String areaName) {
   final fromBackend = (report.name ?? '').trim();
   if (fromBackend.isNotEmpty) return fromBackend;
 
-  final rootCause = report.rootCause.trim().isEmpty ? '-' : report.rootCause.trim();
+  final rootCause =
+      report.rootCause.trim().isEmpty ? '-' : report.rootCause.trim();
   return 'Inspeksi $areaName - Masalah: $rootCause';
 }
 
 String _normalizeStatus(String rawStatus) {
   final value = rawStatus.trim().toLowerCase();
 
-  if (value == 'followupdone' || value == 'follow_up_done' || value == 'followed_up') {
+  if (value == 'followupdone' ||
+      value == 'follow_up_done' ||
+      value == 'followed_up') {
     return 'Follow Up Done';
   }
 
@@ -253,5 +272,8 @@ int _toInt(dynamic value) {
 }
 
 int _ownerId(Map<String, dynamic> report) {
-  return _toInt(report['created_by'] ?? report['createdBy'] ?? report['user_id'] ?? report['userId']);
+  return _toInt(report['created_by'] ??
+      report['createdBy'] ??
+      report['user_id'] ??
+      report['userId']);
 }

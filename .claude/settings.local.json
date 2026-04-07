@@ -4,7 +4,8 @@
       "Bash(flutter clean:*)",
       "Bash(flutter pub:*)",
       "Bash(nc localhost:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(flutter format:*)"
     ]
   }
 }

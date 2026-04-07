@@ -9,6 +9,7 @@ import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/shimmer/base_shimmer.dart';
 import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../../core/utils/progressive_pagination.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
@@ -25,6 +26,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
   String _searchQuery = '';
+  final Map<String, int> _visibleCountPerArea = {};
 
   @override
   void dispose() {
@@ -325,34 +327,78 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     }
     final sortedAreas = grouped.keys.toList()..sort();
 
+    final List<Widget> listItems = [];
+
+    for (int i = 0; i < sortedAreas.length; i++) {
+        final area = sortedAreas[i];
+        final tasks = grouped[area]!;
+
+        final visibleCount = _visibleCountPerArea[area] ?? ProgressivePagination.getNextVisibleCount(0);
+        final hasMore = ProgressivePagination.hasMore(visibleCount, tasks.length);
+        final visibleTasks = tasks.take(visibleCount).toList();
+
+        // 1. Area Header
+        listItems.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8), 
+            child: Text('${i + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontSize: 14))
+          )
+        );
+
+        // 2. Taks List
+        for (final task in visibleTasks) {
+          final tag = _getPicStatusTag(task);
+          listItems.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExactTaskCard(
+                context,
+                title: _getReportTitle(task),
+                dateString: task['date']?.toString(),
+                tag: tag,
+                reportId: task['id'].toString(),
+              ),
+            )
+          );
+        }
+
+        // 3. Load More / Divider
+        if (hasMore) {
+          final nextCount = ProgressivePagination.getNextVisibleCount(visibleCount);
+          final toShow = (nextCount - visibleCount).clamp(0, tasks.length - visibleCount);
+          listItems.add(
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: TextButton(
+                onPressed: () {
+                   setState(() {
+                     _visibleCountPerArea[area] = nextCount;
+                   });
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                ),
+                child: Text(
+                  ProgressivePagination.getButtonText(visibleCount, tasks.length),
+                  style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                ),
+              ),
+            )
+          );
+        } else {
+          listItems.add(const SizedBox(height: 12));
+        }
+    }
+
     return ListView.builder(
+      key: PageStorageKey<String>('pic_all_$filter'),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: sortedAreas.length,
-      itemBuilder: (context, index) {
-        final area = sortedAreas[index];
-        final tasks = grouped[area]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('${index + 1}. $area', style: AppTypography.h3.copyWith(color: AppColors.textPrimary, fontSize: 14))),
-            ...tasks.map((task) {
-              final tag = _getPicStatusTag(task);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildExactTaskCard(
-                  context,
-                  title: _getReportTitle(task),
-                  dateString: task['date']?.toString(),
-                  tag: tag,
-                  reportId: task['id'].toString(),
-                ),
-              );
-            }),
-            const SizedBox(height: 12),
-          ],
-        );
-      },
+      itemCount: listItems.length,
+      itemBuilder: (context, index) => listItems[index],
     );
   }
 

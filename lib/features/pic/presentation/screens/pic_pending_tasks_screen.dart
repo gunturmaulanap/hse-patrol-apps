@@ -13,11 +13,19 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
-class PicPendingTasksScreen extends ConsumerWidget {
+class PicPendingTasksScreen extends ConsumerStatefulWidget {
   const PicPendingTasksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PicPendingTasksScreen> createState() => _PicPendingTasksScreenState();
+}
+
+class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
+  int _rejectedLimit = 5;
+  int _newLimit = 5;
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final reportsAsync = ref.watch(petugasTaskMapsProvider);
     final areasAsync = ref.watch(areaByUserProvider);
@@ -63,6 +71,12 @@ class PicPendingTasksScreen extends ConsumerWidget {
     // Pisahkan mana yang benar-benar baru, mana yang Pending Rejected (urgent)
     final rejectedTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Pending Rejected').toList();
     final newTasks = pendingTasks.where((r) => _getPicStatusTag(r) == 'Pending').toList();
+
+    final visibleRejected = rejectedTasks.take(_rejectedLimit).toList();
+    final hasMoreRejected = rejectedTasks.length > _rejectedLimit;
+
+    final visibleNew = newTasks.take(_newLimit).toList();
+    final hasMoreNew = newTasks.length > _newLimit;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -134,7 +148,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
                     const SizedBox(height: 32),
                     Text('Pending Rejected (Perlu Revisi)', style: AppTypography.h3),
                     const SizedBox(height: 16),
-                    ...rejectedTasks.map((task) => Padding(
+                    ...visibleRejected.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                         child: _buildExactTaskCard(
                           context,
@@ -145,6 +159,27 @@ class PicPendingTasksScreen extends ConsumerWidget {
                         reportId: task['id'].toString(),
                       ),
                     )),
+                    if (hasMoreRejected)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: TextButton(
+                          onPressed: () {
+                             setState(() {
+                               _rejectedLimit = rejectedTasks.length;
+                             });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: Colors.redAccent.withValues(alpha: 0.05),
+                          ),
+                          child: Text(
+                            'Tampilkan ${rejectedTasks.length - _rejectedLimit} Laporan Lainnya',
+                            style: AppTypography.body1.copyWith(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                   ],
 
@@ -152,7 +187,7 @@ class PicPendingTasksScreen extends ConsumerWidget {
                   if (newTasks.isNotEmpty) ...[
                     Text('Tugas Baru', style: AppTypography.h3),
                     const SizedBox(height: 16),
-                    ...newTasks.map((task) => Padding(
+                    ...visibleNew.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                         child: _buildExactTaskCard(
                           context,
@@ -163,6 +198,27 @@ class PicPendingTasksScreen extends ConsumerWidget {
                         reportId: task['id'].toString(),
                       ),
                     )),
+                    if (hasMoreNew)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: TextButton(
+                          onPressed: () {
+                             setState(() {
+                               _newLimit = newTasks.length;
+                             });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                          ),
+                          child: Text(
+                            'Tampilkan ${newTasks.length - _newLimit} Tugas Lainnya',
+                            style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                   ],
                   const SizedBox(height: 100), // Spacing bawah untuk bottom nav dan FAB
                 ],
