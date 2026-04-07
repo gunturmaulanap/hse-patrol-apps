@@ -4,12 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/shimmer/shimmers/task_detail_shimmer.dart';
 import '../../../../app/router/route_names.dart';
@@ -145,12 +143,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
   }
 
   IconData _getRiskLevelIcon(String? riskLevel) {
-    if (riskLevel == null || riskLevel!.trim().isEmpty) {
+    if (riskLevel == null || riskLevel.trim().isEmpty) {
       return Icons.warning_amber;
     }
 
     // Gunakan Icons dari material design yang mirip dengan HugeIcons
-    final normalizedLevel = riskLevel!.trim();
+    final normalizedLevel = riskLevel.trim();
     switch (normalizedLevel) {
       case '1':
         return Icons.access_time; // < 1 jam (timer icon)
@@ -378,7 +376,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
         },
       );
 
-      if (reason == null || reason!.trim().isEmpty) return;
+      if (reason == null || reason.trim().isEmpty) return;
     } else if (action == 'Approved') {
       isConfirm = await showDialog<bool>(
             context: context,
