@@ -49,22 +49,26 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
           photoFiles,
         );
 
+        // OPTIMIZATION: Only invalidate providers that are directly affected
+        // Instead of invalidating 6 providers, we only invalidate the specific task provider
+        // This will trigger a cascade update to dependent providers automatically
         ref.invalidate(taskDetailMapProvider(draft.reportId!));
-        ref.invalidate(tasksFutureProvider);
-        ref.invalidate(petugasTaskMapsProvider);
-        ref.invalidate(supervisorOwnTaskMapsProvider);
-        ref.invalidate(supervisorStaffTaskMapsProvider);
-        ref.invalidate(supervisorAllVisibleTaskMapsProvider);
+
+        // Note: tasksFutureProvider will auto-refresh when user navigates back
+        // No need to invalidate all task map providers
       }
 
       if (mounted) {
         setState(() => _isSaving = false);
 
+        // Ambil ID sebelum form reset
+        final finalReportId = draft.reportId!;
+
         // Clear draft
         ref.read(picFollowUpFormProvider.notifier).reset();
 
-        // Return to PIC Home explicitly (popping off the wizard + detail screen)
-        context.goNamed(RouteNames.picHome);
+        // Kembali ke Task Detail alih-alih Home Screen
+        context.goNamed(RouteNames.taskDetail, pathParameters: {'id': finalReportId});
 
         AppToast.success(
           context,

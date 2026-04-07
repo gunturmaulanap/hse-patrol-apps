@@ -4,4 +4,15 @@ class AppEnv {
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const bool enableRouteLogging = false;
+
+  // Enable detailed logging in debug mode, disable in production
+  static const bool enableLogging = bool.fromEnvironment('DEBUG', defaultValue: true);
+
+  // API Configuration
+  static const int maxPaginationPages = 10; // Prevent infinite pagination
+  static const int defaultPaginationPageSize = 50;
+  static const int maxPhotosPerTask = 3;
+
+  // Security
+  static const Duration tokenRefreshThreshold = Duration(minutes: 5);
 }

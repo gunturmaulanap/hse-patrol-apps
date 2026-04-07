@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/error/error_handler.dart';
+import '../../../../core/utils/logger.dart';
+import '../../../../app/env/app_env.dart';
 import '../models/hse_task_model.dart';
 import '../models/create_hse_task_request.dart';
 import '../models/hse_staff_model.dart';
@@ -11,8 +13,10 @@ abstract class TaskRemoteDataSource {
   Future<HseTaskModel> getTaskById(int id);
   Future<HseTaskModel> getTaskByPicToken(String picToken);
   Future<Map<String, dynamic>> validatePicToken(String picToken);
-  Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos);
-  Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request, {List<File>? photos, String? mode});
+  Future<HseTaskModel> createTask(
+      CreateHseTaskRequest request, List<File>? photos);
+  Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request,
+      {List<File>? photos, String? mode});
   Future<void> cancelTask(int id);
   Future<List<HseStaffModel>> fetchStaffs();
 }
@@ -20,84 +24,162 @@ abstract class TaskRemoteDataSource {
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   final Dio _dio = DioClient.instance;
 
-  void _log(String message, [Object? data]) {
-    debugPrint('[TaskRemoteDataSource] $message${data != null ? ' => $data' : ''}');
-  }
-
   @override
   Future<List<HseTaskModel>> fetchTasks({int? areaId, String? status}) async {
     try {
-      final queryParams = <String, dynamic>{};
-      if (areaId != null) queryParams['area_id'] = areaId;
-      if (status != null) queryParams['status'] = status;
+      List<HseTaskModel> allTasks = [];
+      int currentPage = 1;
+      int totalPages = 1;
+      int perPage = AppEnv.defaultPaginationPageSize;
+      int maxPages = AppEnv.maxPaginationPages;
 
-      final response = await _dio.get(
-        '/hse-reports',
-        queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      );
+      do {
+        final queryParams = <String, dynamic>{
+          'page': currentPage,
+          'per_page': perPage,
+        };
+        if (areaId != null) queryParams['area_id'] = areaId;
+        if (status != null) queryParams['status'] = status;
 
-      final List<dynamic> data = _extractListData(response.data);
-      return data.map((json) => _parseReportModel(json as Map<String, dynamic>)).toList();
+        log.info('Fetching tasks', data: {'page': currentPage, 'per_page': perPage}, tag: 'TaskRemoteDataSource');
+
+        final response = await _dio.get(
+          '/hse-reports',
+          queryParameters: queryParams,
+        );
+
+        // Parse response
+        final responseData = response.data;
+        List<dynamic> data = [];
+
+        if (responseData is Map) {
+          final map = responseData as Map<String, dynamic>;
+          data = _extractListData(map);
+
+          // Cek pagination info
+          if (map['total'] != null) {
+            final total = map['total'] is int
+                ? map['total'] as int
+                : int.tryParse(map['total']?.toString() ?? '') ?? 0;
+            final receivedPerPage = map['per_page'] is int
+                ? map['per_page'] as int
+                : int.tryParse(map['per_page']?.toString() ?? '') ?? perPage;
+
+            if (receivedPerPage > 0) {
+              totalPages = (total / receivedPerPage).ceil();
+            }
+          } else if (map['last_page'] != null) {
+            totalPages = map['last_page'] is int
+                ? map['last_page'] as int
+                : int.tryParse(map['last_page']?.toString() ?? '') ?? 1;
+          } else if (map['total_pages'] != null) {
+            totalPages = map['total_pages'] is int
+                ? map['total_pages'] as int
+                : int.tryParse(map['total_pages']?.toString() ?? '') ?? 1;
+          }
+
+          log.debug('Page info', data: {
+            'current_page': map['current_page'],
+            'last_page': map['last_page'],
+            'total_pages': map['total_pages'],
+            'total': map['total'],
+            'calculated_total_pages': totalPages,
+          }, tag: 'TaskRemoteDataSource');
+        }
+
+        // Parse tasks
+        final pageTasks = data.map((json) => _parseReportModel(json as Map<String, dynamic>)).toList();
+        allTasks.addAll(pageTasks);
+
+        log.debug('Page fetched', data: {
+          'page': currentPage,
+          'count': pageTasks.length,
+          'total_so_far': allTasks.length
+        }, tag: 'TaskRemoteDataSource');
+
+        currentPage++;
+      } while (currentPage <= totalPages && currentPage <= maxPages);
+
+      log.info('All tasks fetched successfully', data: {'total': allTasks.length}, tag: 'TaskRemoteDataSource');
+      return allTasks;
     } catch (e) {
-      throw Exception('Gagal mengambil data reports: ${e.toString()}');
+      log.error('Error fetching tasks', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
   @override
   Future<HseTaskModel> getTaskById(int id) async {
     try {
+      log.info('Fetching task by ID', data: {'id': id}, tag: 'TaskRemoteDataSource');
+
       final response = await _dio.get('/hse-reports/$id');
       final data = response.data is Map
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) throw Exception('Report not found');
+      if (data == null) {
+        throw ErrorHandler.handleException(
+          BusinessException.taskNotFound(),
+        );
+      }
+
       return _parseReportModel(data);
     } catch (e) {
-      throw Exception('Gagal mengambil detail report: ${e.toString()}');
+      log.error('Error fetching task by ID', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
   @override
   Future<HseTaskModel> getTaskByPicToken(String picToken) async {
     try {
-      _log('Fetching task by picToken from ALL reports endpoint', {'token': picToken});
-      
-      // Fallback: Cari di endpoint list report secara manual
-      // Karena backend belum memiliki route khusus GET /hse-reports/pic/:picToken
-      final response = await _dio.get('/hse-reports');
-      final data = response.data is Map
-          ? (response.data['data'] as Map<String, dynamic>?)
-          : (response.data as Map<String, dynamic>?);
-          
-      List<dynamic> allReports = [];
-      if (data != null && data['data'] is List) {
-        allReports = data['data'];
-      } else if (data != null && data['reports'] is List) {
-        allReports = data['reports'];
-      } else if (response.data is List) {
-        allReports = response.data;
-      } else if (response.data is Map && response.data['data'] is List) {
-        allReports = response.data['data'];
-      } else if (response.data is Map && response.data['items'] is List) {
-        allReports = response.data['items'];
-      }
-      
-      for (final report in allReports) {
-        if (report is Map<String, dynamic>) {
-           final pt = report['pic_token']?.toString() ?? report['picToken']?.toString();
-           if (pt == picToken) {
-             _log('Task found by picToken in all reports', {'id': report['id']});
-             return _parseReportModel(report);
-           }
-        }
+      log.info('Fetching task by picToken', tag: 'TaskRemoteDataSource');
+
+      // Step 1: Hit API /hse/reports/pic/{token}
+      final validateResponse = await _dio.get('/hse/reports/pic/$picToken');
+
+      final data = validateResponse.data;
+      if (data is! Map ||
+          data['status'] != 'success' ||
+          data['redirect_to'] == null) {
+        throw ErrorHandler.handleException(
+          ValidationException.invalidInput(
+            message: 'Token tidak valid atau tidak menemukan redirect_to_url',
+          ),
+        );
       }
 
-      _log('Task not found for picToken in all reports');
-      throw Exception('Task not found');
+      final String redirectTo = data['redirect_to'];
+      log.debug('Got redirect URL', data: {'redirect_to': redirectTo}, tag: 'TaskRemoteDataSource');
+
+      // Step 2: Extract ID from redirect_to
+      final uri = Uri.tryParse(redirectTo);
+      if (uri == null || uri.pathSegments.isEmpty) {
+        throw ErrorHandler.handleException(
+          ValidationException.invalidInput(
+            message: 'Format URL redirect tidak valid: $redirectTo',
+          ),
+        );
+      }
+
+      final idStr = uri.pathSegments.last;
+      final int? id = int.tryParse(idStr);
+
+      if (id == null) {
+        throw ErrorHandler.handleException(
+          ValidationException.invalidInput(
+            message: 'Gagal mengekstrak ID laporan dari string: $idStr',
+          ),
+        );
+      }
+
+      // Step 3: Panggil getTaskById yang sudah ada
+      log.debug('Extracted task ID from redirect URL', data: {'id': id}, tag: 'TaskRemoteDataSource');
+      return await getTaskById(id);
     } catch (e) {
-      _log('Error getting task by picToken: ${e.toString()}');
-      throw Exception('Gagal mengambil task: ${e.toString()}');
+      log.error('Error getting task by picToken', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
@@ -106,10 +188,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     final endpoint = '/hse-reports/pic/$picToken';
 
     try {
-      _log('Validating picToken (existing endpoint)', {
-        'endpoint': endpoint,
-        'token': picToken,
-      });
+      log.info('Validating picToken', data: {'token': picToken}, tag: 'TaskRemoteDataSource');
 
       final response = await _dio.get(endpoint);
       final raw = response.data;
@@ -146,20 +225,33 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       final result = <String, dynamic>{
         'tokenValid': tokenValid,
         'authorized': authorized,
-        'taskId': data['task_id'] ?? data['taskId'] ?? data['id'] ?? map['task_id'] ?? map['taskId'] ?? map['id'],
-        'reportId': data['report_id'] ?? data['reportId'] ?? map['report_id'] ?? map['reportId'],
-        'areaId': data['area_id'] ?? data['areaId'] ?? map['area_id'] ?? map['areaId'],
-        'authorId': data['author_id'] ?? data['authorId'] ?? data['created_by'] ?? data['createdBy'],
+        'taskId': data['task_id'] ??
+            data['taskId'] ??
+            data['id'] ??
+            map['task_id'] ??
+            map['taskId'] ??
+            map['id'],
+        'reportId': data['report_id'] ??
+            data['reportId'] ??
+            map['report_id'] ??
+            map['reportId'],
+        'areaId': data['area_id'] ??
+            data['areaId'] ??
+            map['area_id'] ??
+            map['areaId'],
+        'authorId': data['author_id'] ??
+            data['authorId'] ??
+            data['created_by'] ??
+            data['createdBy'],
         'reason': data['reason'] ?? data['message'] ?? map['message'] ?? '',
         'raw': map,
       };
 
-      _log('Validation result (normalized)', {
+      log.debug('picToken validation result', data: {
         'tokenValid': result['tokenValid'],
         'authorized': result['authorized'],
         'taskId': result['taskId'],
-        'areaId': result['areaId'],
-      });
+      }, tag: 'TaskRemoteDataSource');
 
       return result;
     } on DioException catch (e) {
@@ -183,24 +275,42 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'raw': payload,
       };
 
-      _log('Validation result (from error response)', {
+      log.debug('picToken validation from error', data: {
         'status': status,
         'tokenValid': result['tokenValid'],
         'authorized': result['authorized'],
-      });
+      }, tag: 'TaskRemoteDataSource');
 
       return result;
     }
   }
 
   @override
-  Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos) async {
+  Future<HseTaskModel> createTask(
+      CreateHseTaskRequest request, List<File>? photos) async {
     try {
-      if (request.title.trim().isEmpty) throw Exception('❌ Title tidak boleh kosong');
-      if (request.areaId == null || request.areaId! <= 0) throw Exception('❌ area_id tidak valid');
-      if (request.riskLevel.trim().isEmpty) throw Exception('❌ Risk level tidak boleh kosong');
-      if (request.rootCause.trim().isEmpty) throw Exception('❌ Root cause tidak boleh kosong');
-      if (request.notes.trim().isEmpty) throw Exception('❌ Notes tidak boleh kosong');
+      // Validate input
+      if (request.title.trim().isEmpty) {
+        throw ValidationException.requiredField(fieldName: 'Judul');
+      }
+      if (request.areaId == null || request.areaId! <= 0) {
+        throw ValidationException.invalidInput(message: 'Area ID tidak valid');
+      }
+      if (request.riskLevel.trim().isEmpty) {
+        throw ValidationException.requiredField(fieldName: 'Risk level');
+      }
+      if (request.rootCause.trim().isEmpty) {
+        throw ValidationException.requiredField(fieldName: 'Root cause');
+      }
+      if (request.notes.trim().isEmpty) {
+        throw ValidationException.requiredField(fieldName: 'Notes');
+      }
+
+      log.info('Creating task', data: {
+        'title': request.title.trim(),
+        'area_id': request.areaId,
+        'risk_level': request.riskLevel,
+      }, tag: 'TaskRemoteDataSource');
 
       final formData = FormData.fromMap({
         'title': request.title.trim(),
@@ -210,19 +320,17 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'notes': request.notes.trim(),
       });
 
-      // PERBAIKAN 1: Format key sesuai API Doc (photos[0], photos[1])
+      // Upload photos with proper format
       if (photos != null && photos.isNotEmpty) {
-        for (var i = 0; i < photos.length && i < 3; i++) {
+        for (var i = 0; i < photos.length && i < AppEnv.maxPhotosPerTask; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
-            filename: 'photo_${i + 1}.jpg', // Berikan ekstensi valid
+            filename: 'photo_${i + 1}.jpg',
           );
-          formData.files.add(MapEntry('photos[$i]', file)); 
+          formData.files.add(MapEntry('photos[$i]', file));
         }
       }
 
-      // PERBAIKAN 2: Jangan menimpa Options(contentType: ...). 
-      // Biarkan Dio yang membuatkan header Content-Type + Boundary secara otomatis!
       final response = await _dio.post(
         '/hse-reports',
         data: formData,
@@ -232,46 +340,29 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) throw Exception('Failed to create report: ${response.data}');
+      if (data == null) {
+        throw ErrorHandler.handleException(
+          BusinessException.invalidOperation(
+            message: 'Failed to create report',
+          ),
+        );
+      }
+
+      log.info('Task created successfully', data: {'id': data['id']}, tag: 'TaskRemoteDataSource');
 
       return _parseReportModel(data);
-
-    } on DioException catch (e) {
-      // PERBAIKAN 3: Tangkap error 422 di dalam catch block DioException
-      if (e.response?.statusCode == 422) {
-        final responseData = e.response?.data;
-        String errorMsg = 'Validasi data gagal.';
-        
-        if (responseData is Map<String, dynamic>) {
-          errorMsg = responseData['message']?.toString() ?? errorMsg;
-          final errors = responseData['errors'];
-          
-          if (errors is Map) {
-            final errorDetail = StringBuffer('$errorMsg\n\n');
-            errors.forEach((key, value) {
-              if (value is List) {
-                errorDetail.writeln('• ${value.join(", ")}');
-              } else {
-                errorDetail.writeln('• $value');
-              }
-            });
-            // Lempar dengan pesan rapih yang akan dibaca oleh UI
-            throw Exception(errorDetail.toString().trim());
-          }
-        }
-        throw Exception(errorMsg);
-      }
-      
-      _log('❌ ERROR creating task: ${e.message}');
-      rethrow;
     } catch (e) {
-      rethrow;
+      log.error('Error creating task', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
   @override
-  Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request, {List<File>? photos, String? mode}) async {
+  Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request,
+      {List<File>? photos, String? mode}) async {
     try {
+      log.info('Updating task', data: {'id': id, 'mode': mode}, tag: 'TaskRemoteDataSource');
+
       final formData = FormData.fromMap({
         if (mode != null) 'mode': mode,
         'area_id': request.areaId,
@@ -281,16 +372,15 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       });
 
       if (photos != null && photos.isNotEmpty) {
-        for (var i = 0; i < photos.length && i < 3; i++) {
+        for (var i = 0; i < photos.length && i < AppEnv.maxPhotosPerTask; i++) {
           final file = await MultipartFile.fromFile(
             photos[i].path,
             filename: 'photo_${i + 1}.jpg',
           );
-          formData.files.add(MapEntry('photos[$i]', file)); 
+          formData.files.add(MapEntry('photos[$i]', file));
         }
       }
 
-      // Sama, biarkan dio mengatur Boundary untuk PUT multipart (jika server support)
       final response = await _dio.put(
         '/hse-reports/$id',
         data: formData,
@@ -300,64 +390,59 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           ? (response.data['data'] as Map<String, dynamic>?)
           : (response.data as Map<String, dynamic>?);
 
-      if (data == null) throw Exception('Failed to update report');
+      if (data == null) {
+        throw ErrorHandler.handleException(
+          BusinessException.invalidOperation(
+            message: 'Failed to update report',
+          ),
+        );
+      }
+
+      log.info('Task updated successfully', data: {'id': id}, tag: 'TaskRemoteDataSource');
 
       return _parseReportModel(data);
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 422) {
-         // Sama seperti create, bisa Anda perluas jika butuh pesan detail
-         throw Exception(e.response?.data['message'] ?? 'Validasi update gagal');
-      }
-      throw Exception('Gagal update report: ${e.message}');
     } catch (e) {
-      throw Exception('Gagal update report: ${e.toString()}');
+      log.error('Error updating task', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
   @override
   Future<void> cancelTask(int id) async {
     try {
-      // PERBAIKAN: Backend memerlukan field 'mode' = 'cancel'
-      // Kirim sebagai JSON (bukan FormData) karena tidak ada file upload
-      // Menggunakan PATCH untuk partial update (lebih sesuai daripada PUT)
+      log.info('Canceling task', data: {'id': id}, tag: 'TaskRemoteDataSource');
+
       final response = await _dio.patch(
         '/hse-reports/$id',
         data: {'mode': 'cancel'},
       );
 
-      // Log response untuk debugging
-      _log('Cancel task response: ${response.statusCode}');
-    } on DioException catch (e) {
-      _log('Cancel task DioException: ${e.response?.statusCode} => ${e.response?.data}');
-
-      // Tangkap error detail dari backend
-      if (e.response?.statusCode == 422) {
-        final responseData = e.response?.data;
-        String errorMsg = 'Gagal membatalkan laporan.';
-
-        if (responseData is Map<String, dynamic>) {
-          errorMsg = responseData['message']?.toString() ?? errorMsg;
-          final errors = responseData['errors'];
-
-          if (errors is Map) {
-            final errorDetail = StringBuffer('$errorMsg\n\n');
-            errors.forEach((key, value) {
-              if (value is List) {
-                errorDetail.writeln('• ${value.join(", ")}');
-              } else {
-                errorDetail.writeln('• $value');
-              }
-            });
-            throw Exception(errorDetail.toString().trim());
-          }
-        }
-        throw Exception(errorMsg);
-      }
-
-      throw Exception('Gagal cancel report: ${e.toString()}');
+      log.info('Task canceled successfully', data: {'id': id}, tag: 'TaskRemoteDataSource');
     } catch (e) {
-      _log('Cancel task error: ${e.toString()}');
-      throw Exception('Gagal cancel report: ${e.toString()}');
+      log.error('Error canceling task', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
+    }
+  }
+
+  @override
+  Future<List<HseStaffModel>> fetchStaffs() async {
+    try {
+      log.info('Fetching staffs list', tag: 'TaskRemoteDataSource');
+
+      final response = await _dio.get('/hse/staffs');
+
+      final List<dynamic> data = _extractListData(response.data);
+
+      final staffs = data.map((json) {
+        return HseStaffModel.fromJson(json as Map<String, dynamic>);
+      }).toList();
+
+      log.info('Staffs fetched successfully', data: {'count': staffs.length}, tag: 'TaskRemoteDataSource');
+
+      return staffs;
+    } catch (e) {
+      log.error('Error fetching staffs', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
     }
   }
 
@@ -371,20 +456,31 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     return HseTaskModel(
       id: _toInt(json['id']),
       code: json['code']?.toString() ?? '',
-      userId: _toInt(json['created_by'] ?? json['createdBy'] ?? json['user_id'] ?? json['userId']),
+      userId: _toInt(json['created_by'] ??
+          json['createdBy'] ??
+          json['user_id'] ??
+          json['userId']),
       areaId: _toInt(json['area_id'] ?? json['areaId']),
       name: title,
-      riskLevel: json['risk_level']?.toString() ?? json['riskLevel']?.toString() ?? '',
-      rootCause: json['root_cause']?.toString() ?? json['rootCause']?.toString() ?? '',
+      riskLevel:
+          json['risk_level']?.toString() ?? json['riskLevel']?.toString() ?? '',
+      rootCause:
+          json['root_cause']?.toString() ?? json['rootCause']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       picToken: json['pic_token']?.toString() ?? json['picToken']?.toString(),
       photos: parsedPhotos,
-      followUps: (json['follow_ups'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ??
-                 (json['followUps'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ??
-                 [],
+      followUps: (json['follow_ups'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          (json['followUps'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [],
       date: json['date']?.toString() ?? json['created_at']?.toString(),
-      userName: json['user']?.toString() ?? json['user_name']?.toString() ?? json['username']?.toString(),
+      userName: json['user']?.toString() ??
+          json['user_name']?.toString() ??
+          json['username']?.toString(),
     );
   }
 
@@ -399,10 +495,18 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     if (value is num) return value != 0;
     final normalized = value?.toString().trim().toLowerCase();
     if (normalized == null || normalized.isEmpty) return null;
-    if (normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'valid' || normalized == 'authorized') {
+    if (normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'valid' ||
+        normalized == 'authorized') {
       return true;
     }
-    if (normalized == 'false' || normalized == '0' || normalized == 'no' || normalized == 'invalid' || normalized == 'unauthorized') {
+    if (normalized == 'false' ||
+        normalized == '0' ||
+        normalized == 'no' ||
+        normalized == 'invalid' ||
+        normalized == 'unauthorized') {
       return false;
     }
     return null;
@@ -410,10 +514,16 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
   List<String> _parsePhotos(dynamic raw) {
     if (raw is List) {
-      return raw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+      return raw
+          .map((e) => e?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
     if (raw is Map) {
-      return raw.values.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+      return raw.values
+          .map((e) => e?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
     return <String>[];
   }
@@ -438,27 +548,5 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       if (reports is List) return reports;
     }
     return <dynamic>[];
-  }
-
-  @override
-  Future<List<HseStaffModel>> fetchStaffs() async {
-    try {
-      _log('Fetching staffs list');
-      final response = await _dio.get('/hse/staffs');
-
-      _log('Staffs response status', response.statusCode);
-
-      final List<dynamic> data = _extractListData(response.data);
-
-      final staffs = data.map((json) {
-        return HseStaffModel.fromJson(json as Map<String, dynamic>);
-      }).toList();
-
-      _log('Staffs fetched successfully', {'count': staffs.length});
-      return staffs;
-    } catch (e) {
-      _log('Error fetching staffs: ${e.toString()}');
-      throw Exception('Gagal mengambil data staff: ${e.toString()}');
-    }
   }
 }
