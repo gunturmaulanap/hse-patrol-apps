@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
@@ -122,6 +123,68 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
 
   String _normalizeStatus(dynamic raw) {
     return raw?.toString().trim().toLowerCase() ?? '';
+  }
+
+  String _getRiskLevelLabel(String? riskLevel) {
+    if (riskLevel == null || riskLevel.isEmpty) return '-';
+
+    // Konversi angka ke deskripsi yang lebih mudah dipahami
+    switch (riskLevel.trim()) {
+      case '1':
+        return 'Kurang dari 1 jam';
+      case '2':
+        return 'Kurang dari 24 jam';
+      case '3':
+        return 'Kurang dari 3 hari';
+      case '4':
+        return 'Kurang dari 2 minggu';
+      default:
+        // Fallback ke angka asli jika tidak dikenali
+        return 'Level $riskLevel';
+    }
+  }
+
+  IconData _getRiskLevelIcon(String? riskLevel) {
+    if (riskLevel == null || riskLevel!.trim().isEmpty) {
+      return Icons.warning_amber;
+    }
+
+    // Gunakan Icons dari material design yang mirip dengan HugeIcons
+    final normalizedLevel = riskLevel!.trim();
+    switch (normalizedLevel) {
+      case '1':
+        return Icons.access_time; // < 1 jam (timer icon)
+      case '2':
+        return Icons.schedule; // < 24 jam (clock icon)
+      case '3':
+        return Icons.calendar_today; // < 3 hari
+      case '4':
+        return Icons.event; // < 2 minggu (calendar icon)
+      default:
+        return Icons.warning_amber; // Unknown
+    }
+  }
+
+  Color _getRiskLevelColor(String? riskLevel) {
+    if (riskLevel == null || riskLevel.isEmpty) return AppColors.textSecondary;
+
+    // Mapping sesuai dengan create_task_risk_level_screen:
+    // Level 1 "Kurang dari 1 Jam" → riskLevel4 (Merah) - Paling cepat, paling bahaya
+    // Level 2 "Kurang dari 24 Jam" → riskLevel3 (Orange) - Bahaya
+    // Level 3 "Kurang dari 3 Hari" → riskLevel2 (Kuning) - Sedang
+    // Level 4 "Kurang dari 2 Minggu" → riskLevel1 (Biru) - Paling lama, paling aman
+    switch (riskLevel.trim()) {
+      case '1':
+        return AppColors.riskLevel4; // Merah - < 1 jam (paling bahaya)
+      case '2':
+        return AppColors.riskLevel3; // Orange - < 24 jam
+      case '3':
+        return AppColors.riskLevel2; // Kuning - < 3 hari
+      case '4':
+        return AppColors.riskLevel1; // Biru - < 2 minggu (paling aman)
+      default:
+        return AppColors.textSecondary;
+    }
   }
 
   String _latestFollowUpAction(Map<String, dynamic> rpt) {
@@ -542,8 +605,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
               }
 
               final waText = '''🚨 *DETAIL TEMUAN HSE* 🚨
+
 📍 *Area:* ${rpt['area'] ?? '-'}
-⚠️ *Tingkat Risiko:* ${rpt['riskLevel'] ?? '-'}
+⚠️ *Tingkat Risiko:* ${_getRiskLevelLabel(rpt['riskLevel']?.toString())} ${_getRiskLevelIcon(rpt['riskLevel']?.toString())}
 💬 *Catatan:* ${rpt['notes'] ?? '-'}
 
 🔗 Buka di Aplikasi: https://mes.aksamala.co.id/share/report/${resolvedPicToken ?? widget.taskId}''';
@@ -584,12 +648,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
                               'Lokasi', rpt['area']?.toString() ?? '-')),
                       const SizedBox(width: 16),
                       Expanded(
-                          child: _buildInfoCard(PhosphorIcons.warningCircle(),
-                              'Risiko', rpt['riskLevel']?.toString() ?? '-',
-                              iconColor:
-                                  rpt['riskLevel']?.toString() == 'Kritis'
-                                      ? Colors.redAccent
-                                      : AppColors.primary)),
+                        child: _buildRiskLevelCard(rpt['riskLevel']?.toString()),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -845,6 +905,58 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
           const SizedBox(height: 4),
           Text(value,
               style: AppTypography.body1.copyWith(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiskLevelCard(String? riskLevel) {
+    final label = _getRiskLevelLabel(riskLevel);
+    final iconData = _getRiskLevelIcon(riskLevel);
+    final color = _getRiskLevelColor(riskLevel);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // PhosphorIcon di atas dengan background warna - mirip dengan create_task_risk_level_screen
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+            ),
+            child: Icon(
+              iconData,
+              size: 28,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Label "Tingkat Risiko" di tengah
+          Text(
+            'Tingkat Risiko',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Keterangan risk level di bawah
+          Text(
+            label,
+            style: AppTypography.body1.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );
