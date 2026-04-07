@@ -95,10 +95,11 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
       // 2. Resolve task detail via Endpoint Backend (2-step API request)
       debugPrint('[DeepLinkHandler] attempt to resolve task from Backend API for token: ${widget.token}');
-      
+
       Map<String, dynamic>? foundTask;
       try {
         foundTask = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
+        debugPrint('[DeepLinkHandler] Task fetched successfully => ${foundTask != null ? 'ID: ${foundTask['id']}, Area: ${foundTask['area']}, AreaId: ${foundTask['areaId']}' : 'null'}');
       } catch (e) {
         debugPrint('[DeepLinkHandler] failed to fetch from backend: $e');
         final errorMsg = e.toString().toLowerCase();
@@ -134,15 +135,37 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       // Jika PIC ditolak oleh currentUser, coba verifikasi dengan menarik data area nya langsung.
       if (!roleAllowed && currentUser.role == UserRole.pic) {
         try {
+          debugPrint('[DeepLinkHandler] PIC role detected but initial check failed. Fetching areas from API...');
           final picAreas = await ref.read(areaByUserProvider.future);
           final areaId = foundTask['areaId']?.toString();
           final areaName = foundTask['area']?.toString();
-          
-          final hasAreaById = areaId != null && picAreas.any((a) => a.id.toString() == areaId);
-          final hasAreaByName = areaName != null && picAreas.any((a) => a.name == areaName);
-          
+
+          debugPrint('[DeepLinkHandler] Task data => areaId: $areaId, areaName: $areaName');
+          debugPrint('[DeepLinkHandler] PIC areas count: ${picAreas.length}');
+
+          if (picAreas.isEmpty) {
+            debugPrint('[DeepLinkHandler] WARNING: PIC has no areas assigned!');
+          } else {
+            debugPrint('[DeepLinkHandler] Available areas: ${picAreas.map((a) => '${a.id}:${a.name}').join(', ')}');
+          }
+
+          // Perbaiki: Cek areaId dan areaName dengan lebih robust
+          bool hasAreaById = false;
+          bool hasAreaByName = false;
+
+          if (areaId != null) {
+            hasAreaById = picAreas.any((a) => a.id.toString() == areaId.trim());
+            debugPrint('[DeepLinkHandler] Checking areaId "$areaId": $hasAreaById');
+          }
+
+          if (areaName != null) {
+            // Case-insensitive comparison untuk area name
+            hasAreaByName = picAreas.any((a) => a.name.toLowerCase().trim() == areaName.toLowerCase().trim());
+            debugPrint('[DeepLinkHandler] Checking areaName "$areaName": $hasAreaByName');
+          }
+
           roleAllowed = hasAreaById || hasAreaByName;
-          debugPrint('[DeepLinkHandler] Fetching picAreas (${picAreas.length}) via provider => fallback PIC roleAllowed: $roleAllowed');
+          debugPrint('[DeepLinkHandler] Final PIC roleAllowed: $roleAllowed (byId: $hasAreaById, byName: $hasAreaByName)');
         } catch (e) {
           debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
         }
@@ -197,7 +220,12 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     final areaName = taskMap['area']?.toString();
 
     debugPrint(
-      '[DeepLinkHandler] role validation => role: $role, authorId: $authorId, areaId: $areaId, areaName: $areaName',
+      '[DeepLinkHandler] Initial role validation => '
+      'role: $role, '
+      'authorId: $authorId, '
+      'areaId: $areaId, '
+      'areaName: $areaName, '
+      'currentUser.areaAccess: ${currentUser.areaAccess}',
     );
 
     if (role == UserRole.hseSupervisor || role == UserRole.petugasHse) {
@@ -205,8 +233,18 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     }
 
     if (role == UserRole.pic) {
+      // PERBAIKAN: currentUser.areaAccess mungkin kosong atau tidak terpopulate dengan benar
+      // Jadi kita return false agar trigger fallback logic ke areaByUserProvider
+      if (currentUser.areaAccess.isEmpty) {
+        debugPrint('[DeepLinkHandler] PIC areaAccess is empty, will use fallback to API');
+        return false;
+      }
+
       final hasAreaById = areaId != null && currentUser.areaAccess.contains(areaId);
       final hasAreaByName = areaName != null && currentUser.areaAccess.contains(areaName);
+
+      debugPrint('[DeepLinkHandler] PIC areaAccess check => byId: $hasAreaById, byName: $hasAreaByName');
+
       return hasAreaById || hasAreaByName;
     }
 
@@ -352,48 +390,42 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       '[DeepLinkHandler] grant access -> taskId: $taskId, sourceToken: ${widget.token}',
     );
 
-    // Navigate ke home dulu (sesuai role), baru ke task detail
-    // Ini memastikan back stack tersedia dengan benar
-    final user = ref.read(currentUserProvider);
-    if (user == null) {
-      _goOnce('/petugas/home');
-      return;
-    }
-
-    // Tentukan home route berdasarkan role
-    final homeRoute = switch (user.role) {
-      UserRole.petugasHse => '/petugas/home',
-      UserRole.hseSupervisor => '/supervisor/home',
-      UserRole.pic => '/pic/home',
-    };
-
-    // Navigate ke home dulu, baru push ke task detail
+    // PERBAIKAN: Langsung navigate ke task detail tanpa lewat home
+    // Ketika user tekan back dari task detail, GoRouter akan otomatis
+    // redirect ke home route yang sesuai dengan role user
     _hasNavigated = true;
-    debugPrint('[DeepLinkHandler] navigate -> $homeRoute -> task detail');
 
-    // Navigate ke home untuk establish shell navigation
-    context.go(homeRoute);
+    debugPrint('[DeepLinkHandler] Navigating directly to task detail: $taskId');
 
-    // Kemudian push task detail ke atas stack
-    Future.delayed(const Duration(milliseconds: 50), () {
-      if (mounted) {
+    try {
+      // Gunakan context.goNamed untuk replace current location dengan task detail
+      // Ini akan menghapus deep link handler dari stack
+      context.goNamed(
+        RouteNames.taskDetail,
+        pathParameters: {'id': taskId},
+        queryParameters: {'picToken': widget.token},
+      );
+      debugPrint('[DeepLinkHandler] Successfully navigated to task detail');
+
+      // Toast akan ditampilkan di task detail screen
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          AppToast.success(context, message: message);
+        }
+      });
+    } catch (e) {
+      debugPrint('[DeepLinkHandler] Error navigating to task detail: $e');
+      // Fallback: coba dengan pushNamed
+      try {
         context.pushNamed(
           RouteNames.taskDetail,
           pathParameters: {'id': taskId},
           queryParameters: {'picToken': widget.token},
         );
+      } catch (e2) {
+        debugPrint('[DeepLinkHandler] Fatal error: $e2');
       }
-    });
-
-    // Toast setelah navigasi
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) {
-        AppToast.success(
-          context,
-          message: message,
-        );
-      }
-    });
+    }
   }
 
   void _navigateToHome(String routeName, String message) {

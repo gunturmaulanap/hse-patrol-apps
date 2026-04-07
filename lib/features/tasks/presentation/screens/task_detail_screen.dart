@@ -14,6 +14,7 @@ import '../../../../core/widgets/shimmer/shimmers/task_detail_shimmer.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/utils/share_helper.dart';
 import '../../../../shared/enums/user_role.dart';
+import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../pic/presentation/providers/pic_follow_up_provider.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
@@ -21,14 +22,15 @@ import '../providers/task_provider.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   final String taskId;
-  final String? picToken; 
+  final String? picToken;
   const TaskDetailScreen({super.key, required this.taskId, this.picToken});
 
   @override
   ConsumerState<TaskDetailScreen> createState() => _TaskDetailScreenState();
 }
 
-class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with AutomaticKeepAliveClientMixin {
+class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _isSubmitting = false;
 
   @override
@@ -40,7 +42,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   }
 
   int? _getTaskId() {
-    if (_isPicToken) return null; 
+    if (_isPicToken) return null;
     return int.tryParse(widget.taskId);
   }
 
@@ -56,10 +58,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     final uri = Uri.tryParse(value);
     if (uri != null) {
       final segments = uri.pathSegments;
-      if (segments.length >= 2 && segments[0] == 'share' && segments[1] == 'report') {
+      if (segments.length >= 2 &&
+          segments[0] == 'share' &&
+          segments[1] == 'report') {
         return segments.last;
       }
-      if (segments.length >= 4 && segments[0] == 'api' && segments[1] == 'hse' && segments[2] == 'reports' && segments[3] == 'pic') {
+      if (segments.length >= 4 &&
+          segments[0] == 'api' &&
+          segments[1] == 'hse' &&
+          segments[2] == 'reports' &&
+          segments[3] == 'pic') {
         return segments.last;
       }
     }
@@ -72,7 +80,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   // Helper untuk menentukan status sebenarnya dari report (sama seperti di all tasks screen)
   String _getActualStatus(Map<String, dynamic> report) {
     final followUps = report['followUps'] as List<dynamic>? ??
-                      report['follow_ups'] as List<dynamic>? ?? [];
+        report['follow_ups'] as List<dynamic>? ??
+        [];
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
@@ -90,7 +99,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
 
   bool _canCancelTask(Map<String, dynamic> rpt, dynamic user) {
     if (user == null || rpt.isEmpty) return false;
-    
+
     final status = (rpt['status']?.toString() ?? '').toLowerCase();
     if (status != 'pending') return false;
 
@@ -102,8 +111,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   }
 
   int? _ownerId(Map<String, dynamic> rpt) {
-    final raw =
-        rpt['created_by'] ?? rpt['createdBy'] ?? rpt['user_id'] ?? rpt['userId'];
+    final raw = rpt['created_by'] ??
+        rpt['createdBy'] ??
+        rpt['user_id'] ??
+        rpt['userId'];
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '');
@@ -207,18 +218,21 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Text(
                             'Apakah Anda yakin ingin membatalkan laporan ini? Laporan yang dibatalkan tidak dapat dikembalikan.',
-                            style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
+                            style: AppTypography.body1
+                                .copyWith(color: AppColors.textSecondary),
                           ),
                         ),
                       Row(
                         children: [
                           Text(
                             isCancel ? 'Alasan Pembatalan' : 'Alasan Penolakan',
-                            style: AppTypography.body1.copyWith(fontWeight: FontWeight.w600),
+                            style: AppTypography.body1
+                                .copyWith(fontWeight: FontWeight.w600),
                           ),
                           const Text(
                             ' *',
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Colors.red, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -234,7 +248,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           filled: true,
                           fillColor: AppColors.background,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.medium),
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.medium),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -250,7 +265,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                               onPressed: () => Navigator.pop(ctx),
                               child: Text(
                                 'Kembali',
-                                style: AppTypography.body1.copyWith(color: AppColors.textSecondary),
+                                style: AppTypography.body1
+                                    .copyWith(color: AppColors.textSecondary),
                               ),
                             ),
                           ),
@@ -258,9 +274,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                           Expanded(
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isCancel ? Colors.redAccent : Colors.orangeAccent,
+                                backgroundColor: isCancel
+                                    ? Colors.redAccent
+                                    : Colors.orangeAccent,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.pill),
                                 ),
                               ),
                               onPressed: () {
@@ -297,24 +316,39 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
       );
 
       if (reason == null || reason!.trim().isEmpty) return;
-      
     } else if (action == 'Approved') {
       isConfirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
-          title: Text('Terima Perbaikan?', style: AppTypography.h3),
-          content: Text('Apakah Anda yakin tindak lanjut sudah sesuai standar?', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Batal', style: AppTypography.body1.copyWith(color: AppColors.textSecondary))),
-            ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill))),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text('Ya, Terima', style: AppTypography.body1.copyWith(color: AppColors.textInverted, fontWeight: FontWeight.bold))),
-          ],
-        ),
-      ) ?? false;
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.large)),
+              title: Text('Terima Perbaikan?', style: AppTypography.h3),
+              content: Text(
+                  'Apakah Anda yakin tindak lanjut sudah sesuai standar?',
+                  style: AppTypography.body1
+                      .copyWith(color: AppColors.textSecondary)),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text('Batal',
+                        style: AppTypography.body1
+                            .copyWith(color: AppColors.textSecondary))),
+                ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.pill))),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text('Ya, Terima',
+                        style: AppTypography.body1.copyWith(
+                            color: AppColors.textInverted,
+                            fontWeight: FontWeight.bold))),
+              ],
+            ),
+          ) ??
+          false;
       if (!isConfirm) return;
     }
 
@@ -325,7 +359,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     try {
       final followUps = rpt['followUps'] as List<dynamic>? ?? [];
 
-      if (followUps.isNotEmpty && (action == 'Approved' || action == 'Rejected')) {
+      if (followUps.isNotEmpty &&
+          (action == 'Approved' || action == 'Rejected')) {
         final latestFollowUp = followUps.last as Map<String, dynamic>;
         final followUpId = latestFollowUp['id'] as int?;
 
@@ -369,7 +404,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
 
       final toastMsg = action == 'Approved'
           ? 'Tugas Selesai!'
-          : (action == 'Rejected' ? 'Perbaikan ditolak!' : 'Laporan berhasil dibatalkan!');
+          : (action == 'Rejected'
+              ? 'Perbaikan ditolak!'
+              : 'Laporan berhasil dibatalkan!');
 
       if (action == 'Approved') {
         AppToast.success(context, message: toastMsg);
@@ -379,7 +416,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
         AppToast.success(context, message: toastMsg);
         context.pop();
       }
-      
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, message: 'Gagal memproses aksi: ${e.toString()}');
@@ -414,8 +450,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
-            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: AppColors.textPrimary, size: 20),
+            onPressed: () => _handleBackPressed(context, user),
           ),
           title: Text('Detail', style: AppTypography.h3),
         ),
@@ -434,11 +471,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: Colors.transparent, elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20), onPressed: () => context.pop()),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new,
+                  color: AppColors.textPrimary, size: 20),
+              onPressed: () => _handleBackPressed(context, user)),
           title: Text('Detail', style: AppTypography.h3),
         ),
-        body: Center(child: Text('Laporan tidak ditemukan.', style: AppTypography.body1)),
+        body: Center(
+            child:
+                Text('Laporan tidak ditemukan.', style: AppTypography.body1)),
       );
     }
 
@@ -457,8 +500,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     final latestFollowUpStatus = _latestFollowUpStatus(rpt);
 
     // Menunggu respon PIC jika follow-up terakhir di-reject dan status actual-nya "Pending Rejected"
-    final isWaitingPicResponse =
-        (isPetugas || isSupervisor) &&
+    final isWaitingPicResponse = (isPetugas || isSupervisor) &&
         isTaskOwner &&
         latestFollowUpStatus == 'rejected' &&
         rawStatusLower == 'pending rejected';
@@ -477,8 +519,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background, elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20), onPressed: () => context.pop()),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: AppColors.textPrimary, size: 20),
+            onPressed: () => _handleBackPressed(context, user)),
         title: Text('Task Detail', style: AppTypography.h3),
         centerTitle: true,
         actions: [
@@ -486,8 +532,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           IconButton(
             icon: const Icon(Icons.share, color: AppColors.primary),
             onPressed: () {
-              final resolvedPicToken =
-                  _normalizePicToken(widget.picToken) ??
+              final resolvedPicToken = _normalizePicToken(widget.picToken) ??
                   _normalizePicToken(rpt['picToken']?.toString());
 
               if (resolvedPicToken == null) {
@@ -534,27 +579,41 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Expanded(child: _buildInfoCard(PhosphorIcons.mapPin(), 'Lokasi', rpt['area']?.toString() ?? '-')),
+                      Expanded(
+                          child: _buildInfoCard(PhosphorIcons.mapPin(),
+                              'Lokasi', rpt['area']?.toString() ?? '-')),
                       const SizedBox(width: 16),
-                      Expanded(child: _buildInfoCard(PhosphorIcons.warningCircle(), 'Risiko', rpt['riskLevel']?.toString() ?? '-', iconColor: rpt['riskLevel']?.toString() == 'Kritis' ? Colors.redAccent : AppColors.primary)),
+                      Expanded(
+                          child: _buildInfoCard(PhosphorIcons.warningCircle(),
+                              'Risiko', rpt['riskLevel']?.toString() ?? '-',
+                              iconColor:
+                                  rpt['riskLevel']?.toString() == 'Kritis'
+                                      ? Colors.redAccent
+                                      : AppColors.primary)),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoCard(PhosphorIcons.clock(), 'Waktu Dilaporkan', _formatDate(rpt['date']?.toString())),
+                  _buildInfoCard(PhosphorIcons.clock(), 'Waktu Dilaporkan',
+                      _formatDate(rpt['date']?.toString())),
                   const SizedBox(height: 24),
-                  _buildSectionBox('Catatan Temuan', rpt['notes']?.toString() ?? '-', PhosphorIcons.notePencil()),
+                  _buildSectionBox(
+                      'Catatan Temuan',
+                      rpt['notes']?.toString() ?? '-',
+                      PhosphorIcons.notePencil()),
                   const SizedBox(height: 16),
-                  _buildSectionBox('Akar Masalah (Root Cause)', rpt['rootCause']?.toString() ?? '-', PhosphorIcons.treeStructure()),
+                  _buildSectionBox(
+                      'Akar Masalah (Root Cause)',
+                      rpt['rootCause']?.toString() ?? '-',
+                      PhosphorIcons.treeStructure()),
                   const SizedBox(height: 24),
-
                   if (_extractPhotoUrls(rpt['photos']).isNotEmpty) ...[
                     Text("Lampiran Bukti", style: AppTypography.h3),
                     const SizedBox(height: 12),
                     _buildPhotoGrid(_extractPhotoUrls(rpt['photos'])),
                   ],
-
                   const SizedBox(height: 32),
-                  if (rpt['followUps'] != null && (rpt['followUps'] as List).isNotEmpty) ...[
+                  if (rpt['followUps'] != null &&
+                      (rpt['followUps'] as List).isNotEmpty) ...[
                     Text("Riwayat Tindak Lanjut", style: AppTypography.h3),
                     const SizedBox(height: 16),
                     _buildLogTimeline(rpt['followUps'] as List<dynamic>),
@@ -562,16 +621,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                 ],
               ),
             ),
-            
+
             // ACTION BUTTON AREA
-            if (rawStatusLower != 'canceled') 
+            if (rawStatusLower != 'canceled')
               Positioned(
-                bottom: 0, left: 0, right: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))],
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -4))
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -584,20 +650,27 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.redAccent,
-                                side: const BorderSide(color: Colors.redAccent, width: 2),
+                                side: const BorderSide(
+                                    color: Colors.redAccent, width: 2),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.pill),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 24),
                               ),
-                              onPressed: _isSubmitting ? null : () => _handlePetugasReview(rpt, 'Canceled'),
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _handlePetugasReview(rpt, 'Canceled'),
                               child: _isSubmitting
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.5,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.redAccent),
                                       ),
                                     )
                                   : Text(
@@ -610,17 +683,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                             ),
                           ),
                         ),
-
-                      if (isPic && (rawStatusLower == 'pending' || rawStatusLower == 'pending rejected'))
+                      if (isPic &&
+                          (rawStatusLower == 'pending' ||
+                              rawStatusLower == 'pending rejected'))
                         AppButton(
                           text: 'Mulai Tindak Lanjut',
                           isLoading: _isSubmitting,
                           onPressed: () {
-                            ref.read(picFollowUpFormProvider.notifier).setReportId(widget.taskId);
+                            ref
+                                .read(picFollowUpFormProvider.notifier)
+                                .setReportId(widget.taskId);
                             context.pushNamed(RouteNames.picFollowUpPhotos);
                           },
                         )
-                      
                       else if (canReviewFollowUp)
                         Row(
                           children: [
@@ -629,7 +704,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                                 text: 'Tolak',
                                 type: AppButtonType.outlined,
                                 isLoading: _isSubmitting,
-                                onPressed: () => _handlePetugasReview(rpt, 'Rejected'),
+                                onPressed: () =>
+                                    _handlePetugasReview(rpt, 'Rejected'),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -637,12 +713,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                               child: AppButton(
                                 text: 'Terima',
                                 isLoading: _isSubmitting,
-                                onPressed: () => _handlePetugasReview(rpt, 'Approved'),
+                                onPressed: () =>
+                                    _handlePetugasReview(rpt, 'Approved'),
                               ),
                             ),
                           ],
                         )
-                        
                       else if (!canCancel)
                         AppButton(
                           text: isWaitingPicResponse
@@ -651,7 +727,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                                   ? 'Laporan Selesai'
                                   : 'Menunggu Respon'),
                           type: AppButtonType.outlined,
-                          onPressed: null, 
+                          onPressed: null,
                         ),
                     ],
                   ),
@@ -668,12 +744,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     final rawStatus = status.toLowerCase();
 
     switch (rawStatus) {
-      case 'pending': bgColor = const Color(0xFFD4D8FF); break;
-      case 'follow up done': bgColor = const Color(0xFFFAFF9F); break;
-      case 'pending rejected': bgColor = const Color(0xFFFFCDD2); break; // Merah muda untuk rejected
-      case 'completed': bgColor = const Color(0xFFC1F0D0); break;
-      case 'canceled': bgColor = const Color(0xFF1E1E1E); break;
-      default: bgColor = const Color(0xFFFFFFFF);
+      case 'pending':
+        bgColor = const Color(0xFFD4D8FF);
+        break;
+      case 'follow up done':
+        bgColor = const Color(0xFFFAFF9F);
+        break;
+      case 'pending rejected':
+        bgColor = const Color(0xFFFFCDD2);
+        break; // Merah muda untuk rejected
+      case 'completed':
+        bgColor = const Color(0xFFC1F0D0);
+        break;
+      case 'canceled':
+        bgColor = const Color(0xFF1E1E1E);
+        break;
+      default:
+        bgColor = const Color(0xFFFFFFFF);
     }
 
     final bool isDark = rawStatus == 'canceled';
@@ -693,7 +780,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.2)
@@ -701,29 +789,38 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
-                  rawStatus == 'canceled' ? 'DIBATALKAN' :
-                  rawStatus == 'pending rejected' ? 'PENDING REJECTED' :
-                  status.toUpperCase(),
-                  style: AppTypography.caption.copyWith(color: textColor, fontWeight: FontWeight.bold),
+                  rawStatus == 'canceled'
+                      ? 'DIBATALKAN'
+                      : rawStatus == 'pending rejected'
+                          ? 'PENDING REJECTED'
+                          : status.toUpperCase(),
+                  style: AppTypography.caption
+                      .copyWith(color: textColor, fontWeight: FontWeight.bold),
                 ),
               ),
               PhosphorIcon(
-                rawStatus == 'canceled' ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill) : PhosphorIcons.shieldCheck(PhosphorIconsStyle.fill), 
-                color: textColor, 
-                size: 32
-              ),
+                  rawStatus == 'canceled'
+                      ? PhosphorIcons.xCircle(PhosphorIconsStyle.fill)
+                      : PhosphorIcons.shieldCheck(PhosphorIconsStyle.fill),
+                  color: textColor,
+                  size: 32),
             ],
           ),
           const SizedBox(height: 24),
-          Text(rpt['title']?.toString() ?? 'Inspeksi Rutin', style: AppTypography.h2.copyWith(color: textColor, height: 1.2)),
+          Text(rpt['title']?.toString() ?? 'Inspeksi Rutin',
+              style: AppTypography.h2.copyWith(color: textColor, height: 1.2)),
           const SizedBox(height: 12),
-          Text('Dilaporkan oleh: ${rpt['staffName']?.toString() ?? 'HSE Officer'}', style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.7))),
+          Text(
+              'Dilaporkan oleh: ${rpt['staffName']?.toString() ?? 'HSE Officer'}',
+              style: AppTypography.body1
+                  .copyWith(color: textColor.withValues(alpha: 0.7))),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard(IconData icon, String title, String value, {Color? iconColor}) {
+  Widget _buildInfoCard(IconData icon, String title, String value,
+      {Color? iconColor}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -736,13 +833,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+                color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
+                shape: BoxShape.circle),
             child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
           ),
           const SizedBox(height: 12),
-          Text(title, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+          Text(title,
+              style: AppTypography.caption
+                  .copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
-          Text(value, style: AppTypography.body1.copyWith(fontWeight: FontWeight.bold)),
+          Text(value,
+              style: AppTypography.body1.copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -751,7 +853,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
   Widget _buildSectionBox(String title, String content, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -759,7 +864,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
             children: [
               Icon(icon, size: 20, color: AppColors.textSecondary),
               const SizedBox(width: 8),
-              Text(title, style: AppTypography.body1.copyWith(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+              Text(title,
+                  style: AppTypography.body1.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary)),
             ],
           ),
           const SizedBox(height: 12),
@@ -773,7 +881,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3, crossAxisSpacing: 12, mainAxisSpacing: 12),
       itemCount: paths.length,
       itemBuilder: (context, index) {
         final url = paths[index];
@@ -782,8 +891,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
           child: InkWell(
             onTap: () => _showImagePreview(url),
             child: url.startsWith('http')
-                ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.broken_image, color: Colors.grey)))
-                : Image.file(File(url), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.broken_image, color: Colors.grey))),
+                ? Image.network(url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child:
+                            const Icon(Icons.broken_image, color: Colors.grey)))
+                : Image.file(File(url),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.broken_image,
+                            color: Colors.grey))),
           ),
         );
       },
@@ -863,7 +982,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                     border: Border.all(color: Colors.white, width: 3),
                   ),
                 ),
-                if (!isLast) Container(width: 2, height: 72, color: AppColors.border),
+                if (!isLast)
+                  Container(width: 2, height: 72, color: AppColors.border),
               ],
             ),
             const SizedBox(width: 16),
@@ -881,52 +1001,80 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _formatDate(log['date']?.toString()),
-                        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                        _formatDate(
+                          log['date']?.toString() ??
+                              log['created_at']?.toString() ??
+                              log['updated_at']?.toString(),
+                        ),
+                        style: AppTypography.caption
+                            .copyWith(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            isPicLog ? 'Respon PIC' : 'Review Petugas',
-                            style: AppTypography.body1.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: dotColor,
-                            ),
+                      Text(
+                        isPicLog ? 'Respon PIC' : 'Review Petugas',
+                        style: AppTypography.body1.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: dotColor,
+                        ),
+                      ),
+                      // Nama user di baris terpisah untuk menghindari overflow
+                      if (picName != null && picName.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: (isPicLog ? AppColors.primary : dotColor)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          if (isPicLog && picName != null && picName.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isPicLog
+                                    ? PhosphorIcons.user(
+                                        PhosphorIconsStyle.fill)
+                                    : PhosphorIcons.shieldCheck(
+                                        PhosphorIconsStyle.fill),
+                                size: 12,
+                                color: isPicLog ? AppColors.primary : dotColor,
                               ),
-                              child: Text(
-                                picName,
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  picName,
+                                  style: AppTypography.caption.copyWith(
+                                    color:
+                                        isPicLog ? AppColors.primary : dotColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (action != null && action.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Status: ${action.toUpperCase()}',
-                          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                          style: AppTypography.caption
+                              .copyWith(color: AppColors.textSecondary),
                         ),
                       ],
-                      if (log['notes'] != null && log['notes'].toString().isNotEmpty) ...[
+                      if (log['notes'] != null &&
+                          log['notes'].toString().isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Text(log['notes'].toString(), style: AppTypography.caption),
+                        Text(log['notes'].toString(),
+                            style: AppTypography.caption),
                       ],
                       if (_extractPhotoUrls(log['photos']).isNotEmpty) ...[
                         const SizedBox(height: 12),
-                        _buildPhotoGrid(_extractPhotoUrls(log['photos']), height: 60),
+                        _buildPhotoGrid(_extractPhotoUrls(log['photos']),
+                            height: 60),
                       ],
                     ],
                   ),
@@ -972,5 +1120,22 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> with Automa
     }
 
     return <String>[];
+  }
+
+  void _handleBackPressed(BuildContext context, UserModel? user) {
+    // Coba pop dulu untuk normal flow (masuk dari list screen)
+    if (Navigator.of(context).canPop()) {
+      context.pop();
+    } else {
+      // Jika tidak bisa pop (akses via deeplink), redirect ke home sesuai role
+      final homeRoute = switch (user?.role) {
+        UserRole.petugasHse => '/petugas/home',
+        UserRole.hseSupervisor => '/supervisor/home',
+        UserRole.pic => '/pic/home',
+        _ => '/petugas/home',
+      };
+      debugPrint('[TaskDetailScreen] Cannot pop, redirecting to home: $homeRoute');
+      context.go(homeRoute);
+    }
   }
 }
