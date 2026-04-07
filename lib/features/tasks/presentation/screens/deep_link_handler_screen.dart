@@ -8,6 +8,7 @@ import '../../../../shared/enums/user_role.dart';
 import '../providers/task_provider.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../areas/presentation/providers/area_provider.dart';
 
 /// DeepLinkHandlerScreen
 ///
@@ -92,33 +93,64 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         return;
       }
 
-      // 2. Cari task berdasarkan picToken dari list task yang sudah di-fetch
-      // Karena endpoint /hse-reports/pic/:picToken mungkin belum ada di backend
-      debugPrint('[DeepLinkHandler] attempt to resolve task from existing app data for token: ${widget.token}');
+      // 2. Resolve task detail via Endpoint Backend (2-step API request)
+      debugPrint('[DeepLinkHandler] attempt to resolve task from Backend API for token: ${widget.token}');
       
-      final allTaskMaps = await ref.read(petugasTaskMapsProvider.future);
       Map<String, dynamic>? foundTask;
+      try {
+        foundTask = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
+      } catch (e) {
+        debugPrint('[DeepLinkHandler] failed to fetch from backend: $e');
+        final errorMsg = e.toString().toLowerCase();
 
-      for (final task in allTaskMaps) {
-        if (task['picToken']?.toString() == widget.token) {
-          foundTask = task;
-          break;
+        if (errorMsg.contains('403') || errorMsg.contains('forbidden')) {
+          _navigateBasedOnRoleWithCustomMessage(
+            currentUser.role,
+            'Laporan valid, namun di luar tanggung jawab area Anda.',
+          );
+          return;
+        }
+
+        if (errorMsg.contains('404') || errorMsg.contains('not found')) {
+          _navigateBasedOnRoleWithCustomMessage(
+            currentUser.role,
+            'Laporan tidak ditemukan, sudah dihapus, atau token kedaluwarsa.',
+          );
+          return;
         }
       }
 
       if (foundTask == null) {
         _navigateBasedOnRoleWithCustomMessage(
           currentUser.role,
-          'Token laporan tidak ditemukan atau sudah kedaluwarsa.',
+          'Gagal membuka laporan. Laporan mungkin tidak valid atau koneksi bermasalah.',
         );
         return;
       }
 
       // 3. Validasi Role & Area Akses
-      final roleAllowed = _isRoleAllowedForTask(currentUser, foundTask);
+      bool roleAllowed = _isRoleAllowedForTask(currentUser, foundTask);
+      
+      // Jika PIC ditolak oleh currentUser, coba verifikasi dengan menarik data area nya langsung.
+      if (!roleAllowed && currentUser.role == UserRole.pic) {
+        try {
+          final picAreas = await ref.read(areaByUserProvider.future);
+          final areaId = foundTask['areaId']?.toString();
+          final areaName = foundTask['area']?.toString();
+          
+          final hasAreaById = areaId != null && picAreas.any((a) => a.id.toString() == areaId);
+          final hasAreaByName = areaName != null && picAreas.any((a) => a.name == areaName);
+          
+          roleAllowed = hasAreaById || hasAreaByName;
+          debugPrint('[DeepLinkHandler] Fetching picAreas (${picAreas.length}) via provider => fallback PIC roleAllowed: $roleAllowed');
+        } catch (e) {
+          debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
+        }
+      }
+
       final taskId = foundTask['id']?.toString() ?? '';
       
-      debugPrint('[DeepLinkHandler] Task found => taskId: $taskId, roleAllowed: $roleAllowed');
+      debugPrint('[DeepLinkHandler] Task found => taskId: $taskId, final roleAllowed: $roleAllowed');
 
       if (!roleAllowed) {
         _navigateBasedOnRoleWithCustomMessage(
@@ -168,13 +200,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       '[DeepLinkHandler] role validation => role: $role, authorId: $authorId, areaId: $areaId, areaName: $areaName',
     );
 
-    if (role == UserRole.hseSupervisor) {
+    if (role == UserRole.hseSupervisor || role == UserRole.petugasHse) {
       return true;
-    }
-
-    if (role == UserRole.petugasHse) {
-      final currentUserId = _toInt(currentUser.id);
-      return authorId != null && currentUserId != null && authorId == currentUserId;
     }
 
     if (role == UserRole.pic) {
@@ -279,14 +306,17 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
   void _navigateToRelevantList(UserRole role, String message) {
     if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
 
-    final route = switch (role) {
-      UserRole.petugasHse => RouteNames.petugasAllTasks,
-      UserRole.hseSupervisor => RouteNames.supervisorAllTasks,
-      UserRole.pic => RouteNames.picTasks,
+    // Navigate ke home dulu untuk establish shell
+    final homeRoute = switch (role) {
+      UserRole.petugasHse => '/petugas/home',
+      UserRole.hseSupervisor => '/supervisor/home',
+      UserRole.pic => '/pic/home',
     };
 
-    _goOnceNamed(route);
+    debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
+    context.go(homeRoute);
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
@@ -297,18 +327,16 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
   void _navigateBasedOnRoleWithCustomMessage(UserRole role, String message) {
     if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
 
-    switch (role) {
-      case UserRole.petugasHse:
-        _goOnce('/petugas/home');
-        break;
-      case UserRole.hseSupervisor:
-        _goOnce('/supervisor/home');
-        break;
-      case UserRole.pic:
-        _goOnce('/pic/home');
-        break;
-    }
+    final homeRoute = switch (role) {
+      UserRole.petugasHse => '/petugas/home',
+      UserRole.hseSupervisor => '/supervisor/home',
+      UserRole.pic => '/pic/home',
+    };
+
+    debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
+    context.go(homeRoute);
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
@@ -324,15 +352,41 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       '[DeepLinkHandler] grant access -> taskId: $taskId, sourceToken: ${widget.token}',
     );
 
-    // Navigate dulu, baru toast
-    _goOnceNamed(
-      RouteNames.taskDetail,
-      pathParameters: {'id': taskId},
-      queryParameters: {'picToken': widget.token},
-    );
+    // Navigate ke home dulu (sesuai role), baru ke task detail
+    // Ini memastikan back stack tersedia dengan benar
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      _goOnce('/petugas/home');
+      return;
+    }
 
-    // Toast setelah navigasi untuk hindari context dispose error
-    Future.delayed(const Duration(milliseconds: 100), () {
+    // Tentukan home route berdasarkan role
+    final homeRoute = switch (user.role) {
+      UserRole.petugasHse => '/petugas/home',
+      UserRole.hseSupervisor => '/supervisor/home',
+      UserRole.pic => '/pic/home',
+    };
+
+    // Navigate ke home dulu, baru push ke task detail
+    _hasNavigated = true;
+    debugPrint('[DeepLinkHandler] navigate -> $homeRoute -> task detail');
+
+    // Navigate ke home untuk establish shell navigation
+    context.go(homeRoute);
+
+    // Kemudian push task detail ke atas stack
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        context.pushNamed(
+          RouteNames.taskDetail,
+          pathParameters: {'id': taskId},
+          queryParameters: {'picToken': widget.token},
+        );
+      }
+    });
+
+    // Toast setelah navigasi
+    Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) {
         AppToast.success(
           context,
@@ -344,9 +398,10 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
   void _navigateToHome(String routeName, String message) {
     if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
 
-    // Navigate dulu, baru toast
-    _goOnceNamed(routeName);
+    debugPrint('[DeepLinkHandler] navigate to home -> $routeName');
+    context.go(routeName);
 
     // Toast setelah navigasi
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -361,6 +416,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
   void _navigateBasedOnRoleWithError(UserRole role, bool isNotFoundError) {
     if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
 
     final String errorMessage;
     if (isNotFoundError) {
@@ -369,18 +425,14 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       errorMessage = 'Gagal memuat detail laporan. Pastikan link masih valid.';
     }
 
-    // Navigate dulu
-    switch (role) {
-      case UserRole.petugasHse:
-        _goOnce('/petugas/home');
-        break;
-      case UserRole.hseSupervisor:
-        _goOnce('/supervisor/home');
-        break;
-      case UserRole.pic:
-        _goOnce('/pic/home');
-        break;
-    }
+    final homeRoute = switch (role) {
+      UserRole.petugasHse => '/petugas/home',
+      UserRole.hseSupervisor => '/supervisor/home',
+      UserRole.pic => '/pic/home',
+    };
+
+    debugPrint('[DeepLinkHandler] navigate to home with error -> $homeRoute');
+    context.go(homeRoute);
 
     // Toast setelah navigasi
     Future.delayed(const Duration(milliseconds: 100), () {

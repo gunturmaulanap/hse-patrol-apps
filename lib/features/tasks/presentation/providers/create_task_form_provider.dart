@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/models/create_hse_task_request.dart';
+import '../../data/models/hse_task_model.dart';
 import 'task_provider.dart';
 
 class CreateTaskDraft {
@@ -11,7 +14,7 @@ class CreateTaskDraft {
   final List<String> photos;
   final String? notes;
   final String? rootCause;
-  final int? areaId; 
+  final int? areaId;
 
   CreateTaskDraft({
     this.buildingType,
@@ -75,8 +78,8 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
 
   void reset() => state = CreateTaskDraft();
 
-  // PERBAIKAN: Mengubah tipe return dari Future<bool> menjadi Future<dynamic>
-  Future<dynamic> submitTask() async {
+  // PERBAIKAN: Mengubah tipe return dari Future<bool> menjadi Future<HseTaskModel?>
+  Future<HseTaskModel?> submitTask() async {
     try {
       final taskRepo = ref.read(taskRepositoryProvider);
 
@@ -96,28 +99,53 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
 
       final photoFiles = state.photos.map((path) => File(path)).toList();
 
-      // PERBAIKAN: Simpan hasil response backend ke dalam variabel
-      final createdTask = await taskRepo.createTask(request, photoFiles.isNotEmpty ? photoFiles : null);
+      // PERBAIKAN: Tangani exception dengan lebih baik
+      try {
+        // Simpan hasil response backend ke dalam variabel
+        final createdTask = await taskRepo.createTask(request, photoFiles.isNotEmpty ? photoFiles : null);
 
-      // Invalidate cache list agar data terbaru langsung muncul
-      ref.invalidate(tasksFutureProvider);
-      ref.invalidate(petugasTaskMapsProvider);
-      ref.invalidate(supervisorOwnTaskMapsProvider);
-      ref.invalidate(supervisorStaffTaskMapsProvider);
-      ref.invalidate(supervisorAllVisibleTaskMapsProvider);
-      ref.invalidate(supervisorStaffNamesProvider);
+        // Invalidate cache list agar data terbaru langsung muncul
+        ref.invalidate(tasksFutureProvider);
+        ref.invalidate(petugasTaskMapsProvider);
+        ref.invalidate(supervisorOwnTaskMapsProvider);
+        ref.invalidate(supervisorStaffTaskMapsProvider);
+        ref.invalidate(supervisorAllVisibleTaskMapsProvider);
+        ref.invalidate(supervisorStaffNamesProvider);
 
-      // Reset form draft
-      reset();
-      debugPrint('✅ [CreateTaskFormNotifier] Form reset after successful submit');
+        // Reset form draft
+        reset();
+        debugPrint('✅ [CreateTaskFormNotifier] Form reset after successful submit');
 
-      // PERBAIKAN: Kembalikan data task (HseTaskModel) ke UI
-      return createdTask;
-      
+        // PERBAIKAN: Kembalikan data task (HseTaskModel) ke UI
+        return createdTask;
+
+      } on DioException catch (e) {
+        // Tangani DioException secara terpisah untuk error message yang lebih jelas
+        debugPrint('❌ [CreateTaskFormNotifier] DioException: ${e.message}');
+        debugPrint('❌ [CreateTaskFormNotifier] Response: ${e.response?.data}');
+
+        // Extract error message dari response
+        String errorMessage = 'Gagal membuat laporan';
+        try {
+          if (e.response?.data is Map) {
+            final data = e.response?.data as Map<String, dynamic>;
+            if (data['message'] != null) {
+              errorMessage = data['message'].toString();
+            } else if (data['error'] != null) {
+              errorMessage = data['error'].toString();
+            }
+          }
+        } catch (_) {
+          errorMessage = 'Gagal membuat laporan: ${e.message ?? "Unknown error"}';
+        }
+
+        // Re-throw sebagai generic Exception agar bisa ditangkap UI
+        throw Exception(errorMessage);
+      }
     } catch (e) {
       debugPrint('❌ [CreateTaskFormNotifier] submitTask error: $e');
       // RETHROW: Supaya ditangkap oleh Try-Catch di Review Screen UI
-      rethrow; 
+      rethrow;
     }
   }
 }

@@ -10,7 +10,7 @@ class AppEnv {
 
   // API Configuration
   static const int maxPaginationPages = 10; // Prevent infinite pagination
-  static const int defaultPaginationPageSize = 50;
+  static const int defaultPaginationPageSize = 100; // Backend limit: max 100 per page
   static const int maxPhotosPerTask = 3;
 
   // Security

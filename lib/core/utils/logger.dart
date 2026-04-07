@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../error/app_exception.dart';
-
-import '../app/env/app_env.dart';
+import '../../app/env/app_env.dart';
 
 /// Application logger with configurable log levels
 class AppLogger {
@@ -100,6 +99,18 @@ class AppLogger {
       if (body != null) {
         debugPrint('Body: ${_sanitize(body)}');
       }
+    }
+  }
+
+  /// Log API request with dynamic body (for FormData)
+  void apiRequestWithData(String method, String endpoint,
+      {Map<String, dynamic>? queryParams, dynamic body}) {
+    if (AppEnv.enableLogging) {
+      debugPrint('🌐 [$method] $endpoint');
+      if (queryParams != null) {
+        debugPrint('Query: $queryParams');
+      }
+      debugPrint('Body: $body');
     }
   }
 
