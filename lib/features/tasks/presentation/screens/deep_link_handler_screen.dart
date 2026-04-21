@@ -6,6 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../providers/task_provider.dart';
+import '../../data/models/hse_task_model.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
@@ -28,7 +29,6 @@ class DeepLinkHandlerScreen extends ConsumerStatefulWidget {
 }
 
 class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
-  static bool _globalProcessing = false;
   bool _isProcessing = false;
   bool _hasNavigated = false;
 
@@ -42,9 +42,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
   }
 
   Future<void> _processDeepLink() async {
-    if (_isProcessing || _globalProcessing) return;
+    if (_isProcessing) return;
     _isProcessing = true;
-    _globalProcessing = true;
 
     try {
       debugPrint('[DeepLinkHandler] incoming token: ${widget.token}');
@@ -83,125 +82,92 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         debugPrint('[DeepLinkHandler] user belum login, redirect ke: $loginPath');
         if (mounted) {
           _goOnce(loginPath);
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (mounted) {
-              AppToast.info(
-                context,
-                message: 'Silakan login terlebih dahulu untuk membuka laporan.',
-              );
-            }
+          _showToastAfterNavigation(() {
+            AppToast.info(
+              context,
+              message: 'Silakan login terlebih dahulu untuk membuka laporan.',
+            );
           });
         }
         return;
       }
 
-      // 2. Resolve task detail via Endpoint Backend (2-step API request)
-      debugPrint('[DeepLinkHandler] attempt to resolve task from Backend API for token: ${widget.token}');
+      // 2. Resolve task detail via Endpoint Backend
+      // Cek apakah token adalah ID numerik atau picToken string
+      final reportId = int.tryParse(widget.token);
+
+      debugPrint('[DeepLinkHandler] attempt to resolve task from Backend API for token: ${widget.token} (isNumeric: ${reportId != null})');
 
       Map<String, dynamic>? foundTask;
-      Map<String, dynamic>? validationSnapshot;
+      bool fetchLooksUnauthorized = false;
+      bool fetchLooksNotFound = false;
+
       try {
-        foundTask = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
+        if (reportId != null) {
+          // Jika numeric, gunakan getTaskById (endpoint yang sudah ada)
+          debugPrint('[DeepLinkHandler] Using report ID: $reportId');
+          final repository = ref.read(taskRepositoryProvider);
+          final taskModel = await repository.getTaskById(reportId);
+
+          // Convert ke UI map format
+          final areaNameById = await _buildAreaNameByIdMap(ref);
+          foundTask = _toUiTaskMap(taskModel, areaNameById: areaNameById);
+        } else {
+          // Jika string, gunakan picToken (fallback)
+          debugPrint('[DeepLinkHandler] Using picToken: ${widget.token}');
+          foundTask = await ref.read(taskDetailByPicTokenProvider(widget.token).future);
+        }
+
         debugPrint('[DeepLinkHandler] Task fetched successfully => ${foundTask != null ? 'ID: ${foundTask['id']}, Area: ${foundTask['area']}, AreaId: ${foundTask['areaId']}' : 'null'}');
       } catch (e) {
         debugPrint('[DeepLinkHandler] failed to fetch from backend: $e');
         final errorMsg = e.toString().toLowerCase();
 
-        // Fallback kritis: validasi token + ambil task id minimal dari endpoint validasi
-        // Berguna saat endpoint detail by token mengembalikan format non-standar.
-        try {
-          final validation = await ref.read(picTokenValidationProvider(widget.token).future);
-          validationSnapshot = validation;
-          final tokenValid = validation['tokenValid'] == true;
-          final fallbackTaskId = validation['taskId'] ?? validation['reportId'] ?? validation['id'];
+        fetchLooksUnauthorized =
+            errorMsg.contains('403') ||
+            errorMsg.contains('forbidden') ||
+            errorMsg.contains('unauthorized') ||
+            errorMsg.contains('not authorized') ||
+            errorMsg.contains('tidak memiliki akses') ||
+            errorMsg.contains('access denied');
 
-          if (tokenValid && fallbackTaskId != null) {
-            foundTask = <String, dynamic>{
-              'id': fallbackTaskId.toString(),
-              'taskId': fallbackTaskId,
-              'areaId': validation['areaId'],
-              'authorId': validation['authorId'],
-              'area': validation['area'] ?? '',
-            };
-            debugPrint('[DeepLinkHandler] fallback validation success => taskId: ${foundTask['id']}');
-          }
-        } catch (fallbackError) {
-          debugPrint('[DeepLinkHandler] fallback validation failed: $fallbackError');
-        }
+        fetchLooksNotFound =
+            errorMsg.contains('404') || errorMsg.contains('not found');
 
-        if (foundTask != null) {
-          debugPrint('[DeepLinkHandler] continue with fallback resolved task');
-          // lanjut ke alur normal setelah blok catch
-        } else {
+        debugPrint(
+          '[DeepLinkHandler] fetch classification => unauthorized: $fetchLooksUnauthorized, notFound: $fetchLooksNotFound',
+        );
 
-        // PERBAIKAN: Handle 401 Unauthorized (token expired)
-        if (errorMsg.contains('401') || errorMsg.contains('unauthorized') || errorMsg.contains('tidak memiliki akses')) {
-          debugPrint('[DeepLinkHandler] Token expired or unauthorized, redirecting to login');
-          if (mounted) {
-            final intendedPath = '/share/report/${widget.token}';
-            final encodedRedirect = Uri.encodeComponent(intendedPath);
-            final loginPath = '/login?redirect=$encodedRedirect';
-
-            context.go(loginPath);
-
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) {
-                AppToast.error(
-                  context,
-                  message: 'Sesi Anda telah berakhir. Silakan login kembali untuk membuka laporan.',
-                );
-              }
-            });
-          }
+        if (fetchLooksUnauthorized) {
+          _navigateBasedOnRoleWithCustomMessage(
+            currentUser.role,
+            'Laporan valid, namun di luar tanggung jawab area Anda.',
+          );
           return;
         }
 
-          if (errorMsg.contains('403') || errorMsg.contains('forbidden')) {
-            _navigateBasedOnRoleWithCustomMessage(
-              currentUser.role,
-              'Laporan valid, namun di luar tanggung jawab area Anda.',
-            );
-            return;
-          }
-
-          if (errorMsg.contains('404') || errorMsg.contains('not found')) {
-            _navigateBasedOnRoleWithCustomMessage(
-              currentUser.role,
-              'Laporan tidak ditemukan, sudah dihapus, atau token kedaluwarsa.',
-            );
-            return;
-          }
+        if (fetchLooksNotFound) {
+          _navigateBasedOnRoleWithCustomMessage(
+            currentUser.role,
+            'Laporan tidak ditemukan, sudah dihapus, atau link tidak valid.',
+          );
+          return;
         }
       }
 
       if (foundTask == null) {
-        // Fallback lanjutan untuk supervisor/petugas:
-        // jika token valid tetapi detail endpoint belum sinkron, gunakan cache daftar task
-        // untuk resolve task id lalu langsung buka detail.
-        if (currentUser.role == UserRole.hseSupervisor ||
-            currentUser.role == UserRole.petugasHse) {
-          try {
-            final taskIdFromFallback = await _resolveTaskIdFromExistingData(
-              currentUser,
-              validationSnapshot ?? <String, dynamic>{},
-              foundTask,
-            );
+        final isPicAreaAccessCase =
+            currentUser.role == UserRole.pic && fetchLooksUnauthorized;
 
-            if (taskIdFromFallback != null && taskIdFromFallback.isNotEmpty) {
-              _navigateToTaskDetail(
-                taskIdFromFallback,
-                'Laporan ditemukan melalui fallback data lokal.',
-              );
-              return;
-            }
-          } catch (fallbackError) {
-            debugPrint('[DeepLinkHandler] resolve fallback task id failed: $fallbackError');
-          }
-        }
+        debugPrint(
+          '[DeepLinkHandler] foundTask null => role: ${currentUser.role}, isPicAreaAccessCase: $isPicAreaAccessCase',
+        );
 
         _navigateBasedOnRoleWithCustomMessage(
           currentUser.role,
-          'Gagal membuka laporan. Laporan mungkin tidak valid atau koneksi bermasalah.',
+          isPicAreaAccessCase
+              ? 'Laporan valid, namun di luar tanggung jawab area Anda.'
+              : 'Gagal membuka laporan. Laporan mungkin tidak valid atau koneksi bermasalah.',
         );
         return;
       }
@@ -245,29 +211,6 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
           debugPrint('[DeepLinkHandler] Final PIC roleAllowed: $roleAllowed (byId: $hasAreaById, byName: $hasAreaByName)');
         } catch (e) {
           debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
-          final errorMsg = e.toString().toLowerCase();
-
-          // PERBAIKAN: Handle 401 Unauthorized (token expired)
-          if (errorMsg.contains('401') || errorMsg.contains('unauthorized') || errorMsg.contains('tidak memiliki akses')) {
-            debugPrint('[DeepLinkHandler] Token expired while fetching PIC areas, redirecting to login');
-            if (mounted) {
-              final intendedPath = '/share/report/${widget.token}';
-              final encodedRedirect = Uri.encodeComponent(intendedPath);
-              final loginPath = '/login?redirect=$encodedRedirect';
-
-              context.go(loginPath);
-
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if (mounted) {
-                  AppToast.error(
-                    context,
-                    message: 'Sesi Anda telah berakhir. Silakan login kembali.',
-                  );
-                }
-              });
-            }
-            return;
-          }
         }
       }
 
@@ -276,10 +219,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       debugPrint('[DeepLinkHandler] Task found => taskId: $taskId, final roleAllowed: $roleAllowed');
 
       if (!roleAllowed) {
-        _navigateBasedOnRoleWithCustomMessage(
-          currentUser.role,
-          'Laporan valid, namun Anda tidak memiliki akses untuk task ini.',
-        );
+        final denyMessage = 'Laporan valid, namun Anda tidak memiliki akses untuk task ini.';
+        _navigateBasedOnRoleWithCustomMessage(currentUser.role, denyMessage);
         return;
       }
 
@@ -304,7 +245,6 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       }
     } finally {
       _isProcessing = false;
-      _globalProcessing = false;
     }
   }
 
@@ -329,7 +269,13 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       'currentUser.areaAccess: ${currentUser.areaAccess}',
     );
 
-    if (role == UserRole.hseSupervisor || role == UserRole.petugasHse) {
+    if (role == UserRole.hseSupervisor) {
+      debugPrint('[DeepLinkHandler] access granted: supervisor can access all task details');
+      return true;
+    }
+
+    if (role == UserRole.petugasHse) {
+      debugPrint('[DeepLinkHandler] access granted: petugas can access task detail for monitoring');
       return true;
     }
 
@@ -457,10 +403,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
     context.go(homeRoute);
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        AppToast.info(context, message: message);
-      }
+    _showToastAfterNavigation(() {
+      AppToast.info(context, message: message);
     });
   }
 
@@ -477,10 +421,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
     context.go(homeRoute);
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        AppToast.error(context, message: message);
-      }
+    _showToastAfterNavigation(() {
+      AppToast.error(context, message: message);
     });
   }
 
@@ -499,20 +441,20 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     debugPrint('[DeepLinkHandler] Navigating directly to task detail: $taskId');
 
     try {
-      // Gunakan context.goNamed untuk replace current location dengan task detail
-      // Ini akan menghapus deep link handler dari stack
-      context.goNamed(
-        RouteNames.taskDetail,
-        pathParameters: {'id': taskId},
-        queryParameters: {'picToken': widget.token},
-      );
-      debugPrint('[DeepLinkHandler] Successfully navigated to task detail');
+      // Gunakan context.goNamed untuk replace current location dengan task detail.
+      // Pakai post frame callback agar sinkron terhadap lifecycle frame aktif.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
 
-      // Toast akan ditampilkan di task detail screen
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
+        context.goNamed(
+          RouteNames.taskDetail,
+          pathParameters: {'id': taskId},
+        );
+        debugPrint('[DeepLinkHandler] Successfully navigated to task detail');
+
+        _showToastAfterNavigation(() {
           AppToast.success(context, message: message);
-        }
+        });
       });
     } catch (e) {
       debugPrint('[DeepLinkHandler] Error navigating to task detail: $e');
@@ -521,7 +463,6 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         context.pushNamed(
           RouteNames.taskDetail,
           pathParameters: {'id': taskId},
-          queryParameters: {'picToken': widget.token},
         );
       } catch (e2) {
         debugPrint('[DeepLinkHandler] Fatal error: $e2');
@@ -536,14 +477,11 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     debugPrint('[DeepLinkHandler] navigate to home -> $routeName');
     context.go(routeName);
 
-    // Toast setelah navigasi
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        AppToast.error(
-          context,
-          message: message,
-        );
-      }
+    _showToastAfterNavigation(() {
+      AppToast.error(
+        context,
+        message: message,
+      );
     });
   }
 
@@ -567,14 +505,18 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     debugPrint('[DeepLinkHandler] navigate to home with error -> $homeRoute');
     context.go(homeRoute);
 
-    // Toast setelah navigasi
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        AppToast.error(
-          context,
-          message: errorMessage,
-        );
-      }
+    _showToastAfterNavigation(() {
+      AppToast.error(
+        context,
+        message: errorMessage,
+      );
+    });
+  }
+
+  void _showToastAfterNavigation(VoidCallback action) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      action();
     });
   }
 
@@ -618,6 +560,53 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       return UserRole.pic;
     }
     return UserRole.petugasHse;
+  }
+
+  Future<Map<int, String>> _buildAreaNameByIdMap(WidgetRef ref) async {
+    try {
+      debugPrint('[DeepLinkHandler] _buildAreaNameByIdMap ref runtimeType: ${ref.runtimeType}');
+      final areas = await ref.read(areaRepositoryProvider).getAreas();
+      debugPrint('[DeepLinkHandler] _buildAreaNameByIdMap fetched areas: ${areas.length}');
+      return {
+        for (final area in areas) area.id: area.name,
+      };
+    } catch (e) {
+      debugPrint('[DeepLinkHandler] _buildAreaNameByIdMap failed: $e');
+      return <int, String>{};
+    }
+  }
+
+  Map<String, dynamic> _toUiTaskMap(
+    dynamic task, {
+    required Map<int, String> areaNameById,
+  }) {
+    // Handle both HseTaskModel and Map types
+    final id = task is Map ? task['id'] : task.id;
+    final areaId = task is Map ? task['area_id'] ?? task['areaId'] : task.areaId;
+    final areaName = areaNameById[areaId] ?? 'Area #$areaId';
+    final title = task is Map ? task['title'] ?? task['name'] : task.name ?? 'Inspeksi $areaName';
+    final status = task is Map ? task['status'] : task.status;
+    final picToken = task is Map ? task['pic_token'] ?? task['picToken'] : task.picToken;
+
+    return <String, dynamic>{
+      'id': id.toString(),
+      'taskId': id,
+      'picToken': picToken,
+      'title': title,
+      'area': areaName,
+      'areaId': areaId.toString(),
+      'rootCause': task is Map ? task['root_cause'] ?? task['rootCause'] : task.rootCause,
+      'notes': task is Map ? task['notes'] : task.notes,
+      'riskLevel': task is Map ? task['risk_level'] ?? task['riskLevel'] : task.riskLevel,
+      'status': status,
+      'date': task is Map ? task['date'] ?? task['created_at'] : task.date,
+      'authorId': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,
+      'userId': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,
+      'createdBy': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,
+      'created_by': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,
+      'photos': task is Map ? task['photos'] : task.photos,
+      'followUps': task is Map ? (task['follow_ups'] ?? task['followUps'] ?? []) : task.followUps,
+    };
   }
 
   @override

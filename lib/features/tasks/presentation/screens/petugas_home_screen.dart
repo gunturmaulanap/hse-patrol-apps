@@ -20,6 +20,22 @@ class PetugasHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final reportsAsync = ref.watch(petugasTaskMapsProvider);
 
+    Future<void> onRefresh() async {
+      debugPrint('[PetugasHomeScreen] pull-to-refresh triggered');
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      final results = await Future.wait([
+        ref.read(tasksFutureProvider.future),
+        ref.read(petugasTaskMapsProvider.future),
+      ]);
+
+      final totalTasks = (results[0] as List).length;
+      final totalTaskMaps = (results[1] as List).length;
+      debugPrint(
+        '[PetugasHomeScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps',
+      );
+    }
+
     // FIX: Redirect ke login jika user null (setelah hot restart)
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -90,8 +106,13 @@ class PetugasHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
           SliverToBoxAdapter(
             child: SafeArea(
               bottom: false,
@@ -216,7 +237,8 @@ class PetugasHomeScreen extends ConsumerWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
+          ],
+        ),
       ),
     );
   }

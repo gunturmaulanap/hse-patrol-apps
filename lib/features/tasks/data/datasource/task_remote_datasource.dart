@@ -24,8 +24,9 @@ abstract class TaskRemoteDataSource {
       CreateHseTaskRequest request, List<File>? photos);
   Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request,
       {List<File>? photos, String? mode});
-  Future<void> cancelTask(int id);
+  Future<HseTaskModel> cancelTask(int id, String canceledBy);
   Future<List<HseStaffModel>> fetchStaffs();
+  Future<List<HseStaffModel>> fetchPicUsers();
 }
 
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
@@ -57,6 +58,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       int totalPages = 1;
       int requestedPerPage = perPage;
       int maxPages = AppEnv.maxPaginationPages;
+      bool reachedMaxPagesGuard = false;
 
       do {
         final queryParams = <String, dynamic>{
@@ -81,49 +83,158 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           final map = responseData as Map<String, dynamic>;
           data = _extractListData(map);
 
+          final nested = map['data'];
+          final pageMeta = nested is Map
+              ? Map<String, dynamic>.from(nested)
+              : map;
+
+          final nestedPagination = pageMeta['pagination'] is Map
+              ? Map<String, dynamic>.from(pageMeta['pagination'] as Map)
+              : <String, dynamic>{};
+          final rootPagination = map['pagination'] is Map
+              ? Map<String, dynamic>.from(map['pagination'] as Map)
+              : <String, dynamic>{};
+
           // Cek pagination info
-          if (map['total'] != null) {
-            final total = map['total'] is int
-                ? map['total'] as int
-                : int.tryParse(map['total']?.toString() ?? '') ?? 0;
-            final receivedPerPage = map['per_page'] is int
-                ? map['per_page'] as int
-                : int.tryParse(map['per_page']?.toString() ?? '') ?? requestedPerPage;
+          final totalRaw = pageMeta['total'] ??
+              nestedPagination['total'] ??
+              rootPagination['total'];
+          final perPageRaw = pageMeta['per_page'] ??
+              nestedPagination['per_page'] ??
+              rootPagination['per_page'];
+
+          if (totalRaw != null) {
+            final total = totalRaw is int
+                ? totalRaw
+                : int.tryParse(totalRaw.toString()) ?? 0;
+            final receivedPerPage = perPageRaw is int
+                ? perPageRaw
+                : int.tryParse(perPageRaw?.toString() ?? '') ?? requestedPerPage;
 
             if (receivedPerPage > 0) {
               totalPages = (total / receivedPerPage).ceil();
             }
-          } else if (map['last_page'] != null) {
-            totalPages = map['last_page'] is int
-                ? map['last_page'] as int
-                : int.tryParse(map['last_page']?.toString() ?? '') ?? 1;
-          } else if (map['total_pages'] != null) {
-            totalPages = map['total_pages'] is int
-                ? map['total_pages'] as int
-                : int.tryParse(map['total_pages']?.toString() ?? '') ?? 1;
+          } else if ((pageMeta['last_page'] ??
+                  nestedPagination['last_page'] ??
+                  rootPagination['last_page']) !=
+              null) {
+            final lastPageRaw = pageMeta['last_page'] ??
+                nestedPagination['last_page'] ??
+                rootPagination['last_page'];
+            totalPages = lastPageRaw is int
+                ? lastPageRaw
+                : int.tryParse(lastPageRaw?.toString() ?? '') ?? 1;
+          } else if ((pageMeta['total_pages'] ??
+                  nestedPagination['total_pages'] ??
+                  rootPagination['total_pages']) !=
+              null) {
+            final totalPagesRaw = pageMeta['total_pages'] ??
+                nestedPagination['total_pages'] ??
+                rootPagination['total_pages'];
+            totalPages = totalPagesRaw is int
+                ? totalPagesRaw
+                : int.tryParse(totalPagesRaw?.toString() ?? '') ?? 1;
           }
 
-          log.debug('Page info', data: {
-            'current_page': map['current_page'],
-            'last_page': map['last_page'],
-            'total_pages': map['total_pages'],
-            'total': map['total'],
+          final currentPageRaw = pageMeta['current_page'] ??
+              nestedPagination['current_page'] ??
+              rootPagination['current_page'];
+          final lastPageRaw = pageMeta['last_page'] ??
+              nestedPagination['last_page'] ??
+              rootPagination['last_page'];
+
+          final currentPageFromApi = currentPageRaw is int
+              ? currentPageRaw
+              : int.tryParse(currentPageRaw?.toString() ?? '');
+          final lastPageFromApi = lastPageRaw is int
+              ? lastPageRaw
+              : int.tryParse(lastPageRaw?.toString() ?? '');
+          if (lastPageFromApi != null && lastPageFromApi > totalPages) {
+            totalPages = lastPageFromApi;
+          }
+
+          log.info('Page info', data: {
+            'requested_page': requestedPage,
+            'current_page_api': currentPageFromApi,
+            'last_page_api': lastPageFromApi,
+            'total_pages_api': pageMeta['total_pages'],
+            'total_api': pageMeta['total'],
+            'per_page_api': pageMeta['per_page'],
+            'reports_count': data.length,
             'calculated_total_pages': totalPages,
           }, tag: 'TaskRemoteDataSource');
+
+          final totalApiText = pageMeta['total']?.toString() ?? '-';
+          log.info(
+            'Pagination summary',
+            data: {
+              'page': requestedPage,
+              'reports': data.length,
+              'total_api': totalApiText,
+              'total_pages': totalPages,
+            },
+            tag: 'TaskRemoteDataSource',
+          );
         }
 
-        // Parse tasks
-        final pageTasks = data.map((json) => _parseReportModel(json as Map<String, dynamic>)).toList();
+        // Parse tasks (defensive cast)
+        final pageTasks = data
+            .map((json) => _toMapOrNull(json))
+            .whereType<Map<String, dynamic>>()
+            .map(_parseReportModel)
+            .toList();
         allTasks.addAll(pageTasks);
 
-        log.debug('Page fetched', data: {
+        log.info(
+          'Page date distribution',
+          data: {
+            'page': requestedPage,
+            'date_buckets': _buildDateBucketsFromModels(pageTasks),
+          },
+          tag: 'TaskRemoteDataSource',
+        );
+
+        // Fallback pagination strategy:
+        // jika metadata total/last_page tidak dikirim backend,
+        // lanjutkan ke halaman berikut selama halaman saat ini "penuh".
+        // Ini mencegah berhenti di page 1 saat data sebenarnya masih ada.
+        if (pageTasks.length >= requestedPerPage && requestedPage >= totalPages) {
+          totalPages = requestedPage + 1;
+        }
+
+        log.info('Page fetched', data: {
           'page': requestedPage,
           'count': pageTasks.length,
           'total_so_far': allTasks.length
         }, tag: 'TaskRemoteDataSource');
 
         requestedPage++;
+        if (requestedPage > maxPages && requestedPage <= totalPages) {
+          reachedMaxPagesGuard = true;
+        }
       } while (requestedPage <= totalPages && requestedPage <= maxPages);
+
+      if (reachedMaxPagesGuard) {
+        log.warning(
+          'Pagination stopped by maxPages safety guard (partial data possible)',
+          data: {
+            'max_pages': maxPages,
+            'next_page': requestedPage,
+            'total_pages': totalPages,
+            'fetched_items': allTasks.length,
+          },
+          tag: 'TaskRemoteDataSource',
+        );
+      }
+
+      log.info(
+        'All pages date distribution',
+        data: {
+          'total_items': allTasks.length,
+          'date_buckets': _buildDateBucketsFromModels(allTasks),
+        },
+        tag: 'TaskRemoteDataSource',
+      );
 
       log.info('All tasks fetched successfully', data: {'total': allTasks.length}, tag: 'TaskRemoteDataSource');
       return allTasks;
@@ -524,16 +635,25 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   }
 
   @override
-  Future<void> cancelTask(int id) async {
+  Future<HseTaskModel> cancelTask(int id, String canceledBy) async {
     try {
-      log.info('Canceling task', data: {'id': id}, tag: 'TaskRemoteDataSource');
+      log.info('Canceling task', data: {'id': id, 'canceled_by': canceledBy}, tag: 'TaskRemoteDataSource');
 
       final response = await _dio.patch(
         '/hse-reports/$id',
-        data: {'mode': 'cancel'},
+        data: {
+          'mode': 'cancel',
+          'cancelled_by': canceledBy,
+        },
       );
 
-      log.info('Task canceled successfully', data: {'id': id}, tag: 'TaskRemoteDataSource');
+      final data = response.data is Map<String, dynamic>
+          ? response.data['data']
+          : response.data['data'];
+
+      log.info('Task canceled successfully', data: {'id': id, 'canceled_by': canceledBy}, tag: 'TaskRemoteDataSource');
+
+      return _parseReportModel(data);
     } catch (e) {
       log.error('Error canceling task', error: e, tag: 'TaskRemoteDataSource');
       throw ErrorHandler.handleException(e);
@@ -562,6 +682,38 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     }
   }
 
+  @override
+  Future<List<HseStaffModel>> fetchPicUsers() async {
+    try {
+      log.info('Fetching PIC users list', tag: 'TaskRemoteDataSource');
+
+      final response = await _dio.get('/hse/pic-users');
+
+      final responseData = response.data;
+      List<dynamic> users = [];
+
+      if (responseData is Map) {
+        final map = responseData as Map<String, dynamic>;
+        users = map['users'] as List<dynamic>? ??
+                 map['data'] as List<dynamic>? ??
+                 _extractListData(responseData);
+      } else if (responseData is List) {
+        users = responseData;
+      }
+
+      final picUsers = users.map((json) {
+        return HseStaffModel.fromJson(json as Map<String, dynamic>);
+      }).toList();
+
+      log.info('PIC users fetched successfully', data: {'count': picUsers.length}, tag: 'TaskRemoteDataSource');
+
+      return picUsers;
+    } catch (e) {
+      log.error('Error fetching PIC users', error: e, tag: 'TaskRemoteDataSource');
+      throw ErrorHandler.handleException(e);
+    }
+  }
+
   HseTaskModel _parseReportModel(Map<String, dynamic> json) {
     final title = json['title']?.toString().trim().isNotEmpty == true
         ? json['title']?.toString().trim()
@@ -569,13 +721,17 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
     final parsedPhotos = _parsePhotos(json['photos']);
 
-    return HseTaskModel(
+      return HseTaskModel(
       id: _toInt(json['id']),
       code: json['code']?.toString() ?? '',
-      userId: _toInt(json['created_by'] ??
-          json['createdBy'] ??
-          json['user_id'] ??
-          json['userId']),
+      userId: _toInt(json['user_id'] ??
+          json['userId'] ??
+          json['author_id'] ??
+          json['authorId'] ??
+          json['created_by_id'] ??
+          json['createdById'] ??
+          json['created_by'] ??
+          json['createdBy']),
       areaId: _toInt(json['area_id'] ?? json['areaId']),
       name: title,
       riskLevel:
@@ -586,15 +742,12 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       status: json['status']?.toString() ?? '',
       picToken: json['pic_token']?.toString() ?? json['picToken']?.toString(),
       photos: parsedPhotos,
-      followUps: (json['follow_ups'] as List<dynamic>?)
-              ?.map((e) => e as Map<String, dynamic>)
-              .toList() ??
-          (json['followUps'] as List<dynamic>?)
-              ?.map((e) => e as Map<String, dynamic>)
-              .toList() ??
-          [],
+      followUps: _parseFollowUps(json['follow_ups'])
+          .followedBy(_parseFollowUps(json['followUps']))
+          .toList(),
       date: json['date']?.toString() ?? json['created_at']?.toString(),
       userName: json['user']?.toString() ??
+          json['created_by']?.toString() ??
           json['user_name']?.toString() ??
           json['username']?.toString(),
     );
@@ -642,6 +795,48 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           .toList();
     }
     return <String>[];
+  }
+
+  List<Map<String, dynamic>> _parseFollowUps(dynamic raw) {
+    if (raw is! List) return <Map<String, dynamic>>[];
+    return raw
+        .map(_toMapOrNull)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  Map<String, int> _buildDateBucketsFromModels(List<HseTaskModel> tasks,
+      {int maxBuckets = 12}) {
+    final buckets = <String, int>{};
+    for (final task in tasks) {
+      final key = _extractDateKey(task.date);
+      buckets[key] = (buckets[key] ?? 0) + 1;
+    }
+
+    final sortedKeys = buckets.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    final result = <String, int>{};
+    for (final key in sortedKeys.take(maxBuckets)) {
+      result[key] = buckets[key] ?? 0;
+    }
+    return result;
+  }
+
+  String _extractDateKey(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return 'unknown';
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return 'invalid';
+    final y = parsed.year.toString().padLeft(4, '0');
+    final m = parsed.month.toString().padLeft(2, '0');
+    final d = parsed.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  Map<String, dynamic>? _toMapOrNull(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 
   List<dynamic> _extractListData(dynamic raw) {

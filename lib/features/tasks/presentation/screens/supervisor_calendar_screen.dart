@@ -29,10 +29,52 @@ class _SupervisorCalendarScreenState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  Future<void> _onRefresh() async {
+    debugPrint('[SupervisorCalendarScreen] pull-to-refresh triggered');
+    debugPrint('[SupervisorCalendarScreen] Invalidating all task providers...');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(supervisorOwnTaskMapsProvider);
+    ref.invalidate(supervisorStaffTaskMapsProvider);
+    ref.invalidate(supervisorAllVisibleTaskMapsProvider);
+
+    debugPrint('[SupervisorCalendarScreen] Waiting for providers to fetch data...');
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+      ref.read(supervisorOwnTaskMapsProvider.future),
+      ref.read(supervisorStaffTaskMapsProvider.future),
+      ref.read(supervisorAllVisibleTaskMapsProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    final totalOwn = (results[2] as List).length;
+    final totalStaff = (results[3] as List).length;
+    final totalVisible = (results[4] as List).length;
+
+    debugPrint(
+      '[SupervisorCalendarScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps own=$totalOwn staff=$totalStaff visible=$totalVisible',
+    );
+
+    // Print sample data from visible tasks
+    if (totalVisible > 0) {
+      final visibleTasks = results[4] as List;
+      debugPrint('[SupervisorCalendarScreen] Sample visible tasks:');
+      for (var i = 0; i < (visibleTasks.length > 5 ? 5 : visibleTasks.length); i++) {
+        final task = visibleTasks[i] as Map<String, dynamic>;
+        debugPrint('  - Task ${task['id']}: date="${task['date']}" title="${task['title']}"');
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _initDate(DateTime.now());
+    final now = DateTime.now();
+    debugPrint('[SupervisorCalendar] initState - current datetime: $now');
+    debugPrint('[SupervisorCalendar] initState - local timezone: ${now.timeZoneOffset}');
+    _initDate(now);
   }
 
   void _initDate(DateTime baseDate) {
@@ -89,6 +131,12 @@ class _SupervisorCalendarScreenState
     final user = ref.watch(currentUserProvider);
     final reportsAsync = ref.watch(supervisorAllVisibleTaskMapsProvider);
 
+    // Debug: check provider state
+    debugPrint('[SupervisorCalendar] Provider state: isLoading=${reportsAsync.isLoading} hasValue=${reportsAsync.hasValue} hasError=${reportsAsync.hasError}');
+    if (reportsAsync.hasError) {
+      debugPrint('[SupervisorCalendar] Provider error: ${reportsAsync.error}');
+    }
+
     if (user == null || user.role != UserRole.hseSupervisor) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
@@ -99,14 +147,63 @@ class _SupervisorCalendarScreenState
       );
     }
 
+    // Show shimmer when loading
+    if (reportsAsync.isLoading && !reportsAsync.hasValue) {
+      debugPrint('[SupervisorCalendar] Showing shimmer - loading data...');
+      return const Scaffold(
+        backgroundColor: Color(0xFF111111),
+        body: _CalendarShimmer(),
+      );
+    }
+
+    // Show error if any
+    if (reportsAsync.hasError) {
+      debugPrint('[SupervisorCalendar] Error loading data: ${reportsAsync.error}');
+      return Scaffold(
+        backgroundColor: const Color(0xFF111111),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Error: ${reportsAsync.error}',
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
+    debugPrint('[SupervisorCalendar] Total reports: ${reports.length}');
+    debugPrint('[SupervisorCalendar] Selected date: $_selectedDate (year=${_selectedDate.year}, month=${_selectedDate.month}, day=${_selectedDate.day})');
+    debugPrint('[SupervisorCalendar] Selected date in ISO: ${_selectedDate.toIso8601String()}');
+
+    // Debug: print semua tanggal yang ada di reports
+    final allDates = reports.map((r) => r['date']?.toString()).toSet().toList()..sort();
+    debugPrint('[SupervisorCalendar] All dates in reports: $allDates');
+
     final tasksForSelectedDate = reports.where((task) {
-      final taskDate = DateTime.tryParse(task['date']?.toString() ?? '');
-      if (taskDate == null) return false;
+      final taskDateStr = task['date']?.toString() ?? '';
+      final taskDate = DateTime.tryParse(taskDateStr);
+
+      if (taskDate == null) {
+        debugPrint('[SupervisorCalendar] Task ID ${task['id']} has invalid date: "$taskDateStr"');
+        return false;
+      }
+
       final matchDate = taskDate.year == _selectedDate.year &&
           taskDate.month == _selectedDate.month &&
           taskDate.day == _selectedDate.day;
+
+      debugPrint('[SupervisorCalendar] Task ID ${task['id']}: date="$taskDateStr" parsed=(${taskDate.year}-${taskDate.month}-${taskDate.day}) vs selected=(${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}) match=$matchDate');
+
+      if (!matchDate) return false;
 
       if (!matchDate) return false;
 
@@ -117,10 +214,15 @@ class _SupervisorCalendarScreenState
         final rootCause = (task['rootCause'] ?? '').toString().toLowerCase();
         final staffName = (task['staffName'] ?? '').toString().toLowerCase();
 
-        return title.contains(query) ||
+        final searchMatch = title.contains(query) ||
             area.contains(query) ||
             rootCause.contains(query) ||
             staffName.contains(query);
+
+        if (!searchMatch) {
+          debugPrint('[SupervisorCalendar] Task ID ${task['id']} filtered out by search: query="$query"');
+        }
+        return searchMatch;
       }
 
       return true;
@@ -128,10 +230,14 @@ class _SupervisorCalendarScreenState
       ..sort((a, b) => _tryParseDate(a['date']?.toString())
           .compareTo(_tryParseDate(b['date']?.toString())));
 
+    debugPrint('[SupervisorCalendar] Tasks for selected date after filtering: ${tasksForSelectedDate.length}');
+
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
-      body: SafeArea(
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: SafeArea(
+          child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -278,16 +384,30 @@ class _SupervisorCalendarScreenState
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
                 child: tasksForSelectedDate.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isNotEmpty
-                              ? 'No tasks found.'
-                              : 'No schedules for today.',
-                          style: AppTypography.body1
-                              .copyWith(color: AppColors.textSecondary),
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
                         ),
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
+                        children: [
+                          SizedBox(
+                            height: 220,
+                            child: Center(
+                              child: Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'No tasks found.'
+                                    : 'No schedules for today.',
+                                style: AppTypography.body1
+                                    .copyWith(color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ),
+                        ],
                       )
                     : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
                         itemCount: tasksForSelectedDate.length,
                         itemBuilder: (context, index) {
@@ -371,6 +491,7 @@ class _SupervisorCalendarScreenState
               ),
             ),
           ],
+        ),
         ),
       ),
     );

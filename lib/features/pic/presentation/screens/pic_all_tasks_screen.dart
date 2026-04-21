@@ -27,11 +27,50 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   DateTime? _dateTo;
   String _searchQuery = '';
   final Map<String, int> _visibleCountPerArea = {};
+  String _lastFilterSignature = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(areaByUserProvider);
+      ref.read(tasksFutureProvider.future);
+      ref.read(petugasTaskMapsProvider.future);
+      ref.read(areaByUserProvider.future);
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onRefresh() async {
+    debugPrint('[PicAllTasksScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(areaByUserProvider);
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+      ref.read(areaByUserProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    final totalAreas = (results[2] as List).length;
+    debugPrint(
+      '[PicAllTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps areas=$totalAreas',
+    );
+  }
+
+  void _resetPagination() {
+    _visibleCountPerArea.clear();
+    debugPrint('[PicAllTasksScreen] pagination reset');
   }
 
   @override
@@ -60,11 +99,23 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
         .toSet();
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
+    final filterSignature =
+        'q=$_searchQuery|from=${_dateFrom?.toIso8601String() ?? '-'}|to=${_dateTo?.toIso8601String() ?? '-'}';
+    if (_lastFilterSignature != filterSignature) {
+      _lastFilterSignature = filterSignature;
+      _resetPagination();
+    }
+
     // Filter base data: Hanya ambil task yang areanya diizinkan untuk PIC ini
     // Dan hilangkan yang statusnya Canceled (Dihapus dari pandangan PIC)
     final picReports = reports.where((r) {
-      return areaAccess.contains(r['area']) && r['status'] != 'Canceled';
+      return areaAccess.contains(r['area']) && _getActualStatus(r) != 'Canceled';
     }).toList();
+
+    debugPrint(
+      '[PicAllTasksScreen] accessibleAreas=${areaAccess.length} reports=${picReports.length} '
+      'dateBuckets=${_buildDateBuckets(picReports)}',
+    );
 
     final isInitialLoading =
         (reportsAsync.isLoading && !reportsAsync.hasValue) ||
@@ -120,6 +171,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                             onPressed: () => setState(() {
                               _dateFrom = null;
                               _dateTo = null;
+                              _resetPagination();
                             }),
                           ),
                       ],
@@ -130,13 +182,16 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
                     TextField(
                       controller: _searchController,
                       style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
-                      onChanged: (value) => setState(() => _searchQuery = value),
+                      onChanged: (value) => setState(() {
+                        _searchQuery = value;
+                        _resetPagination();
+                      }),
                       decoration: InputDecoration(
                         hintText: 'Search...',
                         hintStyle: AppTypography.body1.copyWith(color: AppColors.textSecondary),
                         prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppColors.textSecondary, size: 18),
                         suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), color: AppColors.textSecondary, size: 18), onPressed: () { _searchController.clear(); setState(() { _searchQuery = ''; }); })
+                            ? IconButton(icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill), color: AppColors.textSecondary, size: 18), onPressed: () { _searchController.clear(); setState(() { _searchQuery = ''; _resetPagination(); }); })
                             : null,
                         filled: true, fillColor: AppColors.surface,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -218,6 +273,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
         if (_dateTo != null && _dateTo!.isBefore(_dateFrom!)) {
           _dateTo = _dateFrom;
         }
+        _resetPagination();
       });
     }
   }
@@ -232,11 +288,17 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     if (picked != null) {
       setState(() {
         _dateTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+        _resetPagination();
       });
     }
   }
 
   // --- Logika Filter POV PIC ---
+
+  String _canonicalStatus(dynamic raw) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return value.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
 
   // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
   String _getActualStatus(Map<String, dynamic> report) {
@@ -245,12 +307,27 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
-      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+      final lastStatus = _canonicalStatus(lastFollowUp['status']);
 
       // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
       if (lastStatus == 'rejected') {
         return 'Pending Rejected';
       }
+    }
+
+    final rawStatus = report['status'];
+    final status = _canonicalStatus(rawStatus);
+    debugPrint('[PicAllTasksScreen] status normalization raw=$rawStatus canonical=$status');
+
+    if (status == 'pending') return 'Pending';
+    if (status == 'followupdone' || status == 'followedup' || status == 'followup') {
+      return 'Follow Up Done';
+    }
+    if (status == 'completed' || status == 'approved' || status == 'done') {
+      return 'Completed';
+    }
+    if (status == 'canceled' || status == 'cancelled') {
+      return 'Canceled';
     }
 
     // Default ke status report
@@ -260,14 +337,18 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   String _getPicStatusTag(Map<String, dynamic> report) {
     // Gunakan actual status yang sama dengan petugas/supervisor
     final actualStatus = _getActualStatus(report);
+    final normalized = _canonicalStatus(actualStatus);
+    debugPrint('[PicAllTasksScreen] tag mapping actual=$actualStatus normalized=$normalized');
 
     // Penamaan POV PIC
-    if (actualStatus == 'Pending Rejected') {
+    if (normalized == 'pendingrejected') {
       return 'Pending Rejected';
-    } else if (actualStatus == 'Completed') {
+    } else if (normalized == 'completed' || normalized == 'approved') {
       return 'Approved'; // POV PIC melihat Completed sebagai Approved
-    } else if (actualStatus == 'Follow Up Done') {
+    } else if (normalized == 'followupdone' || normalized == 'followedup' || normalized == 'followup') {
       return 'Follow Up Done';
+    } else if (normalized == 'pending') {
+      return 'Pending';
     }
 
     return actualStatus; // Pending
@@ -306,13 +387,27 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     }
 
     if (filtered.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
           children: [
-            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 48, color: AppColors.surfaceLight),
-            const SizedBox(height: 12),
-            Text(_searchQuery.isNotEmpty ? 'No tasks found for "$_searchQuery"' : 'No $filter tasks yet.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+            SizedBox(
+              height: 320,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 48, color: AppColors.surfaceLight),
+                    const SizedBox(height: 12),
+                    Text(_searchQuery.isNotEmpty ? 'No tasks found for "$_searchQuery"' : 'No $filter tasks yet.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -332,10 +427,14 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     for (int i = 0; i < sortedAreas.length; i++) {
         final area = sortedAreas[i];
         final tasks = grouped[area]!;
+        final areaPaginationKey = '$filter::$area';
 
-        final visibleCount = _visibleCountPerArea[area] ?? ProgressivePagination.getNextVisibleCount(0);
+        final visibleCount =
+            _visibleCountPerArea[areaPaginationKey] ??
+                ProgressivePagination.getNextVisibleCount(0);
         final hasMore = ProgressivePagination.hasMore(visibleCount, tasks.length);
         final visibleTasks = tasks.take(visibleCount).toList();
+        debugPrint('[PicAllTasksScreen] pagination filter=$filter area=$area visible=$visibleCount total=${tasks.length} hasMore=$hasMore');
 
         // 1. Area Header
         listItems.add(
@@ -373,7 +472,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
               child: TextButton(
                 onPressed: () {
                    setState(() {
-                     _visibleCountPerArea[area] = nextCount;
+                     _visibleCountPerArea[areaPaginationKey] = nextCount;
                    });
                 },
                 style: TextButton.styleFrom(
@@ -393,12 +492,18 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
         }
     }
 
-    return ListView.builder(
-      key: PageStorageKey<String>('pic_all_$filter'),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: listItems.length,
-      itemBuilder: (context, index) => listItems[index],
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: ListView.builder(
+        key: PageStorageKey<String>('pic_all_$filter'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        itemCount: listItems.length,
+        itemBuilder: (context, index) => listItems[index],
+      ),
     );
   }
 
@@ -523,6 +628,28 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  Map<String, int> _buildDateBuckets(List<Map<String, dynamic>> reports,
+      {int maxBuckets = 10}) {
+    final buckets = <String, int>{};
+    for (final report in reports) {
+      final key = _dateKey(report['date']);
+      buckets[key] = (buckets[key] ?? 0) + 1;
+    }
+    final sorted = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
+    return {
+      for (final key in sorted.take(maxBuckets)) key: buckets[key] ?? 0,
+    };
+  }
+
+  String _dateKey(dynamic rawDate) {
+    final parsed = DateTime.tryParse(rawDate?.toString() ?? '');
+    if (parsed == null) return 'invalid';
+    final y = parsed.year.toString().padLeft(4, '0');
+    final m = parsed.month.toString().padLeft(2, '0');
+    final d = parsed.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 }
 

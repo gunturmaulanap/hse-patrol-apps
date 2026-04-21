@@ -152,11 +152,15 @@ class ErrorHandler {
       );
     }
 
-    if (error is FormatException) {
-      return ValidationException.invalidInput(
-        message: 'Format data tidak valid.',
-        originalError: error,
-      );
+    try {
+      if (error is FormatException) {
+        return ValidationException.invalidInput(
+          message: 'Format data tidak valid.',
+          originalError: error,
+        );
+      }
+    } catch (_) {
+      // Fallback if type check fails
     }
 
     // Default fallback
@@ -188,12 +192,4 @@ class ErrorHandler {
 
     return null;
   }
-}
-
-/// Type alias for FormatException (dart:core)
-class FormatException implements Exception {
-  final String message;
-  FormatException(this.message);
-  @override
-  String toString() => message;
 }

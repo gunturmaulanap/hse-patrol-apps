@@ -35,28 +35,8 @@ class DioClient {
         onRequest: (options, handler) async {
           // Add authorization token if available
           final token = await sessionManager.getToken();
-
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
-            log.debug(
-              'Authorization header attached',
-              data: {
-                'method': options.method,
-                'path': options.path,
-                'hasToken': true,
-              },
-              tag: 'DioClient',
-            );
-          } else {
-            log.warning(
-              'No authorization token available',
-              data: {
-                'method': options.method,
-                'path': options.path,
-                'hasToken': false,
-              },
-              tag: 'DioClient',
-            );
           }
 
           // Log request WITHOUT accessing data directly (data might be FormData)
@@ -80,33 +60,19 @@ class DioClient {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          final statusCode = error.response?.statusCode;
-          final request = error.requestOptions;
-
-          log.warning(
-            'HTTP error intercepted',
-            data: {
-              'statusCode': statusCode,
-              'method': request.method,
-              'path': request.path,
-            },
-            tag: 'DioClient',
-          );
-
           // Handle token expiration
-          if (statusCode == 401) {
-            // Token expired or invalid, clear session
-            await sessionManager.clearToken();
-            await sessionManager.clearRole();
-
+          if (error.response?.statusCode == 401) {
             log.warning(
-              'Session cleared after 401 response',
+              '401 detected, clearing local session',
               data: {
-                'method': request.method,
-                'path': request.path,
+                'path': error.requestOptions.path,
+                'method': error.requestOptions.method,
               },
               tag: 'DioClient',
             );
+            // Token expired or invalid, clear session
+            await sessionManager.clearToken();
+            await sessionManager.clearRole();
           }
           return handler.next(error);
         },

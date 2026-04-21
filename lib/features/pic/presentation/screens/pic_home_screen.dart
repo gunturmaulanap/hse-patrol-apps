@@ -21,13 +21,37 @@ class PicHomeScreen extends ConsumerWidget {
     final areasAsync = ref.watch(areaByUserProvider);
     final reportsAsync = ref.watch(petugasTaskMapsProvider);
 
+    Future<void> onRefresh() async {
+      debugPrint('[PicHomeScreen] pull-to-refresh triggered');
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(areaByUserProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      final results = await Future.wait([
+        ref.read(tasksFutureProvider.future),
+        ref.read(areaByUserProvider.future),
+        ref.read(petugasTaskMapsProvider.future),
+      ]);
+
+      final totalTasks = (results[0] as List).length;
+      final totalAreas = (results[1] as List).length;
+      final totalTaskMaps = (results[2] as List).length;
+      debugPrint(
+        '[PicHomeScreen] refresh complete -> tasks=$totalTasks areas=$totalAreas maps=$totalTaskMaps',
+      );
+    }
+
     final areas = areasAsync.valueOrNull ?? const [];
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
           // HEADER: Good Morning & Profile 
           SliverToBoxAdapter(
             child: SafeArea(
@@ -121,20 +145,36 @@ class PicHomeScreen extends ConsumerWidget {
                    
                   // Hitung jumlah task Pending dan Follow Up Done secara terpisah
                   final tasksInArea = reports.where((r) {
-                    final sameArea = (r['area']?.toString() ?? '') == area.name;
-                    final isNotCanceled = (r['status']?.toString() ?? '') != 'Canceled';
+                    final sameArea =
+                        (r['area']?.toString().trim().toLowerCase() ?? '') ==
+                        area.name.trim().toLowerCase();
+                    final isNotCanceled = _getPicStatusTag(r) != 'Canceled';
                     return sameArea && isNotCanceled;
                   }).toList();
-                   
+                    
                   // 1. Task Pending (Termasuk Rejected yang revert ke Pending) membutuhkan aksi PIC
-                  final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
-                   
+                  final pendingCount = tasksInArea
+                      .where((r) {
+                        final tag = _getPicStatusTag(r);
+                        return tag == 'Pending' || tag == 'Pending Rejected';
+                      })
+                      .length;
+                    
                   // 2. Task Follow Up Done yang sedang menunggu respon/approval Petugas
-                  final waitingCount = tasksInArea.where((r) => r['status'] == 'Follow Up Done').length;
-                   
+                  final waitingCount = tasksInArea
+                      .where((r) => _getPicStatusTag(r) == 'Follow Up Done')
+                      .length;
+                    
                   final totalTasks = tasksInArea.length;
 
+                  debugPrint(
+                    '[PicHomeScreen] area=${area.name} total=$totalTasks pending=$pendingCount waiting=$waitingCount',
+                  );
+
                   return AreaCard(
+                    key: ValueKey(
+                      '${area.id}-$pendingCount-$waitingCount-$totalTasks',
+                    ),
                     areaName: area.name,
                     pendingCount: pendingCount,
                     waitingResponseCount: waitingCount, // Pass data waiting
@@ -151,8 +191,58 @@ class PicHomeScreen extends ConsumerWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  String _canonicalStatus(dynamic raw) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return value.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  String _getActualStatus(Map<String, dynamic> report) {
+    final followUps = report['followUps'] as List<dynamic>? ??
+        report['follow_ups'] as List<dynamic>? ??
+        [];
+
+    if (followUps.isNotEmpty) {
+      final lastFollowUp = followUps.last as Map<String, dynamic>;
+      final lastStatus = _canonicalStatus(lastFollowUp['status']);
+      if (lastStatus == 'rejected') {
+        return 'Pending Rejected';
+      }
+    }
+
+    final rawStatus = report['status'];
+    final status = _canonicalStatus(rawStatus);
+    if (status == 'pending') return 'Pending';
+    if (status == 'followupdone' || status == 'followedup' || status == 'followup') {
+      return 'Follow Up Done';
+    }
+    if (status == 'completed' || status == 'approved' || status == 'done') {
+      return 'Completed';
+    }
+    if (status == 'canceled' || status == 'cancelled') {
+      return 'Canceled';
+    }
+
+    return report['status']?.toString() ?? 'Pending';
+  }
+
+  String _getPicStatusTag(Map<String, dynamic> report) {
+    final actualStatus = _getActualStatus(report);
+    final normalized = _canonicalStatus(actualStatus);
+
+    if (normalized == 'pendingrejected') return 'Pending Rejected';
+    if (normalized == 'completed' || normalized == 'approved') return 'Approved';
+    if (normalized == 'followupdone' || normalized == 'followedup' || normalized == 'followup') {
+      return 'Follow Up Done';
+    }
+    if (normalized == 'pending') return 'Pending';
+    if (normalized == 'canceled' || normalized == 'cancelled') return 'Canceled';
+
+    return actualStatus;
   }
 }

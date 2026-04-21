@@ -28,6 +28,11 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
   DateTime? _dateTo;
   String _searchQuery = '';
   final Map<String, int> _visibleCountPerArea = {};
+  String _lastFilterSignature = '';
+
+  void _resetPagination() {
+    _visibleCountPerArea.clear();
+  }
 
 
   @override
@@ -35,7 +40,9 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
+      ref.read(tasksFutureProvider.future);
       ref.read(petugasTaskMapsProvider.future);
     });
   }
@@ -44,6 +51,22 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onRefresh() async {
+    debugPrint('[PetugasAllTasksScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    debugPrint(
+      '[PetugasAllTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps',
+    );
   }
 
   @override
@@ -85,6 +108,18 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     final currentUserId = user.id;
     final reports =
         allReports.where((r) => _taskOwnerId(r) == currentUserId).toList();
+
+    debugPrint(
+      '[PetugasAllTasksScreen] userId=$currentUserId reports=${reports.length} '
+      'dateBuckets=${_buildDateBuckets(reports)}',
+    );
+
+    final filterSignature =
+        'q=${_searchQuery.trim()}|from=${_dateFrom?.toIso8601String() ?? '-'}|to=${_dateTo?.toIso8601String() ?? '-'}';
+    if (_lastFilterSignature != filterSignature) {
+      _lastFilterSignature = filterSignature;
+      _resetPagination();
+    }
 
     if ((reportsAsync.isLoading && reports.isEmpty) || !reportsAsync.hasValue) {
       return const Scaffold(
@@ -168,6 +203,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                             onPressed: () => setState(() {
                               _dateFrom = null;
                               _dateTo = null;
+                              _resetPagination();
                             }),
                           ),
                       ],
@@ -179,8 +215,10 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                       controller: _searchController,
                       style: AppTypography.body1
                           .copyWith(color: AppColors.textPrimary),
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
+                      onChanged: (value) => setState(() {
+                        _searchQuery = value;
+                        _resetPagination();
+                      }),
                       decoration: InputDecoration(
                         hintText: 'Search...',
                         hintStyle: AppTypography.body1
@@ -198,6 +236,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
                                   _searchController.clear();
                                   setState(() {
                                     _searchQuery = '';
+                                    _resetPagination();
                                   });
                                 })
                             : null,
@@ -302,6 +341,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
         if (_dateTo != null && _dateTo!.isBefore(_dateFrom!)) {
           _dateTo = _dateFrom;
         }
+        _resetPagination();
       });
     }
   }
@@ -316,6 +356,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     if (picked != null) {
       setState(() {
         _dateTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+        _resetPagination();
       });
     }
   }
@@ -372,19 +413,32 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     }
 
     if (filtered.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           children: [
-            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin),
-                size: 48, color: AppColors.surfaceLight),
-            const SizedBox(height: 12),
-            Text(
-                _searchQuery.isNotEmpty
-                    ? 'No tasks found for "$_searchQuery"'
-                    : 'No $filter tasks yet.',
-                style: AppTypography.body1
-                    .copyWith(color: AppColors.textSecondary)),
+            SizedBox(
+              height: 320,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin),
+                        size: 48, color: AppColors.surfaceLight),
+                    const SizedBox(height: 12),
+                    Text(
+                        _searchQuery.isNotEmpty
+                            ? 'No tasks found for "$_searchQuery"'
+                            : 'No $filter tasks yet.',
+                        style: AppTypography.body1
+                            .copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -406,8 +460,9 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     for (int i = 0; i < sortedAreas.length; i++) {
         final area = sortedAreas[i];
         final tasks = grouped[area]!;
+        final areaPaginationKey = '$filter::$area';
 
-        final visibleCount = _visibleCountPerArea[area] ?? ProgressivePagination.getNextVisibleCount(0);
+        final visibleCount = _visibleCountPerArea[areaPaginationKey] ?? ProgressivePagination.getNextVisibleCount(0);
         final hasMore = ProgressivePagination.hasMore(visibleCount, tasks.length);
         final visibleTasks = tasks.take(visibleCount).toList();
 
@@ -453,7 +508,7 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
               child: TextButton(
                 onPressed: () {
                    setState(() {
-                     _visibleCountPerArea[area] = nextCount;
+                     _visibleCountPerArea[areaPaginationKey] = nextCount;
                    });
                 },
                 style: TextButton.styleFrom(
@@ -473,12 +528,18 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
         }
     }
 
-    return ListView.builder(
-      key: PageStorageKey<String>('petugas_all_$filter'),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: listItems.length,
-      itemBuilder: (context, index) => listItems[index],
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: ListView.builder(
+        key: PageStorageKey<String>('petugas_all_$filter'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        itemCount: listItems.length,
+        itemBuilder: (context, index) => listItems[index],
+      ),
     );
   }
 
@@ -667,6 +728,28 @@ class _PetugasAllTasksScreenState extends ConsumerState<PetugasAllTasksScreen> {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '') ?? 0;
+  }
+
+  Map<String, int> _buildDateBuckets(List<Map<String, dynamic>> reports,
+      {int maxBuckets = 10}) {
+    final buckets = <String, int>{};
+    for (final report in reports) {
+      final key = _dateKey(report['date']);
+      buckets[key] = (buckets[key] ?? 0) + 1;
+    }
+    final sorted = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
+    return {
+      for (final key in sorted.take(maxBuckets)) key: buckets[key] ?? 0,
+    };
+  }
+
+  String _dateKey(dynamic rawDate) {
+    final parsed = DateTime.tryParse(rawDate?.toString() ?? '');
+    if (parsed == null) return 'invalid';
+    final y = parsed.year.toString().padLeft(4, '0');
+    final m = parsed.month.toString().padLeft(2, '0');
+    final d = parsed.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
   String _getReportTitle(Map<String, dynamic> report) {

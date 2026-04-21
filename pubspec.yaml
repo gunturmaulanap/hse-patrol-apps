@@ -65,5 +65,8 @@ flutter:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "lib/assets/logos/hse-logo.png"
+  # Icon dengan background 1024x1024px - gunakan apa adanya
+  image_path: "lib/assets/logos/hse_aksamala_icon.png"
   min_sdk_android: 21
+  # Icon iOS tidak perlu remove alpha karena sudah ada background
+  remove_alpha_ios: false

@@ -54,7 +54,8 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       // DEBUG: Tampilkan token untuk verifikasi
       final token = await sessionManager.getToken();
       final role = await sessionManager.getRole();
-      debugPrint('[Splash] DEBUG: Token = ${token?.substring(0, 20) ?? 'null'}...');
+      final hasToken = token != null && token.isNotEmpty;
+      debugPrint('[Splash] DEBUG: hasToken = $hasToken');
       debugPrint('[Splash] DEBUG: Role = $role');
 
       final isLoggedIn = await sessionManager.isLoggedIn();

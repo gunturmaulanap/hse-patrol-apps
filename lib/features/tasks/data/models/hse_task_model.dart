@@ -20,6 +20,8 @@ class HseTaskModel with _$HseTaskModel {
     @Default([]) List<Map<String, dynamic>> followUps,
     String? date,
     String? userName,
+    @JsonKey(name: 'cancelled_by') String? cancelledBy,
+    @JsonKey(name: 'cancelled_at') String? cancelledAt,
   }) = _HseTaskModel;
 
   factory HseTaskModel.fromJson(Map<String, dynamic> json) => _$HseTaskModelFromJson(json);

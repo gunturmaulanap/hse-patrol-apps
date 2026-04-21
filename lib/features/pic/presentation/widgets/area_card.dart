@@ -115,6 +115,10 @@ class AreaCard extends StatelessWidget {
 
   // Fungsi khusus untuk merender kombinasi badge
   Widget _buildStatusBadges() {
+    debugPrint(
+      '[AreaCard] area=$areaName pending=$pendingCount waiting=$waitingResponseCount total=$totalTasks',
+    );
+
     if (pendingCount == 0 && waitingResponseCount == 0) {
       // Kondisi ALL CLEAR
       return FittedBox(

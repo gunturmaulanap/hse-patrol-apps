@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../data/datasource/task_remote_datasource.dart';
 import '../../data/repositories/task_repository_impl.dart';
@@ -19,8 +20,13 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 
 final tasksFutureProvider = FutureProvider<List<HseTaskModel>>((ref) async {
   ref.watch(currentUserProvider); // Force re-fetch when user logs in/out
+  debugPrint('[TaskProvider][tasksFutureProvider] fetching /hse-reports ...');
   final repository = ref.watch(taskRepositoryProvider);
-  return repository.getTasks();
+  final tasks = await repository.getTasks();
+  debugPrint(
+    '[TaskProvider][tasksFutureProvider] fetched total=${tasks.length}',
+  );
+  return tasks;
 });
 
 final taskDetailMapProvider =
@@ -33,12 +39,7 @@ final taskDetailMapProvider =
   final repository = ref.watch(taskRepositoryProvider);
   final task = await repository.getTaskById(id);
   final areaNameById = await _buildAreaNameByIdMap(ref);
-  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
-  return _toUiTaskMap(
-    task,
-    areaNameById: areaNameById,
-    areaBuildingTypeById: areaBuildingTypeById,
-  );
+  return _toUiTaskMap(task, areaNameById: areaNameById);
 });
 
 // Provider untuk mencari task berdasarkan picToken (untuk Deep Link dari WhatsApp)
@@ -47,12 +48,7 @@ final taskDetailByPicTokenProvider =
   final repository = ref.watch(taskRepositoryProvider);
   final task = await repository.getTaskByPicToken(picToken);
   final areaNameById = await _buildAreaNameByIdMap(ref);
-  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
-  return _toUiTaskMap(
-    task,
-    areaNameById: areaNameById,
-    areaBuildingTypeById: areaBuildingTypeById,
-  );
+  return _toUiTaskMap(task, areaNameById: areaNameById);
 });
 
 /// Provider validasi picToken via endpoint existing tanpa ubah backend contract.
@@ -66,25 +62,50 @@ final petugasTaskMapsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final tasks = await ref.watch(tasksFutureProvider.future);
   final areaNameById = await _buildAreaNameByIdMap(ref);
-  final areaBuildingTypeById = await _buildAreaBuildingTypeByIdMap(ref);
 
-  return tasks
-      .map((task) => _toUiTaskMap(
-            task,
-            areaNameById: areaNameById,
-            areaBuildingTypeById: areaBuildingTypeById,
-          ))
+  final mapped = tasks
+      .map((task) => _toUiTaskMap(task, areaNameById: areaNameById))
       .toList();
+
+  debugPrint(
+    '[TaskProvider][PetugasMaps] total=${mapped.length} dateBuckets=${_buildDateBucketsFromMaps(mapped)}',
+  );
+
+  return mapped;
+});
+
+/// Task milik petugas yang sedang login saja.
+final petugasOwnTaskMapsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final currentUser = ref.watch(currentUserProvider);
+  final allReports = await ref.watch(petugasTaskMapsProvider.future);
+
+  final currentUserId = currentUser?.id;
+  if (currentUserId == null) {
+    debugPrint('[TaskProvider][PetugasOwn] currentUserId is null -> empty');
+    return <Map<String, dynamic>>[];
+  }
+
+  final ownReports = allReports
+      .where((report) => _ownerId(report) == currentUserId)
+      .toList();
+
+  debugPrint(
+    '[TaskProvider][PetugasOwn] userId=$currentUserId all=${allReports.length} own=${ownReports.length}',
+  );
+  debugPrint(
+    '[TaskProvider][PetugasOwn] dateBuckets=${_buildDateBucketsFromMaps(ownReports)}',
+  );
+
+  return ownReports;
 });
 
 Map<String, dynamic> _toUiTaskMap(
   HseTaskModel task, {
   required Map<int, String> areaNameById,
-  required Map<int, String> areaBuildingTypeById,
 }) {
   final areaName = _resolveAreaName(task, areaNameById);
   final title = _resolveTitle(task, areaName);
-  final buildingType = areaBuildingTypeById[task.areaId] ?? '';
 
   final followUps = task.followUps.map((item) {
     final map = Map<String, dynamic>.from(item);
@@ -131,7 +152,6 @@ Map<String, dynamic> _toUiTaskMap(
     'picToken': task.picToken,
     'title': title,
     'area': areaName,
-    'buildingType': buildingType,
     'areaId': task.areaId.toString(),
     'rootCause': task.rootCause,
     'notes': task.notes,
@@ -146,6 +166,10 @@ Map<String, dynamic> _toUiTaskMap(
     'staffName': _resolveStaffName(task),
     'photos': task.photos,
     'followUps': followUps,
+    'cancelled_by': task.cancelledBy,
+    'cancelledBy': task.cancelledBy,
+    'cancelled_at': task.cancelledAt,
+    'cancelledAt': task.cancelledAt,
   };
 }
 
@@ -154,17 +178,6 @@ Future<Map<int, String>> _buildAreaNameByIdMap(Ref ref) async {
     final areas = await ref.read(areaRepositoryProvider).getAreas();
     return {
       for (final area in areas) area.id: area.name,
-    };
-  } catch (_) {
-    return <int, String>{};
-  }
-}
-
-Future<Map<int, String>> _buildAreaBuildingTypeByIdMap(Ref ref) async {
-  try {
-    final areas = await ref.read(areaRepositoryProvider).getAreas();
-    return {
-      for (final area in areas) area.id: area.buildingType,
     };
   } catch (_) {
     return <int, String>{};
@@ -181,9 +194,18 @@ final supervisorOwnTaskMapsProvider =
 
   // Filter hanya task milik supervisor yang sedang login.
   // Guard mockDb dihapus: ID backend bisa berbeda dari ID mock.
-  return allReports
+  final ownReports = allReports
       .where((report) => _ownerId(report) == currentUserId)
       .toList();
+
+  debugPrint(
+    '[TaskProvider][SupervisorOwn] userId=$currentUserId all=${allReports.length} own=${ownReports.length}',
+  );
+  debugPrint(
+    '[TaskProvider][SupervisorOwn] dateBuckets=${_buildDateBucketsFromMaps(ownReports)}',
+  );
+
+  return ownReports;
 });
 
 final supervisorStaffTaskMapsProvider =
@@ -198,6 +220,19 @@ final supervisorStaffTaskMapsProvider =
           .where((report) => _ownerId(report) != currentUserId)
           .toList();
 
+  final ownerIds = nonSelfReports
+      .map((e) => _ownerId(e))
+      .toSet()
+      .toList()
+    ..sort();
+
+  debugPrint(
+    '[TaskProvider][SupervisorStaff] userId=$currentUserId all=${allReports.length} staff=${nonSelfReports.length} ownerIds=$ownerIds',
+  );
+  debugPrint(
+    '[TaskProvider][SupervisorStaff] dateBuckets=${_buildDateBucketsFromMaps(nonSelfReports)}',
+  );
+
   // Staff Task: semua task yang bukan milik supervisor login.
   // Penyaringan per petugas dilakukan menggunakan created_by/user_id di UI.
   return nonSelfReports;
@@ -207,7 +242,22 @@ final supervisorAllVisibleTaskMapsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final own = await ref.watch(supervisorOwnTaskMapsProvider.future);
   final staff = await ref.watch(supervisorStaffTaskMapsProvider.future);
-  return <Map<String, dynamic>>[...own, ...staff];
+  final visible = <Map<String, dynamic>>[...own, ...staff];
+
+  debugPrint(
+    '[TaskProvider][SupervisorVisible] total=${visible.length} dateBuckets=${_buildDateBucketsFromMaps(visible)}',
+  );
+
+  // Debug: print sample tasks with dates
+  if (visible.isNotEmpty) {
+    debugPrint('[TaskProvider][SupervisorVisible] Sample tasks:');
+    for (var i = 0; i < (visible.length > 10 ? 10 : visible.length); i++) {
+      final task = visible[i];
+      debugPrint('  - Task ${task['id']}: date="${task['date']}" title="${task['title']}" status="${task['status']}"');
+    }
+  }
+
+  return visible;
 });
 
 final supervisorStaffNamesProvider = FutureProvider<List<String>>((ref) async {
@@ -237,6 +287,27 @@ final supervisorStaffTaskByNameProvider =
 final staffListProvider = FutureProvider<List<HseStaffModel>>((ref) async {
   final repository = ref.watch(taskRepositoryProvider);
   return repository.getStaffs();
+});
+
+// Provider untuk mengambil list PIC users dari API /hse/pic-users
+final picUsersProvider = FutureProvider<List<HseStaffModel>>((ref) async {
+  final repository = ref.watch(taskRepositoryProvider);
+  return repository.getPicUsers();
+});
+
+// Provider untuk membuat mapping userId -> nama user dari PIC users
+final picUserMapProvider = Provider<Map<int, String>>((ref) {
+  final picUsersAsync = ref.watch(picUsersProvider);
+
+  return picUsersAsync.when(
+    data: (users) {
+      return {
+        for (final user in users) user.id: user.name,
+      };
+    },
+    loading: () => {},
+    error: (_, __) => {},
+  );
 });
 
 String _resolveAreaName(HseTaskModel report, Map<int, String> areaNameById) {
@@ -305,4 +376,30 @@ int _ownerId(Map<String, dynamic> report) {
       report['createdBy'] ??
       report['user_id'] ??
       report['userId']);
+}
+
+Map<String, int> _buildDateBucketsFromMaps(List<Map<String, dynamic>> reports,
+    {int maxBuckets = 12}) {
+  final buckets = <String, int>{};
+  for (final report in reports) {
+    final dateKey = _extractDateKey(report['date']?.toString());
+    buckets[dateKey] = (buckets[dateKey] ?? 0) + 1;
+  }
+
+  final sortedKeys = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
+  final limited = <String, int>{};
+  for (final key in sortedKeys.take(maxBuckets)) {
+    limited[key] = buckets[key] ?? 0;
+  }
+  return limited;
+}
+
+String _extractDateKey(String? rawDate) {
+  if (rawDate == null || rawDate.trim().isEmpty) return 'unknown';
+  final parsed = DateTime.tryParse(rawDate);
+  if (parsed == null) return 'invalid';
+  final y = parsed.year.toString().padLeft(4, '0');
+  final m = parsed.month.toString().padLeft(2, '0');
+  final d = parsed.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
 }

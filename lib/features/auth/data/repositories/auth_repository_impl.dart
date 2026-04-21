@@ -5,12 +5,6 @@ import '../models/login_request.dart';
 import '../models/user_model.dart';
 import '../../../../core/storage/session_manager.dart';
 
-String _maskToken(String token) {
-  if (token.isEmpty) return '<empty>';
-  if (token.length <= 10) return '***';
-  return '${token.substring(0, 6)}...${token.substring(token.length - 4)}';
-}
-
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final SessionManager _sessionManager;
@@ -26,23 +20,11 @@ class AuthRepositoryImpl implements AuthRepository {
     );
 
     debugPrint('[AuthRepository] parsed login response: ${response.toJson()}');
-    debugPrint(
-      '[AuthRepository] Token from response: ${_maskToken(response.token)} (length: ${response.token.length})',
-    );
     debugPrint('[AuthRepository] before save token');
     await _sessionManager.saveToken(response.token);
 
     debugPrint('[AuthRepository] before save role: ${response.user.role.name}');
     await _sessionManager.saveRole(response.user.role.name);
-
-    // Verify token was saved correctly
-    final savedToken = await _sessionManager.getToken();
-    debugPrint('[AuthRepository] Token after save: ${savedToken != null ? 'SAVED (length: ${savedToken.length})' : 'NOT SAVED'}');
-    if (savedToken != null && savedToken.isNotEmpty) {
-      debugPrint(
-        '[AuthRepository] Token verification: ${_maskToken(savedToken)}',
-      );
-    }
 
     return response.user;
   }

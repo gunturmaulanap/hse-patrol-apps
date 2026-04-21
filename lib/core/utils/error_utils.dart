@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../error/app_exception.dart';
-import '../error/error_handler.dart';
 import 'logger.dart';
 
 /// Helper utilities for error handling in UI
@@ -12,8 +11,10 @@ class ErrorUtils {
     String? title,
     VoidCallback? onRetry,
   }) {
-    final message = ErrorHandler.getUserMessage(error);
-    final code = ErrorHandler.getErrorCode(error);
+    final message = error is AppException
+        ? error.message
+        : 'Terjadi kesalahan. Silakan coba lagi.';
+    final code = error is AppException ? error.code : null;
 
     log.error('Showing error dialog', error: error);
 
@@ -60,7 +61,9 @@ class ErrorUtils {
     BuildContext context,
     Object error,
   ) {
-    final message = ErrorHandler.getUserMessage(error);
+    final message = error is AppException
+        ? error.message
+        : 'Terjadi kesalahan. Silakan coba lagi.';
     log.error('Showing error snackbar', error: error);
 
     ScaffoldMessenger.of(context).showSnackBar(

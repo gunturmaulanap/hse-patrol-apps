@@ -9,6 +9,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
@@ -196,12 +197,13 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
               final newFrom = DateTime(picked.year, picked.month, picked.day);
               // Max 7 days constraint
               if (_dateTo != null) {
-                final maxFrom = _dateTo!.subtract(const Duration(days: 6));
-                if (newFrom.isBefore(maxFrom)) {
+                final normalizedTo = _dateOnly(_dateTo!);
+                final dayDiff = normalizedTo.difference(newFrom).inDays;
+                debugPrint('[SupervisorDashboard][DateFrom] newFrom=$newFrom normalizedTo=$normalizedTo dayDiff=$dayDiff');
+
+                if (dayDiff > 6) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Maksimal filter adalah 7 hari')),
-                    );
+                    AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
                   }
                   return;
                 }
@@ -230,12 +232,14 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
               final newTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
               // Max 7 days constraint
               if (_dateFrom != null) {
-                final maxTo = _dateFrom!.add(const Duration(days: 6));
-                if (newTo.isAfter(maxTo)) {
+                final normalizedFrom = _dateOnly(_dateFrom!);
+                final normalizedTo = _dateOnly(newTo);
+                final dayDiff = normalizedTo.difference(normalizedFrom).inDays;
+                debugPrint('[SupervisorDashboard][DateTo] normalizedFrom=$normalizedFrom newTo=$newTo normalizedTo=$normalizedTo dayDiff=$dayDiff');
+
+                if (dayDiff > 6) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Maksimal filter adalah 7 hari')),
-                    );
+                    AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
                   }
                   return;
                 }
@@ -517,11 +521,19 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
   List<Map<String, dynamic>> _filterTasksByDate(List<Map<String, dynamic>> tasks) {
     if (_dateFrom == null || _dateTo == null) return tasks;
 
+    final fromDate = _dateOnly(_dateFrom!);
+    final toDate = _dateOnly(_dateTo!);
+
+    debugPrint('[SupervisorDashboard][Filter] fromDate=$fromDate toDate=$toDate rangeDays=${toDate.difference(fromDate).inDays + 1}');
+
     return tasks.where((task) {
       final taskDate = _parseDate(task['date']?.toString());
-      return !taskDate.isBefore(_dateFrom!) && !taskDate.isAfter(_dateTo!);
+      final normalizedTaskDate = _dateOnly(taskDate);
+      return !normalizedTaskDate.isBefore(fromDate) && !normalizedTaskDate.isAfter(toDate);
     }).toList();
   }
+
+  DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
 
   Map<String, int> _groupTasksByDay(List<Map<String, dynamic>> tasks) {
     final Map<String, int> grouped = {};

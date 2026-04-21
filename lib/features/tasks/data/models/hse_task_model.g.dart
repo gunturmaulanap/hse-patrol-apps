@@ -28,6 +28,8 @@ _$HseTaskModelImpl _$$HseTaskModelImplFromJson(Map<String, dynamic> json) =>
           const [],
       date: json['date'] as String?,
       userName: json['userName'] as String?,
+      cancelledBy: json['cancelled_by'] as String?,
+      cancelledAt: json['cancelled_at'] as String?,
     );
 
 Map<String, dynamic> _$$HseTaskModelImplToJson(_$HseTaskModelImpl instance) =>
@@ -46,4 +48,6 @@ Map<String, dynamic> _$$HseTaskModelImplToJson(_$HseTaskModelImpl instance) =>
       'followUps': instance.followUps,
       'date': instance.date,
       'userName': instance.userName,
+      'cancelled_by': instance.cancelledBy,
+      'cancelled_at': instance.cancelledAt,
     };

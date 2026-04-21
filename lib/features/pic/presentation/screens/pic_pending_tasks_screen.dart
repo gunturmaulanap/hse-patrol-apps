@@ -24,6 +24,40 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
   int _rejectedLimit = 5;
   int _newLimit = 5;
 
+  Future<void> _onRefresh() async {
+    debugPrint('[PicPendingTasksScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(areaByUserProvider);
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+      ref.read(areaByUserProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    final totalAreas = (results[2] as List).length;
+    debugPrint(
+      '[PicPendingTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps areas=$totalAreas',
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(areaByUserProvider);
+      ref.read(tasksFutureProvider.future);
+      ref.read(petugasTaskMapsProvider.future);
+      ref.read(areaByUserProvider.future);
+      debugPrint('[PicPendingTasksScreen] init refresh task/area providers');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -92,27 +126,42 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: pendingTasks.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 64, color: Colors.green),
-                    ),
-                    const SizedBox(height: 24),
-                    Text('All Caught Up!', style: AppTypography.h2),
-                    const SizedBox(height: 8),
-                    Text('Tidak ada tugas pending saat ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
-                  ],
+        child: RefreshIndicator(
+          onRefresh: _onRefresh,
+          child: pendingTasks.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
                 ),
+                children: [
+                  SizedBox(
+                    height: 420,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), size: 64, color: Colors.green),
+                          ),
+                          const SizedBox(height: 24),
+                          Text('All Caught Up!', style: AppTypography.h2),
+                          const SizedBox(height: 8),
+                          Text('Tidak ada tugas pending saat ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               )
             : ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 padding: const EdgeInsets.all(24),
                 children: [
                   // Alert Banner Jika Ada Task Rejected (Sangat Urgent)
@@ -138,7 +187,7 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
                               children: [
                                 Text('Urgent Revision Needed', style: AppTypography.body1.copyWith(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                Text('Terdapat ${rejectedTasks.length} tindak lanjut yang ditolak oleh petugas.', style: AppTypography.caption.copyWith(color: AppColors.textPrimary)),
+                                Text('Terdapat ${rejectedTasks.length} tindak lanjut yang ditolak oleh petugas.', style: AppTypography.caption.copyWith(color: Colors.black)),
                               ],
                             ),
                           ),
@@ -223,6 +272,7 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
                   const SizedBox(height: 100), // Spacing bawah untuk bottom nav dan FAB
                 ],
               ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.goNamed(RouteNames.picHome),
@@ -239,6 +289,11 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
 
   // --- Helpers ---
 
+  String _canonicalStatus(dynamic raw) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return value.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
   // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
   String _getActualStatus(Map<String, dynamic> report) {
     final followUps = report['followUps'] as List<dynamic>? ??
@@ -246,12 +301,27 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
-      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+      final lastStatus = _canonicalStatus(lastFollowUp['status']);
 
       // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
       if (lastStatus == 'rejected') {
         return 'Pending Rejected';
       }
+    }
+
+    final rawStatus = report['status'];
+    final status = _canonicalStatus(rawStatus);
+    debugPrint('[PicPendingTasksScreen] status normalization raw=$rawStatus canonical=$status');
+
+    if (status == 'pending') return 'Pending';
+    if (status == 'followupdone' || status == 'followedup' || status == 'followup') {
+      return 'Follow Up Done';
+    }
+    if (status == 'completed' || status == 'approved' || status == 'done') {
+      return 'Completed';
+    }
+    if (status == 'canceled' || status == 'cancelled') {
+      return 'Canceled';
     }
 
     // Default ke status report
@@ -261,14 +331,18 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
   String _getPicStatusTag(Map<String, dynamic> report) {
     // Gunakan actual status yang sama dengan petugas/supervisor
     final actualStatus = _getActualStatus(report);
+    final normalized = _canonicalStatus(actualStatus);
+    debugPrint('[PicPendingTasksScreen] tag mapping actual=$actualStatus normalized=$normalized');
 
     // Penamaan POV PIC
-    if (actualStatus == 'Pending Rejected') {
+    if (normalized == 'pendingrejected') {
       return 'Pending Rejected';
-    } else if (actualStatus == 'Completed') {
+    } else if (normalized == 'completed' || normalized == 'approved') {
       return 'Approved'; // POV PIC melihat Completed sebagai Approved
-    } else if (actualStatus == 'Follow Up Done') {
+    } else if (normalized == 'followupdone' || normalized == 'followedup' || normalized == 'followup') {
       return 'Follow Up Done';
+    } else if (normalized == 'pending') {
+      return 'Pending';
     }
 
     return actualStatus; // Pending

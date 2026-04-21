@@ -21,7 +21,11 @@ class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
           ? (response.data['data'] as List<dynamic>? ?? [])
           : (response.data as List<dynamic>? ?? []);
 
-      return data.map((json) => AreaModel.fromJson(json as Map<String, dynamic>)).toList();
+      return data
+          .map(_toMapOrNull)
+          .whereType<Map<String, dynamic>>()
+          .map(AreaModel.fromJson)
+          .toList();
     } catch (e) {
       throw Exception('Gagal mengambil data areas: ${e.toString()}');
     }
@@ -37,7 +41,11 @@ class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
           ? (response.data['data'] as List<dynamic>? ?? [])
           : (response.data as List<dynamic>? ?? []);
 
-      return data.map((json) => AreaModel.fromJson(json as Map<String, dynamic>)).toList();
+      return data
+          .map(_toMapOrNull)
+          .whereType<Map<String, dynamic>>()
+          .map(AreaModel.fromJson)
+          .toList();
     } catch (e) {
       throw Exception('Gagal mengambil data areas by user: ${e.toString()}');
     }
@@ -59,5 +67,11 @@ class AreaRemoteDataSourceImpl implements AreaRemoteDataSource {
     } catch (e) {
       throw Exception('Gagal mengambil data building types: ${e.toString()}');
     }
+  }
+
+  Map<String, dynamic>? _toMapOrNull(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 }

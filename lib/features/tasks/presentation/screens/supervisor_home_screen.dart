@@ -21,6 +21,26 @@ class SupervisorHomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final ownReportsAsync = ref.watch(supervisorOwnTaskMapsProvider);
 
+    Future<void> onRefresh() async {
+      debugPrint('[SupervisorHomeScreen] pull-to-refresh triggered');
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(supervisorOwnTaskMapsProvider);
+      final results = await Future.wait([
+        ref.read(tasksFutureProvider.future),
+        ref.read(petugasTaskMapsProvider.future),
+        ref.read(supervisorOwnTaskMapsProvider.future),
+      ]);
+
+      final totalTasks = (results[0] as List).length;
+      final totalTaskMaps = (results[1] as List).length;
+      final totalOwn = (results[2] as List).length;
+
+      debugPrint(
+        '[SupervisorHomeScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps own=$totalOwn',
+      );
+    }
+
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.goNamed(RouteNames.login);
@@ -82,8 +102,13 @@ class SupervisorHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
           SliverToBoxAdapter(
             child: SafeArea(
               bottom: false,
@@ -221,7 +246,8 @@ class SupervisorHomeScreen extends ConsumerWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
+          ],
+        ),
       ),
     );
   }

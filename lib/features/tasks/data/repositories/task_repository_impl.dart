@@ -36,12 +36,17 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   @override
-  Future<void> cancelTask(int id) async {
-    return _remoteDataSource.cancelTask(id);
+  Future<HseTaskModel> cancelTask(int id, String canceledBy) async {
+    return _remoteDataSource.cancelTask(id, canceledBy);
   }
 
   @override
   Future<List<HseStaffModel>> getStaffs() async {
     return _remoteDataSource.fetchStaffs();
+  }
+
+  @override
+  Future<List<HseStaffModel>> getPicUsers() async {
+    return _remoteDataSource.fetchPicUsers();
   }
 }

@@ -40,6 +40,10 @@ mixin _$HseTaskModel {
       throw _privateConstructorUsedError;
   String? get date => throw _privateConstructorUsedError;
   String? get userName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'cancelled_by')
+  String? get cancelledBy => throw _privateConstructorUsedError;
+  @JsonKey(name: 'cancelled_at')
+  String? get cancelledAt => throw _privateConstructorUsedError;
 
   /// Serializes this HseTaskModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -71,7 +75,9 @@ abstract class $HseTaskModelCopyWith<$Res> {
       List<String> photos,
       List<Map<String, dynamic>> followUps,
       String? date,
-      String? userName});
+      String? userName,
+      @JsonKey(name: 'cancelled_by') String? cancelledBy,
+      @JsonKey(name: 'cancelled_at') String? cancelledAt});
 }
 
 /// @nodoc
@@ -103,6 +109,8 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
     Object? followUps = null,
     Object? date = freezed,
     Object? userName = freezed,
+    Object? cancelledBy = freezed,
+    Object? cancelledAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -161,6 +169,14 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
           ? _value.userName
           : userName // ignore: cast_nullable_to_non_nullable
               as String?,
+      cancelledBy: freezed == cancelledBy
+          ? _value.cancelledBy
+          : cancelledBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cancelledAt: freezed == cancelledAt
+          ? _value.cancelledAt
+          : cancelledAt // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -187,7 +203,9 @@ abstract class _$$HseTaskModelImplCopyWith<$Res>
       List<String> photos,
       List<Map<String, dynamic>> followUps,
       String? date,
-      String? userName});
+      String? userName,
+      @JsonKey(name: 'cancelled_by') String? cancelledBy,
+      @JsonKey(name: 'cancelled_at') String? cancelledAt});
 }
 
 /// @nodoc
@@ -217,6 +235,8 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
     Object? followUps = null,
     Object? date = freezed,
     Object? userName = freezed,
+    Object? cancelledBy = freezed,
+    Object? cancelledAt = freezed,
   }) {
     return _then(_$HseTaskModelImpl(
       id: null == id
@@ -275,6 +295,14 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
           ? _value.userName
           : userName // ignore: cast_nullable_to_non_nullable
               as String?,
+      cancelledBy: freezed == cancelledBy
+          ? _value.cancelledBy
+          : cancelledBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cancelledAt: freezed == cancelledAt
+          ? _value.cancelledAt
+          : cancelledAt // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -296,7 +324,9 @@ class _$HseTaskModelImpl implements _HseTaskModel {
       final List<String> photos = const [],
       final List<Map<String, dynamic>> followUps = const [],
       this.date,
-      this.userName})
+      this.userName,
+      @JsonKey(name: 'cancelled_by') this.cancelledBy,
+      @JsonKey(name: 'cancelled_at') this.cancelledAt})
       : _photos = photos,
         _followUps = followUps;
 
@@ -350,10 +380,16 @@ class _$HseTaskModelImpl implements _HseTaskModel {
   final String? date;
   @override
   final String? userName;
+  @override
+  @JsonKey(name: 'cancelled_by')
+  final String? cancelledBy;
+  @override
+  @JsonKey(name: 'cancelled_at')
+  final String? cancelledAt;
 
   @override
   String toString() {
-    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date, userName: $userName)';
+    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date, userName: $userName, cancelledBy: $cancelledBy, cancelledAt: $cancelledAt)';
   }
 
   @override
@@ -379,7 +415,11 @@ class _$HseTaskModelImpl implements _HseTaskModel {
                 .equals(other._followUps, _followUps) &&
             (identical(other.date, date) || other.date == date) &&
             (identical(other.userName, userName) ||
-                other.userName == userName));
+                other.userName == userName) &&
+            (identical(other.cancelledBy, cancelledBy) ||
+                other.cancelledBy == cancelledBy) &&
+            (identical(other.cancelledAt, cancelledAt) ||
+                other.cancelledAt == cancelledAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -399,7 +439,9 @@ class _$HseTaskModelImpl implements _HseTaskModel {
       const DeepCollectionEquality().hash(_photos),
       const DeepCollectionEquality().hash(_followUps),
       date,
-      userName);
+      userName,
+      cancelledBy,
+      cancelledAt);
 
   /// Create a copy of HseTaskModel
   /// with the given fields replaced by the non-null parameter values.
@@ -419,20 +461,23 @@ class _$HseTaskModelImpl implements _HseTaskModel {
 
 abstract class _HseTaskModel implements HseTaskModel {
   const factory _HseTaskModel(
-      {required final int id,
-      required final String code,
-      @JsonKey(name: 'user_id') required final int userId,
-      @JsonKey(name: 'area_id') required final int areaId,
-      final String? name,
-      @JsonKey(name: 'risk_level') required final String riskLevel,
-      @JsonKey(name: 'root_cause') required final String rootCause,
-      required final String notes,
-      required final String status,
-      @JsonKey(name: 'pic_token') final String? picToken,
-      final List<String> photos,
-      final List<Map<String, dynamic>> followUps,
-      final String? date,
-      final String? userName}) = _$HseTaskModelImpl;
+          {required final int id,
+          required final String code,
+          @JsonKey(name: 'user_id') required final int userId,
+          @JsonKey(name: 'area_id') required final int areaId,
+          final String? name,
+          @JsonKey(name: 'risk_level') required final String riskLevel,
+          @JsonKey(name: 'root_cause') required final String rootCause,
+          required final String notes,
+          required final String status,
+          @JsonKey(name: 'pic_token') final String? picToken,
+          final List<String> photos,
+          final List<Map<String, dynamic>> followUps,
+          final String? date,
+          final String? userName,
+          @JsonKey(name: 'cancelled_by') final String? cancelledBy,
+          @JsonKey(name: 'cancelled_at') final String? cancelledAt}) =
+      _$HseTaskModelImpl;
 
   factory _HseTaskModel.fromJson(Map<String, dynamic> json) =
       _$HseTaskModelImpl.fromJson;
@@ -470,6 +515,12 @@ abstract class _HseTaskModel implements HseTaskModel {
   String? get date;
   @override
   String? get userName;
+  @override
+  @JsonKey(name: 'cancelled_by')
+  String? get cancelledBy;
+  @override
+  @JsonKey(name: 'cancelled_at')
+  String? get cancelledAt;
 
   /// Create a copy of HseTaskModel
   /// with the given fields replaced by the non-null parameter values.

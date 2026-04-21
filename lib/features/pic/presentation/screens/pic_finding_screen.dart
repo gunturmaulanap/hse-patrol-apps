@@ -20,6 +20,36 @@ class PicFindingScreen extends ConsumerStatefulWidget {
 class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
   int _limit = 5;
 
+  Future<void> _onRefresh() async {
+    debugPrint('[PicFindingScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    debugPrint(
+      '[PicFindingScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps',
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
+      ref.read(tasksFutureProvider.future);
+      ref.read(petugasTaskMapsProvider.future);
+      debugPrint('[PicFindingScreen] init refresh petugasTaskMapsProvider');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeArea = ref.watch(activeAreaFilterProvider);
@@ -30,13 +60,18 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
     // Sembunyikan task yang sudah di Canceled oleh petugas.
     final tasksInArea = reports.where((r) {
       final isAreaMatch = (r['area']?.toString() ?? '') == activeArea;
-      final isNotCanceled = r['status'] != 'Canceled';
+      final isNotCanceled = _getPicStatusTag(r) != 'Canceled';
       return isAreaMatch && isNotCanceled;
     }).toList()
       ..sort((a, b) => _safeParseDate(b['date']?.toString()).compareTo(_safeParseDate(a['date']?.toString())));
 
     // Hitung status untuk insight
-    final pendingCount = tasksInArea.where((r) => r['status'] == 'Pending').length;
+    final pendingCount = tasksInArea
+        .where((r) {
+          final tag = _getPicStatusTag(r);
+          return tag == 'Pending' || tag == 'Pending Rejected';
+        })
+        .length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -140,55 +175,75 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
             // List of Tasks
             Expanded(
               child: tasksInArea.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  ? RefreshIndicator(
+                      onRefresh: _onRefresh,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.all(24),
                         children: [
-                          Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 64, color: AppColors.surfaceLight),
-                          const SizedBox(height: 16),
-                          Text('Tidak ada temuan di area ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+                          SizedBox(
+                            height: 260,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin), size: 64, color: AppColors.surfaceLight),
+                                  const SizedBox(height: 16),
+                                  Text('Tidak ada temuan di area ini.', style: AppTypography.body1.copyWith(color: AppColors.textSecondary)),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     )
                   : (() {
                       final visibleTasks = tasksInArea.take(_limit).toList();
                       final hasMore = tasksInArea.length > _limit;
-                      return ListView(
-                        padding: const EdgeInsets.all(24),
-                        children: [
-                          ...visibleTasks.map((task) => Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildExactTaskCard(
-                              context,
-                              title: _getReportTitle(task),
-                              dateString: task['date']?.toString(),
-                              rawStatus: task['status']?.toString() ?? 'Pending',
-                              tag: _getPicStatusTag(task),
-                              reportId: task['id'].toString(),
-                            ),
-                          )),
-                          if (hasMore)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(top: 8),
-                              child: TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _limit = tasksInArea.length;
-                                  });
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                                ),
-                                child: Text(
-                                  'Tampilkan ${tasksInArea.length - _limit} Temuan Lainnya',
-                                  style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      return RefreshIndicator(
+                        onRefresh: _onRefresh,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          padding: const EdgeInsets.all(24),
+                          children: [
+                            ...visibleTasks.map((task) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildExactTaskCard(
+                                context,
+                                title: _getReportTitle(task),
+                                dateString: task['date']?.toString(),
+                                rawStatus: task['status']?.toString() ?? 'Pending',
+                                tag: _getPicStatusTag(task),
+                                reportId: task['id'].toString(),
+                              ),
+                            )),
+                            if (hasMore)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(top: 8),
+                                child: TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _limit = tasksInArea.length;
+                                    });
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                                  ),
+                                  child: Text(
+                                    'Tampilkan ${tasksInArea.length - _limit} Temuan Lainnya',
+                                    style: AppTypography.body1.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       );
                     })(),
             ),
@@ -210,6 +265,11 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
     }
   }
 
+  String _canonicalStatus(dynamic raw) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return value.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
   // Helper untuk menentukan status sebenarnya dari report (sama seperti di petugas/supervisor)
   String _getActualStatus(Map<String, dynamic> report) {
     final followUps = report['followUps'] as List<dynamic>? ??
@@ -217,12 +277,27 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
 
     if (followUps.isNotEmpty) {
       final lastFollowUp = followUps.last as Map<String, dynamic>;
-      final lastStatus = lastFollowUp['status']?.toString().toLowerCase();
+      final lastStatus = _canonicalStatus(lastFollowUp['status']);
 
       // Jika follow-up terakhir rejected, maka status report adalah "Pending Rejected"
       if (lastStatus == 'rejected') {
         return 'Pending Rejected';
       }
+    }
+
+    final rawStatus = report['status'];
+    final status = _canonicalStatus(rawStatus);
+    debugPrint('[PicFindingScreen] status normalization raw=$rawStatus canonical=$status');
+
+    if (status == 'pending') return 'Pending';
+    if (status == 'followupdone' || status == 'followedup' || status == 'followup') {
+      return 'Follow Up Done';
+    }
+    if (status == 'completed' || status == 'approved' || status == 'done') {
+      return 'Completed';
+    }
+    if (status == 'canceled' || status == 'cancelled') {
+      return 'Canceled';
     }
 
     // Default ke status report
@@ -232,14 +307,18 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
   String _getPicStatusTag(Map<String, dynamic> report) {
     // Gunakan actual status yang sama dengan petugas/supervisor
     final actualStatus = _getActualStatus(report);
+    final normalized = _canonicalStatus(actualStatus);
+    debugPrint('[PicFindingScreen] tag mapping actual=$actualStatus normalized=$normalized');
 
     // Penamaan POV PIC
-    if (actualStatus == 'Pending Rejected') {
+    if (normalized == 'pendingrejected') {
       return 'Pending Rejected';
-    } else if (actualStatus == 'Completed') {
+    } else if (normalized == 'completed' || normalized == 'approved') {
       return 'Approved'; // POV PIC melihat Completed sebagai Approved
-    } else if (actualStatus == 'Follow Up Done') {
+    } else if (normalized == 'followupdone' || normalized == 'followedup' || normalized == 'followup') {
       return 'Follow Up Done';
+    } else if (normalized == 'pending') {
+      return 'Pending';
     }
 
     return actualStatus; // Pending

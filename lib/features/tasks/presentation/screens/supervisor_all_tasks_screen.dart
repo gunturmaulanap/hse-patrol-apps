@@ -34,16 +34,24 @@ class _SupervisorAllTasksScreenState
   String _scope = 'own';
   int? _selectedStaffId;
   final Map<String, int> _visibleCountPerArea = {};
+  String _lastFilterSignature = '';
 
+  void _resetPagination() {
+    _visibleCountPerArea.clear();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      ref.invalidate(tasksFutureProvider);
+      ref.invalidate(petugasTaskMapsProvider);
       ref.invalidate(supervisorOwnTaskMapsProvider);
       ref.invalidate(supervisorStaffTaskMapsProvider);
       ref.invalidate(staffListProvider);
+      ref.read(tasksFutureProvider.future);
+      ref.read(petugasTaskMapsProvider.future);
       ref.read(supervisorOwnTaskMapsProvider.future);
       ref.read(supervisorStaffTaskMapsProvider.future);
       ref.read(staffListProvider.future);
@@ -54,6 +62,32 @@ class _SupervisorAllTasksScreenState
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onRefresh() async {
+    debugPrint('[SupervisorAllTasksScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(supervisorOwnTaskMapsProvider);
+    ref.invalidate(supervisorStaffTaskMapsProvider);
+    ref.invalidate(staffListProvider);
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+      ref.read(supervisorOwnTaskMapsProvider.future),
+      ref.read(supervisorStaffTaskMapsProvider.future),
+      ref.read(staffListProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalPetugasMaps = (results[1] as List).length;
+    final totalOwn = (results[2] as List).length;
+    final totalStaff = (results[3] as List).length;
+    final totalStaffList = (results[4] as List).length;
+
+    debugPrint(
+      '[SupervisorAllTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalPetugasMaps own=$totalOwn staff=$totalStaff staffs=$totalStaffList',
+    );
   }
 
   @override
@@ -77,6 +111,13 @@ class _SupervisorAllTasksScreenState
     final staffTasks = staffAsync.valueOrNull ?? <Map<String, dynamic>>[];
     final staffList = staffListAsync.valueOrNull ?? <HseStaffModel>[];
 
+    final filterSignature =
+        'scope=$_scope|staff=${_selectedStaffId ?? '-'}|q=${_searchQuery.trim()}|from=${_dateFrom?.toIso8601String() ?? '-'}|to=${_dateTo?.toIso8601String() ?? '-'}';
+    if (_lastFilterSignature != filterSignature) {
+      _lastFilterSignature = filterSignature;
+      _resetPagination();
+    }
+
     // Build staff entries dari API staff list
     final staffEntries = staffList
         .map((staff) => _StaffEntry(id: staff.id, name: staff.name))
@@ -92,12 +133,20 @@ class _SupervisorAllTasksScreenState
                 .where((e) => _taskOwnerId(e) == selectedStaffId)
                 .toList();
 
+    debugPrint(
+      '[SupervisorAllTasksScreen] scope=$_scope source=${sourceList.length} '
+      'dateBuckets=${_buildDateBuckets(sourceList)}',
+    );
+
     if ((_scope == 'staff') &&
         _selectedStaffId == null &&
         staffEntries.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          setState(() => _selectedStaffId = staffEntries.first.id);
+          setState(() {
+            _selectedStaffId = staffEntries.first.id;
+            _resetPagination();
+          });
         }
       });
     }
@@ -185,6 +234,7 @@ class _SupervisorAllTasksScreenState
                             onPressed: () => setState(() {
                               _dateFrom = null;
                               _dateTo = null;
+                              _resetPagination();
                             }),
                           ),
                       ],
@@ -196,8 +246,10 @@ class _SupervisorAllTasksScreenState
                       controller: _searchController,
                       style: AppTypography.body1
                           .copyWith(color: AppColors.textPrimary),
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
+                      onChanged: (value) => setState(() {
+                        _searchQuery = value;
+                        _resetPagination();
+                      }),
                       decoration: InputDecoration(
                         hintText: 'Search...',
                         hintStyle: AppTypography.body1
@@ -213,7 +265,10 @@ class _SupervisorAllTasksScreenState
                                     size: 18),
                                 onPressed: () {
                                   _searchController.clear();
-                                  setState(() => _searchQuery = '');
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _resetPagination();
+                                  });
                                 },
                               )
                             : null,
@@ -326,6 +381,7 @@ class _SupervisorAllTasksScreenState
         if (_dateTo != null && _dateTo!.isBefore(_dateFrom!)) {
           _dateTo = _dateFrom;
         }
+        _resetPagination();
       });
     }
   }
@@ -340,6 +396,7 @@ class _SupervisorAllTasksScreenState
     if (picked != null) {
       setState(() {
         _dateTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+        _resetPagination();
       });
     }
   }
@@ -359,7 +416,10 @@ class _SupervisorAllTasksScreenState
               child: _scopeTabButton(
                 label: 'Own Task',
                 selected: _scope == 'own',
-                onTap: () => setState(() => _scope = 'own'),
+                onTap: () => setState(() {
+                  _scope = 'own';
+                  _resetPagination();
+                }),
               ),
             ),
             const SizedBox(width: 8),
@@ -367,7 +427,10 @@ class _SupervisorAllTasksScreenState
               child: _scopeTabButton(
                 label: 'Staff Task',
                 selected: _scope == 'staff',
-                onTap: () => setState(() => _scope = 'staff'),
+                onTap: () => setState(() {
+                  _scope = 'staff';
+                  _resetPagination();
+                }),
               ),
             ),
           ],
@@ -429,7 +492,10 @@ class _SupervisorAllTasksScreenState
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: _chip(entry.name, isSelected,
-                () => setState(() => _selectedStaffId = entry.id)),
+                () => setState(() {
+                      _selectedStaffId = entry.id;
+                      _resetPagination();
+                    })),
           );
         }).toList(),
       ),
@@ -444,6 +510,28 @@ class _SupervisorAllTasksScreenState
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw?.toString() ?? '') ?? 0;
+  }
+
+  Map<String, int> _buildDateBuckets(List<Map<String, dynamic>> reports,
+      {int maxBuckets = 10}) {
+    final buckets = <String, int>{};
+    for (final report in reports) {
+      final key = _dateKey(report['date']);
+      buckets[key] = (buckets[key] ?? 0) + 1;
+    }
+    final sorted = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
+    return {
+      for (final key in sorted.take(maxBuckets)) key: buckets[key] ?? 0,
+    };
+  }
+
+  String _dateKey(dynamic rawDate) {
+    final parsed = DateTime.tryParse(rawDate?.toString() ?? '');
+    if (parsed == null) return 'invalid';
+    final y = parsed.year.toString().padLeft(4, '0');
+    final m = parsed.month.toString().padLeft(2, '0');
+    final d = parsed.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
   Widget _chip(String text, bool selected, VoidCallback onTap) {
@@ -522,19 +610,32 @@ class _SupervisorAllTasksScreenState
     }
 
     if (filtered.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           children: [
-            Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin),
-                size: 48, color: AppColors.surfaceLight),
-            const SizedBox(height: 12),
-            Text(
-              _searchQuery.isNotEmpty
-                  ? 'No tasks found for "$_searchQuery"'
-                  : 'No $filter tasks yet.',
-              style:
-                  AppTypography.body1.copyWith(color: AppColors.textSecondary),
+            SizedBox(
+              height: 320,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(PhosphorIcons.folderOpen(PhosphorIconsStyle.thin),
+                        size: 48, color: AppColors.surfaceLight),
+                    const SizedBox(height: 12),
+                    Text(
+                      _searchQuery.isNotEmpty
+                          ? 'No tasks found for "$_searchQuery"'
+                          : 'No $filter tasks yet.',
+                      style:
+                          AppTypography.body1.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -555,8 +656,9 @@ class _SupervisorAllTasksScreenState
     for (int i = 0; i < sortedAreas.length; i++) {
         final area = sortedAreas[i];
         final tasks = grouped[area]!;
+        final areaPaginationKey = '$filter::$area';
 
-        final visibleCount = _visibleCountPerArea[area] ?? ProgressivePagination.getNextVisibleCount(0);
+        final visibleCount = _visibleCountPerArea[areaPaginationKey] ?? ProgressivePagination.getNextVisibleCount(0);
         final hasMore = ProgressivePagination.hasMore(visibleCount, tasks.length);
         final visibleTasks = tasks.take(visibleCount).toList();
 
@@ -600,7 +702,7 @@ class _SupervisorAllTasksScreenState
               child: TextButton(
                 onPressed: () {
                    setState(() {
-                     _visibleCountPerArea[area] = nextCount;
+                     _visibleCountPerArea[areaPaginationKey] = nextCount;
                    });
                 },
                 style: TextButton.styleFrom(
@@ -620,12 +722,18 @@ class _SupervisorAllTasksScreenState
         }
     }
 
-    return ListView.builder(
-      key: PageStorageKey<String>('supervisor_all_$filter'),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-      itemCount: listItems.length,
-      itemBuilder: (context, index) => listItems[index],
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: ListView.builder(
+        key: PageStorageKey<String>('supervisor_all_$filter'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        itemCount: listItems.length,
+        itemBuilder: (context, index) => listItems[index],
+      ),
     );
   }
 

@@ -27,6 +27,27 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  Future<void> _onRefresh() async {
+    debugPrint('[PetugasCalendarScreen] pull-to-refresh triggered');
+    ref.invalidate(tasksFutureProvider);
+    ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(petugasOwnTaskMapsProvider);
+
+    final results = await Future.wait([
+      ref.read(tasksFutureProvider.future),
+      ref.read(petugasTaskMapsProvider.future),
+      ref.read(petugasOwnTaskMapsProvider.future),
+    ]);
+
+    final totalTasks = (results[0] as List).length;
+    final totalTaskMaps = (results[1] as List).length;
+    final totalOwn = (results[2] as List).length;
+
+    debugPrint(
+      '[PetugasCalendarScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps own=$totalOwn',
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -85,7 +106,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final reportsAsync = ref.watch(petugasOwnTaskMapsProvider);
 
     // FIX: Redirect ke login jika user null (setelah hot restart)
     if (user == null) {
@@ -118,6 +139,9 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     }
 
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    debugPrint(
+      '[PetugasCalendarScreen] userId=${user.id} ownReports=${reports.length}',
+    );
 
     if (reportsAsync.isLoading && reports.isEmpty) {
       return const Scaffold(
@@ -165,9 +189,11 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -295,14 +321,32 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
                 child: tasksForSelectedDate.isEmpty
-                    ? Center(
-                        child: Text(
-                            _searchQuery.isNotEmpty
-                                ? 'No tasks found.'
-                                : 'No schedules for today.',
-                            style: const TextStyle(
-                                color: Colors.grey, fontSize: 16)))
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(16, 32, 16, 120),
+                        children: [
+                          SizedBox(
+                            height: 220,
+                            child: Center(
+                              child: Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'No tasks found.'
+                                    : 'No schedules for today.',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
                     : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         padding: const EdgeInsets.fromLTRB(16, 32, 16, 120),
                         itemCount: tasksForSelectedDate.length,
                         itemBuilder: (context, index) {
@@ -391,6 +435,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

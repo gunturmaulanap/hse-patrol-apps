@@ -1,12 +1,11 @@
 /// Progressive pagination utility
-/// Implements exponential growth: 3 → 5 → 10 → 20 → 40 → ...
+/// Implements exponential growth: 5 → 10 → 20 → 40 → ...
 class ProgressivePagination {
   /// Get next visible count based on current count
   static int getNextVisibleCount(int currentCount) {
-    if (currentCount == 0) return 3;      // Initial: show 3
-    if (currentCount <= 3) return 5;       // Step 1: 3 → 5
-    if (currentCount <= 5) return 10;      // Step 2: 5 → 10
-    if (currentCount <= 10) return 20;     // Step 3: 10 → 20
+    if (currentCount == 0) return 5;       // Initial: show 5
+    if (currentCount <= 5) return 10;      // Step 1: 5 → 10
+    if (currentCount <= 10) return 20;     // Step 2: 10 → 20
     return currentCount * 2;               // Subsequent: x2
   }
 
@@ -17,18 +16,14 @@ class ProgressivePagination {
 
     if (visibleCount == 0) {
       // Initial load
-      perPage = 3;
-      currentPage = 1;
-    } else if (visibleCount <= 3) {
-      // 3 → 5: Need 2 more, but request page 1 with per_page=5
       perPage = 5;
       currentPage = 1;
     } else if (visibleCount <= 5) {
-      // 5 → 10: Need 5 more, request page 1 with per_page=10
+      // 5 → 10: request page 1 with per_page=10
       perPage = 10;
       currentPage = 1;
     } else if (visibleCount <= 10) {
-      // 10 → 20: Need 10 more, request page 1 with per_page=20
+      // 10 → 20: request page 1 with per_page=20
       perPage = 20;
       currentPage = 1;
     } else {

@@ -28,10 +28,16 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
     final draft = ref.read(picFollowUpFormProvider);
 
     try {
-      if (draft.reportId != null) {
+      final draftReportId = draft.reportId?.trim();
+      if (draftReportId != null && draftReportId.isNotEmpty) {
         // Submit to backend API
         final followUpRepo = ref.read(followUpRepositoryProvider);
-        final reportId = int.parse(draft.reportId!);
+        final reportId = int.tryParse(draftReportId);
+        if (reportId == null || reportId <= 0) {
+          throw Exception(
+            'ID laporan tidak valid. Silakan buka ulang detail laporan dari daftar tugas.',
+          );
+        }
 
         // Convert photo paths to File objects
         final photoFiles = draft.photos.map((path) => File(path)).toList();
@@ -49,20 +55,29 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
           photoFiles,
         );
 
-        // OPTIMIZATION: Only invalidate providers that are directly affected
-        // Instead of invalidating 6 providers, we only invalidate the specific task provider
-        // This will trigger a cascade update to dependent providers automatically
-        ref.invalidate(taskDetailMapProvider(draft.reportId!));
+        // Refresh provider tree agar status Follow Up Done langsung terlihat
+        // di daftar PIC saat user kembali dari task detail.
+        ref.invalidate(taskDetailMapProvider(reportId.toString()));
+        ref.invalidate(tasksFutureProvider);
+        ref.invalidate(petugasTaskMapsProvider);
+        ref.invalidate(supervisorOwnTaskMapsProvider);
+        ref.invalidate(supervisorStaffTaskMapsProvider);
+        ref.invalidate(supervisorAllVisibleTaskMapsProvider);
 
-        // Note: tasksFutureProvider will auto-refresh when user navigates back
-        // No need to invalidate all task map providers
+        // Trigger prefetch ringan supaya screen list tidak menunggu lama saat back.
+        ref.read(tasksFutureProvider.future);
+        ref.read(petugasTaskMapsProvider.future);
+
+        debugPrint(
+          '[PicFollowUpReviewScreen] follow-up submitted, invalidated task/list providers for reportId=$reportId',
+        );
       }
 
       if (mounted) {
         setState(() => _isSaving = false);
 
         // Ambil ID sebelum form reset
-        final finalReportId = draft.reportId!;
+        final finalReportId = draftReportId!;
 
         // Clear draft
         ref.read(picFollowUpFormProvider.notifier).reset();

@@ -5,11 +5,12 @@ class AppEnv {
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const bool enableRouteLogging = false;
 
-  // Enable detailed logging in debug mode, disable in production
-  static const bool enableLogging = bool.fromEnvironment('DEBUG', defaultValue: true);
+  // Logging aman: default OFF kecuali diaktifkan eksplisit via --dart-define=DEBUG=true
+  static const bool enableLogging =
+      bool.fromEnvironment('DEBUG', defaultValue: false);
 
   // API Configuration
-  static const int maxPaginationPages = 10; // Prevent infinite pagination
+  static const int maxPaginationPages = 200; // Safety guard tanpa mudah truncation
   static const int defaultPaginationPageSize = 100; // Backend limit: max 100 per page
   static const int maxPhotosPerTask = 3;
 

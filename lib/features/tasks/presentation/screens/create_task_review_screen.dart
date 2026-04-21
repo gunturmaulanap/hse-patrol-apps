@@ -110,18 +110,20 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
       final createdTask = await ref.read(createTaskFormProvider.notifier).submitTask();
 
       if (createdTask != null && createdTask is! bool && mounted) {
-        final picToken = _normalizePicToken(createdTask.picToken?.toString());
-        final deepLinkUrl = (picToken != null && picToken.isNotEmpty)
-            ? 'https://mes.aksamala.co.id/share/report/$picToken'
+        // Gunakan report ID untuk deep link (bukan picToken)
+        final reportId = createdTask.id?.toString() ?? '';
+        final deepLinkUrl = reportId.isNotEmpty
+            ? 'https://mes.aksamala.co.id/share/report/$reportId'
             : 'Link belum tersedia';
         debugPrint('[CreateTaskReviewScreen] share deep-link url: $deepLinkUrl');
+        final reporterName = _safeText(ref.read(currentUserProvider)?.name);
         
         // Format Teks Caption WA
         final areaLabel = _safeText(draft.area);
-        final waText = '''🚨 *LAPORAN TEMUAN HSE* 🚨
+        final waText = ''' *LAPORAN TEMUAN HSE*
 
+👤 *Pelapor:* $reporterName
 📍 *Area:* $areaLabel
-🏭 *Tipe Lokasi:* ${_locationTypeLabel(draft.buildingType)}
 ⚠️ *Tingkat Risiko:* ${_riskLevelLabel(draft.riskLevel)}
 📝 *Akar Masalah:* ${draft.rootCause}
 💬 *Keterangan:* ${draft.notes}
