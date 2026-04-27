@@ -9,6 +9,7 @@ import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/shimmer/base_shimmer.dart';
 import '../../../../core/widgets/shimmer/shimmer_box.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
@@ -29,9 +30,10 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
     ref.invalidate(tasksFutureProvider);
     ref.invalidate(petugasTaskMapsProvider);
     ref.invalidate(areaByUserProvider);
+    ref.invalidate(picAccessibleTaskMapsProvider);
     final results = await Future.wait([
       ref.read(tasksFutureProvider.future),
-      ref.read(petugasTaskMapsProvider.future),
+      ref.read(picAccessibleTaskMapsProvider.future),
       ref.read(areaByUserProvider.future),
     ]);
 
@@ -51,8 +53,9 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
       ref.invalidate(areaByUserProvider);
+      ref.invalidate(picAccessibleTaskMapsProvider);
       ref.read(tasksFutureProvider.future);
-      ref.read(petugasTaskMapsProvider.future);
+      ref.read(picAccessibleTaskMapsProvider.future);
       ref.read(areaByUserProvider.future);
       debugPrint('[PicPendingTasksScreen] init refresh task/area providers');
     });
@@ -61,8 +64,7 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
-    final areasAsync = ref.watch(areaByUserProvider);
+    final reportsAsync = ref.watch(picAccessibleTaskMapsProvider);
 
     // FIX: Redirect ke login jika user null
     if (user == null) {
@@ -79,19 +81,29 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
       );
     }
 
-    final areaAccess = (areasAsync.valueOrNull ?? const [])
-        .map((a) => a.name)
-        .toSet();
+    if (!isPicScopedRole(user.role)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Filter Task:
-    // 1. Hanya Area yang dimiliki PIC
-    // 2. Status yang butuh action PIC: "Pending" atau "Pending Rejected" (Follow Up Done yg di-reject)
+    // Data reports di sini SUDAH difilter oleh [`picAccessibleTaskMapsProvider`](lib/features/tasks/presentation/providers/task_provider.dart:78)
+    // berdasarkan role_id 5 / 24 / 25 dan area akses. Jadi screen ini cukup
+    // memakai kriteria yang sama seperti badge action-needed di Home:
+    // Pending + Pending Rejected.
     final pendingTasks = reports.where((r) {
-      final isMyArea = areaAccess.contains(r['area']);
       final picStatusTag = _getPicStatusTag(r);
       final needsAction = picStatusTag == 'Pending' || picStatusTag == 'Pending Rejected';
-      return isMyArea && needsAction;
+      return needsAction;
     }).toList()
       ..sort((a, b) => _safeParseDate(b['date']?.toString()).compareTo(_safeParseDate(a['date']?.toString())));
 

@@ -7,6 +7,10 @@ enum UserRole {
   hseSupervisor,
   @JsonValue('pic')
   pic,
+  @JsonValue('picEngineer')
+  picEngineer,
+  @JsonValue('picHrga')
+  picHrga,
 }
 
 extension UserRoleX on UserRole {
@@ -18,6 +22,10 @@ extension UserRoleX on UserRole {
         return 'hseSupervisor';
       case UserRole.pic:
         return 'pic';
+      case UserRole.picEngineer:
+        return 'picEngineer';
+      case UserRole.picHrga:
+        return 'picHrga';
     }
   }
 
@@ -29,6 +37,10 @@ extension UserRoleX on UserRole {
         return UserRole.hseSupervisor;
       case 'pic':
         return UserRole.pic;
+      case 'picEngineer':
+        return UserRole.picEngineer;
+      case 'picHrga':
+        return UserRole.picHrga;
       default:
         return UserRole.petugasHse;
     }

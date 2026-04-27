@@ -234,6 +234,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                     child: _buildExactTaskCard(
                       context,
                       title: _getReportTitle(task),
+                      locationLabel: _getLocationLabel(task),
                       dateString: task['date']?.toString(),
                       rawStatus: actualStatus,
                       tag: _getStatusTag(actualStatus),
@@ -406,6 +407,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
   Widget _buildExactTaskCard(
     BuildContext context, {
     required String title,
+    required String locationLabel,
     required String? dateString,
     required String rawStatus,
     required String reportId,
@@ -418,12 +420,12 @@ class SupervisorHomeScreen extends ConsumerWidget {
 
     return InkWell(
       onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
@@ -433,7 +435,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
               child: CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -445,7 +447,9 @@ class SupervisorHomeScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           title,
-                          style: AppTypography.h2.copyWith(color: textColor, fontSize: 18, fontWeight: FontWeight.w600, height: 1.2),
+                          style: AppTypography.h2.copyWith(color: textColor, fontSize: 16, fontWeight: FontWeight.w600, height: 1.2),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (tag != null) ...[
@@ -458,13 +462,36 @@ class SupervisorHomeScreen extends ConsumerWidget {
                           ),
                           child: Text(
                             tag,
-                            style: AppTypography.caption.copyWith(color: isDark ? Colors.white : const Color(0xFF6B6E94), fontWeight: FontWeight.w600),
+                            style: AppTypography.caption.copyWith(color: isDark ? Colors.white : const Color(0xFF6B6E94), fontWeight: FontWeight.w600, fontSize: 11),
                           ),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                        size: 14,
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          locationLabel,
+                          style: AppTypography.body1.copyWith(
+                            color: textColor.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -475,7 +502,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                             Expanded(
                               child: Text(
                                 _formatIndonesianDate(dateString),
-                                style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
+                                style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -490,7 +517,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
                           const SizedBox(width: 6),
                           Text(
                             _formatTime(dateString),
-                            style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
+                            style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 12),
                           ),
                         ],
                       ),
@@ -552,6 +579,25 @@ class SupervisorHomeScreen extends ConsumerWidget {
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  String _getLocationLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return 'Lokasi tidak tersedia';
   }
 
   DateTime _tryParseDate(String? dateStr) {

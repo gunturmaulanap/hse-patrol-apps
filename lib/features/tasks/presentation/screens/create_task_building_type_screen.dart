@@ -52,7 +52,7 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
               ),
             ),
             Text(
-              'Pilih Jenis Fasilitas/Bangunan',
+              'Pilih Jenis Bangunan',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -89,17 +89,17 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
                     separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
                     itemBuilder: (context, index) {
                       final type = types[index];
-                      final isProduction = type.toLowerCase().contains('produksi') && !type.toLowerCase().contains('non');
+                      final isAtas = type.toLowerCase().contains('atas');
 
                       return AppCard(
                         child: _BuildingTypeCard(
-                          icon: isProduction
-                              ? HugeIcons.strokeRoundedFactory
-                              : HugeIcons.strokeRoundedTree02,
+                          icon: isAtas
+                              ? HugeIcons.strokeRoundedBuilding03
+                              : HugeIcons.strokeRoundedBuilding04,
                           title: type,
-                          description: isProduction
-                              ? 'Area pabrik, gudang bahan baku, dan area operasional produksi.'
-                              : 'Kantor umum, area parkir, kantin, dan area non produksi.',
+                          description: isAtas
+                              ? 'Fasilitas atau bangunan yang berlokasi di area atas.'
+                              : 'Fasilitas atau bangunan yang berlokasi di area bawah.',
                           isSelected: form.buildingType == type,
                           onTap: () {
                             ref.read(createTaskFormProvider.notifier).setBuildingType(type);

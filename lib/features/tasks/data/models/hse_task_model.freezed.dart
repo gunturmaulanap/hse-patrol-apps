@@ -22,27 +22,21 @@ HseTaskModel _$HseTaskModelFromJson(Map<String, dynamic> json) {
 mixin _$HseTaskModel {
   int get id => throw _privateConstructorUsedError;
   String get code => throw _privateConstructorUsedError;
-  @JsonKey(name: 'user_id')
   int get userId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'area_id')
   int get areaId => throw _privateConstructorUsedError;
   String? get name => throw _privateConstructorUsedError;
-  @JsonKey(name: 'risk_level')
   String get riskLevel => throw _privateConstructorUsedError;
-  @JsonKey(name: 'root_cause')
   String get rootCause => throw _privateConstructorUsedError;
   String get notes => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
-  @JsonKey(name: 'pic_token')
+  int get toDepartment => throw _privateConstructorUsedError;
   String? get picToken => throw _privateConstructorUsedError;
   List<String> get photos => throw _privateConstructorUsedError;
   List<Map<String, dynamic>> get followUps =>
       throw _privateConstructorUsedError;
   String? get date => throw _privateConstructorUsedError;
   String? get userName => throw _privateConstructorUsedError;
-  @JsonKey(name: 'cancelled_by')
   String? get cancelledBy => throw _privateConstructorUsedError;
-  @JsonKey(name: 'cancelled_at')
   String? get cancelledAt => throw _privateConstructorUsedError;
 
   /// Serializes this HseTaskModel to a JSON map.
@@ -64,20 +58,21 @@ abstract class $HseTaskModelCopyWith<$Res> {
   $Res call(
       {int id,
       String code,
-      @JsonKey(name: 'user_id') int userId,
-      @JsonKey(name: 'area_id') int areaId,
+      int userId,
+      int areaId,
       String? name,
-      @JsonKey(name: 'risk_level') String riskLevel,
-      @JsonKey(name: 'root_cause') String rootCause,
+      String riskLevel,
+      String rootCause,
       String notes,
       String status,
-      @JsonKey(name: 'pic_token') String? picToken,
+      int toDepartment,
+      String? picToken,
       List<String> photos,
       List<Map<String, dynamic>> followUps,
       String? date,
       String? userName,
-      @JsonKey(name: 'cancelled_by') String? cancelledBy,
-      @JsonKey(name: 'cancelled_at') String? cancelledAt});
+      String? cancelledBy,
+      String? cancelledAt});
 }
 
 /// @nodoc
@@ -104,6 +99,7 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
     Object? rootCause = null,
     Object? notes = null,
     Object? status = null,
+    Object? toDepartment = null,
     Object? picToken = freezed,
     Object? photos = null,
     Object? followUps = null,
@@ -149,6 +145,10 @@ class _$HseTaskModelCopyWithImpl<$Res, $Val extends HseTaskModel>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as String,
+      toDepartment: null == toDepartment
+          ? _value.toDepartment
+          : toDepartment // ignore: cast_nullable_to_non_nullable
+              as int,
       picToken: freezed == picToken
           ? _value.picToken
           : picToken // ignore: cast_nullable_to_non_nullable
@@ -192,20 +192,21 @@ abstract class _$$HseTaskModelImplCopyWith<$Res>
   $Res call(
       {int id,
       String code,
-      @JsonKey(name: 'user_id') int userId,
-      @JsonKey(name: 'area_id') int areaId,
+      int userId,
+      int areaId,
       String? name,
-      @JsonKey(name: 'risk_level') String riskLevel,
-      @JsonKey(name: 'root_cause') String rootCause,
+      String riskLevel,
+      String rootCause,
       String notes,
       String status,
-      @JsonKey(name: 'pic_token') String? picToken,
+      int toDepartment,
+      String? picToken,
       List<String> photos,
       List<Map<String, dynamic>> followUps,
       String? date,
       String? userName,
-      @JsonKey(name: 'cancelled_by') String? cancelledBy,
-      @JsonKey(name: 'cancelled_at') String? cancelledAt});
+      String? cancelledBy,
+      String? cancelledAt});
 }
 
 /// @nodoc
@@ -230,6 +231,7 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
     Object? rootCause = null,
     Object? notes = null,
     Object? status = null,
+    Object? toDepartment = null,
     Object? picToken = freezed,
     Object? photos = null,
     Object? followUps = null,
@@ -275,6 +277,10 @@ class __$$HseTaskModelImplCopyWithImpl<$Res>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as String,
+      toDepartment: null == toDepartment
+          ? _value.toDepartment
+          : toDepartment // ignore: cast_nullable_to_non_nullable
+              as int,
       picToken: freezed == picToken
           ? _value.picToken
           : picToken // ignore: cast_nullable_to_non_nullable
@@ -313,20 +319,21 @@ class _$HseTaskModelImpl implements _HseTaskModel {
   const _$HseTaskModelImpl(
       {required this.id,
       required this.code,
-      @JsonKey(name: 'user_id') required this.userId,
-      @JsonKey(name: 'area_id') required this.areaId,
+      required this.userId,
+      required this.areaId,
       this.name,
-      @JsonKey(name: 'risk_level') required this.riskLevel,
-      @JsonKey(name: 'root_cause') required this.rootCause,
+      required this.riskLevel,
+      required this.rootCause,
       required this.notes,
       required this.status,
-      @JsonKey(name: 'pic_token') this.picToken,
+      this.toDepartment = 0,
+      this.picToken,
       final List<String> photos = const [],
       final List<Map<String, dynamic>> followUps = const [],
       this.date,
       this.userName,
-      @JsonKey(name: 'cancelled_by') this.cancelledBy,
-      @JsonKey(name: 'cancelled_at') this.cancelledAt})
+      this.cancelledBy,
+      this.cancelledAt})
       : _photos = photos,
         _followUps = followUps;
 
@@ -338,25 +345,23 @@ class _$HseTaskModelImpl implements _HseTaskModel {
   @override
   final String code;
   @override
-  @JsonKey(name: 'user_id')
   final int userId;
   @override
-  @JsonKey(name: 'area_id')
   final int areaId;
   @override
   final String? name;
   @override
-  @JsonKey(name: 'risk_level')
   final String riskLevel;
   @override
-  @JsonKey(name: 'root_cause')
   final String rootCause;
   @override
   final String notes;
   @override
   final String status;
   @override
-  @JsonKey(name: 'pic_token')
+  @JsonKey()
+  final int toDepartment;
+  @override
   final String? picToken;
   final List<String> _photos;
   @override
@@ -381,15 +386,13 @@ class _$HseTaskModelImpl implements _HseTaskModel {
   @override
   final String? userName;
   @override
-  @JsonKey(name: 'cancelled_by')
   final String? cancelledBy;
   @override
-  @JsonKey(name: 'cancelled_at')
   final String? cancelledAt;
 
   @override
   String toString() {
-    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date, userName: $userName, cancelledBy: $cancelledBy, cancelledAt: $cancelledAt)';
+    return 'HseTaskModel(id: $id, code: $code, userId: $userId, areaId: $areaId, name: $name, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, status: $status, toDepartment: $toDepartment, picToken: $picToken, photos: $photos, followUps: $followUps, date: $date, userName: $userName, cancelledBy: $cancelledBy, cancelledAt: $cancelledAt)';
   }
 
   @override
@@ -408,6 +411,8 @@ class _$HseTaskModelImpl implements _HseTaskModel {
                 other.rootCause == rootCause) &&
             (identical(other.notes, notes) || other.notes == notes) &&
             (identical(other.status, status) || other.status == status) &&
+            (identical(other.toDepartment, toDepartment) ||
+                other.toDepartment == toDepartment) &&
             (identical(other.picToken, picToken) ||
                 other.picToken == picToken) &&
             const DeepCollectionEquality().equals(other._photos, _photos) &&
@@ -435,6 +440,7 @@ class _$HseTaskModelImpl implements _HseTaskModel {
       rootCause,
       notes,
       status,
+      toDepartment,
       picToken,
       const DeepCollectionEquality().hash(_photos),
       const DeepCollectionEquality().hash(_followUps),
@@ -461,23 +467,23 @@ class _$HseTaskModelImpl implements _HseTaskModel {
 
 abstract class _HseTaskModel implements HseTaskModel {
   const factory _HseTaskModel(
-          {required final int id,
-          required final String code,
-          @JsonKey(name: 'user_id') required final int userId,
-          @JsonKey(name: 'area_id') required final int areaId,
-          final String? name,
-          @JsonKey(name: 'risk_level') required final String riskLevel,
-          @JsonKey(name: 'root_cause') required final String rootCause,
-          required final String notes,
-          required final String status,
-          @JsonKey(name: 'pic_token') final String? picToken,
-          final List<String> photos,
-          final List<Map<String, dynamic>> followUps,
-          final String? date,
-          final String? userName,
-          @JsonKey(name: 'cancelled_by') final String? cancelledBy,
-          @JsonKey(name: 'cancelled_at') final String? cancelledAt}) =
-      _$HseTaskModelImpl;
+      {required final int id,
+      required final String code,
+      required final int userId,
+      required final int areaId,
+      final String? name,
+      required final String riskLevel,
+      required final String rootCause,
+      required final String notes,
+      required final String status,
+      final int toDepartment,
+      final String? picToken,
+      final List<String> photos,
+      final List<Map<String, dynamic>> followUps,
+      final String? date,
+      final String? userName,
+      final String? cancelledBy,
+      final String? cancelledAt}) = _$HseTaskModelImpl;
 
   factory _HseTaskModel.fromJson(Map<String, dynamic> json) =
       _$HseTaskModelImpl.fromJson;
@@ -487,25 +493,22 @@ abstract class _HseTaskModel implements HseTaskModel {
   @override
   String get code;
   @override
-  @JsonKey(name: 'user_id')
   int get userId;
   @override
-  @JsonKey(name: 'area_id')
   int get areaId;
   @override
   String? get name;
   @override
-  @JsonKey(name: 'risk_level')
   String get riskLevel;
   @override
-  @JsonKey(name: 'root_cause')
   String get rootCause;
   @override
   String get notes;
   @override
   String get status;
   @override
-  @JsonKey(name: 'pic_token')
+  int get toDepartment;
+  @override
   String? get picToken;
   @override
   List<String> get photos;
@@ -516,10 +519,8 @@ abstract class _HseTaskModel implements HseTaskModel {
   @override
   String? get userName;
   @override
-  @JsonKey(name: 'cancelled_by')
   String? get cancelledBy;
   @override
-  @JsonKey(name: 'cancelled_at')
   String? get cancelledAt;
 
   /// Create a copy of HseTaskModel

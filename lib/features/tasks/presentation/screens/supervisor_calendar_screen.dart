@@ -22,9 +22,13 @@ class SupervisorCalendarScreen extends ConsumerStatefulWidget {
 
 class _SupervisorCalendarScreenState
     extends ConsumerState<SupervisorCalendarScreen> {
+  static const double _dateItemExtent = 74.0;
+  static const double _initialDateOffset = 15 * _dateItemExtent;
+
   late DateTime _selectedDate;
   late List<DateTime> _dateList;
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController =
+      ScrollController(initialScrollOffset: _initialDateOffset);
   bool _isSearchVisible = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -86,10 +90,49 @@ class _SupervisorCalendarScreenState
           .add(Duration(days: index)),
     );
 
+    _scrollToSelectedDate();
+  }
+
+  void _scrollToSelectedDate({bool animated = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController
-            .jumpTo(15 * 72.0 - (MediaQuery.of(context).size.width / 2) + 36);
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      if (!_scrollController.position.hasContentDimensions) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollToSelectedDate(animated: animated);
+          }
+        });
+        return;
+      }
+
+      final selectedIndex = _dateList.indexWhere(
+        (date) =>
+            date.year == _selectedDate.year &&
+            date.month == _selectedDate.month &&
+            date.day == _selectedDate.day,
+      );
+
+      if (selectedIndex < 0) {
+        return;
+      }
+
+      final viewportWidth = MediaQuery.of(context).size.width;
+      final rawOffset =
+          (selectedIndex * _dateItemExtent) - (viewportWidth / 2) + (_dateItemExtent / 2);
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      final targetOffset = rawOffset.clamp(0.0, maxOffset).toDouble();
+
+      if (animated) {
+        _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(targetOffset);
       }
     });
   }
@@ -179,6 +222,7 @@ class _SupervisorCalendarScreenState
     }
 
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    _scrollToSelectedDate();
 
     debugPrint('[SupervisorCalendar] Total reports: ${reports.length}');
     debugPrint('[SupervisorCalendar] Selected date: $_selectedDate (year=${_selectedDate.year}, month=${_selectedDate.month}, day=${_selectedDate.day})');
@@ -344,7 +388,10 @@ class _SupervisorCalendarScreenState
                       date.month == _selectedDate.month &&
                       date.day == _selectedDate.day;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedDate = date),
+                    onTap: () {
+                      setState(() => _selectedDate = date);
+                      _scrollToSelectedDate(animated: true);
+                    },
                     child: Container(
                       width: 66,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -471,6 +518,7 @@ class _SupervisorCalendarScreenState
                                       child: _buildExactTaskCard(
                                         context,
                                         title: _getReportTitle(task),
+                                        locationLabel: _getLocationLabel(task),
                                         dateString: dateString,
                                         rawStatus: _getActualStatus(task),
                                         tag: _getStatusTag(
@@ -537,6 +585,7 @@ class _SupervisorCalendarScreenState
   Widget _buildExactTaskCard(
     BuildContext context, {
     required String title,
+    required String locationLabel,
     required String? dateString,
     required String rawStatus,
     required String reportId,
@@ -553,12 +602,12 @@ class _SupervisorCalendarScreenState
     return InkWell(
       onTap: () => context
           .pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
@@ -569,7 +618,7 @@ class _SupervisorCalendarScreenState
                   CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -583,9 +632,11 @@ class _SupervisorCalendarScreenState
                           title,
                           style: AppTypography.h2.copyWith(
                               color: textColor,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
                               height: 1.2),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (tag != null) ...[
@@ -605,13 +656,37 @@ class _SupervisorCalendarScreenState
                                 color: isDark
                                     ? Colors.white
                                     : const Color(0xFF6B6E94),
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                        size: 14,
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          locationLabel,
+                          style: AppTypography.caption.copyWith(
+                            color: textColor.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(PhosphorIcons.user(PhosphorIconsStyle.bold),
@@ -623,14 +698,14 @@ class _SupervisorCalendarScreenState
                           style: AppTypography.body1.copyWith(
                               color: textColor.withValues(alpha: 0.8),
                               fontWeight: FontWeight.w600,
-                              fontSize: 13),
+                              fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -648,7 +723,7 @@ class _SupervisorCalendarScreenState
                                 style: AppTypography.body1.copyWith(
                                     color: textColor.withValues(alpha: 0.8),
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13),
+                                    fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -668,7 +743,7 @@ class _SupervisorCalendarScreenState
                             style: AppTypography.body1.copyWith(
                                 color: textColor.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13),
+                                fontSize: 12),
                           ),
                         ],
                       ),
@@ -698,6 +773,25 @@ class _SupervisorCalendarScreenState
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  String _getLocationLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return 'Lokasi tidak tersedia';
   }
 
   String _formatIndonesianDate(String? dateStr) {

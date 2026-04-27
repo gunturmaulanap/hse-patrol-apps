@@ -19,9 +19,13 @@ class PetugasCalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
+  static const double _dateItemExtent = 74.0;
+  static const double _initialDateOffset = 15 * _dateItemExtent;
+
   late DateTime _selectedDate;
   late List<DateTime> _dateList;
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController =
+      ScrollController(initialScrollOffset: _initialDateOffset);
 
   bool _isSearchVisible = false;
   final TextEditingController _searchController = TextEditingController();
@@ -62,10 +66,49 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
           .add(Duration(days: index));
     });
 
+    _scrollToSelectedDate();
+  }
+
+  void _scrollToSelectedDate({bool animated = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController
-            .jumpTo(15 * 72.0 - (MediaQuery.of(context).size.width / 2) + 36);
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      if (!_scrollController.position.hasContentDimensions) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollToSelectedDate(animated: animated);
+          }
+        });
+        return;
+      }
+
+      final selectedIndex = _dateList.indexWhere(
+        (date) =>
+            date.year == _selectedDate.year &&
+            date.month == _selectedDate.month &&
+            date.day == _selectedDate.day,
+      );
+
+      if (selectedIndex < 0) {
+        return;
+      }
+
+      final viewportWidth = MediaQuery.of(context).size.width;
+      final rawOffset =
+          (selectedIndex * _dateItemExtent) - (viewportWidth / 2) + (_dateItemExtent / 2);
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      final targetOffset = rawOffset.clamp(0.0, maxOffset).toDouble();
+
+      if (animated) {
+        _scrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(targetOffset);
       }
     });
   }
@@ -139,6 +182,8 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     }
 
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    _scrollToSelectedDate();
+
     debugPrint(
       '[PetugasCalendarScreen] userId=${user.id} ownReports=${reports.length}',
     );
@@ -280,7 +325,10 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                       date.day == _selectedDate.day;
 
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedDate = date),
+                    onTap: () {
+                      setState(() => _selectedDate = date);
+                      _scrollToSelectedDate(animated: true);
+                    },
                     child: Container(
                       width: 66,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -390,6 +438,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                                     child: _buildExactTaskCard(
                                       context,
                                       title: _getReportTitle(task),
+                                      locationLabel: _getLocationLabel(task),
                                       dateString: task['date']?.toString(),
                                       rawStatus: _getActualStatus(task),
                                       tag:
@@ -488,6 +537,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
   Widget _buildExactTaskCard(
     BuildContext context, {
     required String title,
+    required String locationLabel,
     required String? dateString,
     required String rawStatus,
     String? tag,
@@ -504,12 +554,12 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     return InkWell(
       onTap: () => context
           .pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
@@ -520,7 +570,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                   CustomPaint(painter: _CardStripedPainter(color: stripeColor)),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -534,9 +584,11 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                           title,
                           style: TextStyle(
                               color: textColor,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
                               height: 1.2),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (tag != null) ...[
@@ -555,13 +607,13 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                                   color: isDark
                                       ? Colors.white
                                       : const Color(0xFF6B6E94),
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600)),
                         )
                       ]
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Icon(PhosphorIcons.user(PhosphorIconsStyle.bold),
@@ -573,14 +625,37 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                           style: TextStyle(
                               color: textColor.withValues(alpha: 0.8),
                               fontWeight: FontWeight.w500,
-                              fontSize: 13),
+                              fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                        size: 14,
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          locationLabel,
+                          style: TextStyle(
+                            color: textColor.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -598,7 +673,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                                 style: TextStyle(
                                     color: textColor.withValues(alpha: 0.8),
                                     fontWeight: FontWeight.w500,
-                                    fontSize: 13),
+                                    fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -618,7 +693,7 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
                             style: TextStyle(
                                 color: textColor.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w500,
-                                fontSize: 13),
+                                fontSize: 12),
                           ),
                         ],
                       ),
@@ -701,6 +776,25 @@ class _PetugasCalendarScreenState extends ConsumerState<PetugasCalendarScreen> {
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  String _getLocationLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return 'Lokasi tidak tersedia';
   }
 
   String? _getStatusTag(String? status) {

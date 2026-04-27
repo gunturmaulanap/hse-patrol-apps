@@ -9,6 +9,7 @@ import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -132,7 +133,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     final isPetugas = user.role == UserRole.petugasHse;
-    final isSupervisor = user.role == UserRole.hseSupervisor;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -147,17 +147,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               return;
             }
 
-            if (isPetugas) {
-              context.goNamed(RouteNames.petugasHome);
-              return;
-            }
-
-            if (isSupervisor) {
-              context.goNamed(RouteNames.supervisorHome);
-              return;
-            }
-
-            context.goNamed(RouteNames.picHome);
+            context.goNamed(resolveHomeRouteName(user.role));
           },
         ),
         title: Text('My Profile', style: AppTypography.h3),

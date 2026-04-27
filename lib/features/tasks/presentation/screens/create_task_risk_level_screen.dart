@@ -55,7 +55,7 @@ class CreateTaskRiskLevelScreen extends ConsumerWidget {
                 mainAxisSpacing: AppSpacing.md,
                 children: [
                   _RiskCard(
-                    title: 'Kurang dari 1 Jam',
+                    title: 'Kurang dari 2 Jam',
                     color: AppColors.riskLevel4, // Merah
                     icon: HugeIcons.strokeRoundedTimer01,
                     isSelected: form.riskLevel == '1',

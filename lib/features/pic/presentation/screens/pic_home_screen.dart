@@ -6,6 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
@@ -19,17 +20,30 @@ class PicHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final areasAsync = ref.watch(areaByUserProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final reportsAsync = ref.watch(picAccessibleTaskMapsProvider);
+
+    if (user == null || !isPicScopedRole(user.role)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     Future<void> onRefresh() async {
       debugPrint('[PicHomeScreen] pull-to-refresh triggered');
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(areaByUserProvider);
       ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(picAccessibleTaskMapsProvider);
       final results = await Future.wait([
         ref.read(tasksFutureProvider.future),
         ref.read(areaByUserProvider.future),
-        ref.read(petugasTaskMapsProvider.future),
+        ref.read(picAccessibleTaskMapsProvider.future),
       ]);
 
       final totalTasks = (results[0] as List).length;
@@ -68,7 +82,7 @@ class PicHomeScreen extends ConsumerWidget {
                         children: [
                           Text('Good Morning,', style: AppTypography.h2),
                           Text(
-                            '${user?.username ?? 'PIC'}!',
+                            '${user.username.isNotEmpty ? user.username : 'PIC'}!',
                             style: AppTypography.h1,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -78,7 +92,7 @@ class PicHomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: () => context.pushNamed(RouteNames.petugasProfile),
+                      onTap: () => context.pushNamed(RouteNames.picProfile),
                       child: Container(
                         width: 48,
                         height: 48,
@@ -142,12 +156,12 @@ class PicHomeScreen extends ConsumerWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final area = areas[index];
-                   
+                  final areaLabel = _resolveAreaLabel(area);
+                    
                   // Hitung jumlah task Pending dan Follow Up Done secara terpisah
                   final tasksInArea = reports.where((r) {
-                    final sameArea =
-                        (r['area']?.toString().trim().toLowerCase() ?? '') ==
-                        area.name.trim().toLowerCase();
+                    final taskAreaName = _resolveTaskAreaLabel(r);
+                    final sameArea = taskAreaName == areaLabel.toLowerCase();
                     final isNotCanceled = _getPicStatusTag(r) != 'Canceled';
                     return sameArea && isNotCanceled;
                   }).toList();
@@ -168,20 +182,21 @@ class PicHomeScreen extends ConsumerWidget {
                   final totalTasks = tasksInArea.length;
 
                   debugPrint(
-                    '[PicHomeScreen] area=${area.name} total=$totalTasks pending=$pendingCount waiting=$waitingCount',
+                    '[PicHomeScreen] area=$areaLabel total=$totalTasks pending=$pendingCount waiting=$waitingCount',
                   );
 
-                  return AreaCard(
-                    key: ValueKey(
-                      '${area.id}-$pendingCount-$waitingCount-$totalTasks',
-                    ),
-                    areaName: area.name,
-                    pendingCount: pendingCount,
-                    waitingResponseCount: waitingCount, // Pass data waiting
-                    totalTasks: totalTasks, 
+                   return AreaCard(
+                     key: ValueKey(
+                       '${area.id}-$pendingCount-$waitingCount-$totalTasks',
+                     ),
+                     areaName: areaLabel,
+                     areaDescription: area.description,
+                     pendingCount: pendingCount,
+                     waitingResponseCount: waitingCount, // Pass data waiting
+                     totalTasks: totalTasks, 
                     index: index, 
                     onTap: () {
-                      ref.read(activeAreaFilterProvider.notifier).state = area.name;
+                      ref.read(activeAreaFilterProvider.notifier).state = areaLabel;
                       context.pushNamed(RouteNames.picFinding);
                     },
                   );
@@ -244,5 +259,35 @@ class PicHomeScreen extends ConsumerWidget {
     if (normalized == 'canceled' || normalized == 'cancelled') return 'Canceled';
 
     return actualStatus;
+  }
+
+  String _resolveAreaLabel(dynamic area) {
+    final description = area.description?.toString().trim() ?? '';
+    if (description.isNotEmpty) return description;
+
+    final name = area.name?.toString().trim() ?? '';
+    final buildingType = area.buildingType?.toString().trim() ?? '';
+    if (name.isEmpty) return '-';
+    if (buildingType.isEmpty) return name;
+    return '$name $buildingType';
+  }
+
+  String _resolveTaskAreaLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value.toLowerCase();
+      }
+    }
+
+    return '';
   }
 }

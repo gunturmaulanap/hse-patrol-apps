@@ -21,13 +21,11 @@ CreateHseTaskRequest _$CreateHseTaskRequestFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$CreateHseTaskRequest {
   String get title => throw _privateConstructorUsedError;
-  @JsonKey(name: 'area_id')
   int get areaId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'risk_level')
   String get riskLevel => throw _privateConstructorUsedError;
-  @JsonKey(name: 'root_cause')
   String get rootCause => throw _privateConstructorUsedError;
   String get notes => throw _privateConstructorUsedError;
+  int get toDepartment => throw _privateConstructorUsedError;
 
   /// Serializes this CreateHseTaskRequest to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -47,10 +45,11 @@ abstract class $CreateHseTaskRequestCopyWith<$Res> {
   @useResult
   $Res call(
       {String title,
-      @JsonKey(name: 'area_id') int areaId,
-      @JsonKey(name: 'risk_level') String riskLevel,
-      @JsonKey(name: 'root_cause') String rootCause,
-      String notes});
+      int areaId,
+      String riskLevel,
+      String rootCause,
+      String notes,
+      int toDepartment});
 }
 
 /// @nodoc
@@ -74,6 +73,7 @@ class _$CreateHseTaskRequestCopyWithImpl<$Res,
     Object? riskLevel = null,
     Object? rootCause = null,
     Object? notes = null,
+    Object? toDepartment = null,
   }) {
     return _then(_value.copyWith(
       title: null == title
@@ -96,6 +96,10 @@ class _$CreateHseTaskRequestCopyWithImpl<$Res,
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String,
+      toDepartment: null == toDepartment
+          ? _value.toDepartment
+          : toDepartment // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -110,10 +114,11 @@ abstract class _$$CreateHseTaskRequestImplCopyWith<$Res>
   @useResult
   $Res call(
       {String title,
-      @JsonKey(name: 'area_id') int areaId,
-      @JsonKey(name: 'risk_level') String riskLevel,
-      @JsonKey(name: 'root_cause') String rootCause,
-      String notes});
+      int areaId,
+      String riskLevel,
+      String rootCause,
+      String notes,
+      int toDepartment});
 }
 
 /// @nodoc
@@ -134,6 +139,7 @@ class __$$CreateHseTaskRequestImplCopyWithImpl<$Res>
     Object? riskLevel = null,
     Object? rootCause = null,
     Object? notes = null,
+    Object? toDepartment = null,
   }) {
     return _then(_$CreateHseTaskRequestImpl(
       title: null == title
@@ -156,6 +162,10 @@ class __$$CreateHseTaskRequestImplCopyWithImpl<$Res>
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String,
+      toDepartment: null == toDepartment
+          ? _value.toDepartment
+          : toDepartment // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -165,10 +175,11 @@ class __$$CreateHseTaskRequestImplCopyWithImpl<$Res>
 class _$CreateHseTaskRequestImpl implements _CreateHseTaskRequest {
   const _$CreateHseTaskRequestImpl(
       {required this.title,
-      @JsonKey(name: 'area_id') required this.areaId,
-      @JsonKey(name: 'risk_level') required this.riskLevel,
-      @JsonKey(name: 'root_cause') required this.rootCause,
-      required this.notes});
+      required this.areaId,
+      required this.riskLevel,
+      required this.rootCause,
+      required this.notes,
+      this.toDepartment = 0});
 
   factory _$CreateHseTaskRequestImpl.fromJson(Map<String, dynamic> json) =>
       _$$CreateHseTaskRequestImplFromJson(json);
@@ -176,20 +187,20 @@ class _$CreateHseTaskRequestImpl implements _CreateHseTaskRequest {
   @override
   final String title;
   @override
-  @JsonKey(name: 'area_id')
   final int areaId;
   @override
-  @JsonKey(name: 'risk_level')
   final String riskLevel;
   @override
-  @JsonKey(name: 'root_cause')
   final String rootCause;
   @override
   final String notes;
+  @override
+  @JsonKey()
+  final int toDepartment;
 
   @override
   String toString() {
-    return 'CreateHseTaskRequest(title: $title, areaId: $areaId, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes)';
+    return 'CreateHseTaskRequest(title: $title, areaId: $areaId, riskLevel: $riskLevel, rootCause: $rootCause, notes: $notes, toDepartment: $toDepartment)';
   }
 
   @override
@@ -203,13 +214,15 @@ class _$CreateHseTaskRequestImpl implements _CreateHseTaskRequest {
                 other.riskLevel == riskLevel) &&
             (identical(other.rootCause, rootCause) ||
                 other.rootCause == rootCause) &&
-            (identical(other.notes, notes) || other.notes == notes));
+            (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.toDepartment, toDepartment) ||
+                other.toDepartment == toDepartment));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, title, areaId, riskLevel, rootCause, notes);
+  int get hashCode => Object.hash(
+      runtimeType, title, areaId, riskLevel, rootCause, notes, toDepartment);
 
   /// Create a copy of CreateHseTaskRequest
   /// with the given fields replaced by the non-null parameter values.
@@ -232,10 +245,11 @@ class _$CreateHseTaskRequestImpl implements _CreateHseTaskRequest {
 abstract class _CreateHseTaskRequest implements CreateHseTaskRequest {
   const factory _CreateHseTaskRequest(
       {required final String title,
-      @JsonKey(name: 'area_id') required final int areaId,
-      @JsonKey(name: 'risk_level') required final String riskLevel,
-      @JsonKey(name: 'root_cause') required final String rootCause,
-      required final String notes}) = _$CreateHseTaskRequestImpl;
+      required final int areaId,
+      required final String riskLevel,
+      required final String rootCause,
+      required final String notes,
+      final int toDepartment}) = _$CreateHseTaskRequestImpl;
 
   factory _CreateHseTaskRequest.fromJson(Map<String, dynamic> json) =
       _$CreateHseTaskRequestImpl.fromJson;
@@ -243,16 +257,15 @@ abstract class _CreateHseTaskRequest implements CreateHseTaskRequest {
   @override
   String get title;
   @override
-  @JsonKey(name: 'area_id')
   int get areaId;
   @override
-  @JsonKey(name: 'risk_level')
   String get riskLevel;
   @override
-  @JsonKey(name: 'root_cause')
   String get rootCause;
   @override
   String get notes;
+  @override
+  int get toDepartment;
 
   /// Create a copy of CreateHseTaskRequest
   /// with the given fields replaced by the non-null parameter values.

@@ -6,8 +6,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/storage/session_manager.dart';
 import '../../../../core/utils/system_ui_helper.dart';
-import '../../../../shared/enums/user_role.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -75,11 +75,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
       ref.read(authNotifierProvider.notifier).setHydratedUser(me);
 
-      final route = me.role == UserRole.pic
-          ? RouteNames.picHome
-          : me.role == UserRole.hseSupervisor
-              ? RouteNames.supervisorHome
-              : RouteNames.petugasHome;
+      final route = resolveHomeRouteName(me.role);
       debugPrint('[Splash] before redirect/router decision -> go $route');
       if (!mounted) return;
       context.goNamed(route);

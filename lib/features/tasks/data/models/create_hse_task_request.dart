@@ -7,10 +7,11 @@ part 'create_hse_task_request.g.dart';
 class CreateHseTaskRequest with _$CreateHseTaskRequest {
   const factory CreateHseTaskRequest({
     required String title,
-    @JsonKey(name: 'area_id') required int areaId,
-    @JsonKey(name: 'risk_level') required String riskLevel,
-    @JsonKey(name: 'root_cause') required String rootCause,
+    required int areaId,
+    required String riskLevel,
+    required String rootCause,
     required String notes,
+    @Default(0) int toDepartment,
   }) = _CreateHseTaskRequest;
 
   factory CreateHseTaskRequest.fromJson(Map<String, dynamic> json) => _$CreateHseTaskRequestFromJson(json);

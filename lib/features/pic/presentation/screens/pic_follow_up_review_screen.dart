@@ -11,6 +11,7 @@ import '../providers/pic_follow_up_provider.dart';
 import '../../../follow_up/presentation/providers/follow_up_provider.dart';
 import '../../../follow_up/data/models/create_follow_up_request.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
+import '../../../tasks/presentation/controllers/task_detail_controller.dart';
 
 class PicFollowUpReviewScreen extends ConsumerStatefulWidget {
   const PicFollowUpReviewScreen({super.key});
@@ -58,6 +59,14 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
         // Refresh provider tree agar status Follow Up Done langsung terlihat
         // di daftar PIC saat user kembali dari task detail.
         ref.invalidate(taskDetailMapProvider(reportId.toString()));
+        ref.invalidate(
+          taskDetailControllerProvider(
+            TaskDetailControllerArgs(
+              taskId: reportId.toString(),
+              isPicToken: false,
+            ),
+          ),
+        );
         ref.invalidate(tasksFutureProvider);
         ref.invalidate(petugasTaskMapsProvider);
         ref.invalidate(supervisorOwnTaskMapsProvider);
@@ -67,9 +76,18 @@ class _PicFollowUpReviewScreenState extends ConsumerState<PicFollowUpReviewScree
         // Trigger prefetch ringan supaya screen list tidak menunggu lama saat back.
         ref.read(tasksFutureProvider.future);
         ref.read(petugasTaskMapsProvider.future);
+        await ref.read(taskDetailMapProvider(reportId.toString()).future);
+        await ref.read(
+          taskDetailControllerProvider(
+            TaskDetailControllerArgs(
+              taskId: reportId.toString(),
+              isPicToken: false,
+            ),
+          ).future,
+        );
 
         debugPrint(
-          '[PicFollowUpReviewScreen] follow-up submitted, invalidated task/list providers for reportId=$reportId',
+          '[PicFollowUpReviewScreen] follow-up submitted, refreshed detail/list providers for reportId=$reportId',
         );
       }
 

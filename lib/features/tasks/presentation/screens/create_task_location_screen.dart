@@ -132,7 +132,8 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
                     text: 'Lanjutkan',
                     onPressed: _selectedArea != null
                         ? () {
-                            ref.read(createTaskFormProvider.notifier).setArea(_selectedArea!.name);
+                            final combinedAreaName = '${_selectedArea!.name} ${_selectedArea!.buildingType}'.trim();
+                            ref.read(createTaskFormProvider.notifier).setArea(combinedAreaName);
                             ref.read(createTaskFormProvider.notifier).setAreaId(_selectedArea!.id);
                             context.pushNamed(RouteNames.petugasCreateTaskRisk);
                           }

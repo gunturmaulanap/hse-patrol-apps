@@ -10,14 +10,15 @@ _$HseTaskModelImpl _$$HseTaskModelImplFromJson(Map<String, dynamic> json) =>
     _$HseTaskModelImpl(
       id: (json['id'] as num).toInt(),
       code: json['code'] as String,
-      userId: (json['user_id'] as num).toInt(),
-      areaId: (json['area_id'] as num).toInt(),
+      userId: (json['userId'] as num).toInt(),
+      areaId: (json['areaId'] as num).toInt(),
       name: json['name'] as String?,
-      riskLevel: json['risk_level'] as String,
-      rootCause: json['root_cause'] as String,
+      riskLevel: json['riskLevel'] as String,
+      rootCause: json['rootCause'] as String,
       notes: json['notes'] as String,
       status: json['status'] as String,
-      picToken: json['pic_token'] as String?,
+      toDepartment: (json['toDepartment'] as num?)?.toInt() ?? 0,
+      picToken: json['picToken'] as String?,
       photos: (json['photos'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -28,26 +29,27 @@ _$HseTaskModelImpl _$$HseTaskModelImplFromJson(Map<String, dynamic> json) =>
           const [],
       date: json['date'] as String?,
       userName: json['userName'] as String?,
-      cancelledBy: json['cancelled_by'] as String?,
-      cancelledAt: json['cancelled_at'] as String?,
+      cancelledBy: json['cancelledBy'] as String?,
+      cancelledAt: json['cancelledAt'] as String?,
     );
 
 Map<String, dynamic> _$$HseTaskModelImplToJson(_$HseTaskModelImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'code': instance.code,
-      'user_id': instance.userId,
-      'area_id': instance.areaId,
+      'userId': instance.userId,
+      'areaId': instance.areaId,
       'name': instance.name,
-      'risk_level': instance.riskLevel,
-      'root_cause': instance.rootCause,
+      'riskLevel': instance.riskLevel,
+      'rootCause': instance.rootCause,
       'notes': instance.notes,
       'status': instance.status,
-      'pic_token': instance.picToken,
+      'toDepartment': instance.toDepartment,
+      'picToken': instance.picToken,
       'photos': instance.photos,
       'followUps': instance.followUps,
       'date': instance.date,
       'userName': instance.userName,
-      'cancelled_by': instance.cancelledBy,
-      'cancelled_at': instance.cancelledAt,
+      'cancelledBy': instance.cancelledBy,
+      'cancelledAt': instance.cancelledAt,
     };

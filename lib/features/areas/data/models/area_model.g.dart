@@ -12,6 +12,7 @@ _$AreaModelImpl _$$AreaModelImplFromJson(Map<String, dynamic> json) =>
       code: json['code'] as String,
       name: json['name'] as String,
       buildingType: json['building_type'] as String,
+      description: json['description'] as String? ?? '',
     );
 
 Map<String, dynamic> _$$AreaModelImplToJson(_$AreaModelImpl instance) =>
@@ -20,4 +21,5 @@ Map<String, dynamic> _$$AreaModelImplToJson(_$AreaModelImpl instance) =>
       'code': instance.code,
       'name': instance.name,
       'building_type': instance.buildingType,
+      'description': instance.description,
     };

@@ -8,6 +8,11 @@ import '../../data/models/hse_task_model.dart';
 import 'task_provider.dart';
 
 class CreateTaskDraft {
+  static const int noDepartmentSupport = 0;
+  static const int hrgaDepartment = 1;
+  static const int engineeringDepartment = 2;
+  // static const int bothDepartments = 3;
+
   final String? buildingType;
   final String? area;
   final String? riskLevel;
@@ -15,6 +20,7 @@ class CreateTaskDraft {
   final String? notes;
   final String? rootCause;
   final int? areaId;
+  final int toDepartment;
 
   CreateTaskDraft({
     this.buildingType,
@@ -24,6 +30,7 @@ class CreateTaskDraft {
     this.notes,
     this.rootCause,
     this.areaId,
+    this.toDepartment = noDepartmentSupport,
   });
 
   CreateTaskDraft copyWith({
@@ -34,6 +41,7 @@ class CreateTaskDraft {
     String? notes,
     String? rootCause,
     int? areaId,
+    int? toDepartment,
   }) {
     return CreateTaskDraft(
       buildingType: buildingType ?? this.buildingType,
@@ -43,8 +51,11 @@ class CreateTaskDraft {
       notes: notes ?? this.notes,
       rootCause: rootCause ?? this.rootCause,
       areaId: areaId ?? this.areaId,
+      toDepartment: toDepartment ?? this.toDepartment,
     );
   }
+
+  bool get needsOtherDepartmentSupport => toDepartment != noDepartmentSupport;
 }
 
 class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
@@ -75,6 +86,17 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
   void setNotes(String value) => state = state.copyWith(notes: value);
   void setRootCause(String value) => state = state.copyWith(rootCause: value);
   void setAreaId(int? id) => state = state.copyWith(areaId: id);
+  void setNeedsOtherDepartmentSupport(bool value) {
+    state = state.copyWith(
+      toDepartment: value
+          ? (state.toDepartment == CreateTaskDraft.noDepartmentSupport
+              ? CreateTaskDraft.hrgaDepartment
+              : state.toDepartment)
+          : CreateTaskDraft.noDepartmentSupport,
+    );
+  }
+
+  void setToDepartment(int value) => state = state.copyWith(toDepartment: value);
 
   void reset() => state = CreateTaskDraft();
 
@@ -95,6 +117,7 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
         riskLevel: state.riskLevel ?? 'medium',
         rootCause: rootCause,
         notes: state.notes ?? '-',
+        toDepartment: state.toDepartment,
       );
 
       final photoFiles = state.photos.map((path) => File(path)).toList();

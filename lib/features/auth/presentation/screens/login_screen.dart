@@ -5,12 +5,11 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_radius.dart';
-import '../../../../app/router/route_names.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../shared/enums/user_role.dart';
 import '../providers/auth_provider.dart';
-import '../../data/models/user_model.dart';
+import '../../domain/auth_role_helper.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -26,6 +25,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // State untuk toggle hide/show password
   bool _obscurePassword = true;
+
+  String _mapLoginErrorMessage(Object error) {
+    final rawMessage = error.toString().toLowerCase();
+
+    if (rawMessage.contains('email atau password salah') ||
+        rawMessage.contains('unauthorized')) {
+      return 'Email atau password salah, atau akun Anda belum terdaftar.';
+    }
+
+    if (rawMessage.contains('socketexception') ||
+        rawMessage.contains('failed host lookup')) {
+      return 'Koneksi gagal. Silakan periksa paket data atau Wi‑Fi Anda.';
+    }
+
+    if (rawMessage.contains('timeout')) {
+      return 'Waktu koneksi habis. Coba lagi dalam beberapa saat.';
+    }
+
+    return 'Terjadi kendala pada server. Mohon hubungi tim IT.';
+  }
 
   @override
   void dispose() {
@@ -56,20 +75,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (mounted) {
         if (success) {
-          // Fetch user data to determine role and navigate
-          UserModel? user;
-          try {
-            debugPrint('[LoginScreen] before call /me');
-            final authRepository = ref.read(authRepositoryProvider);
-            user = await authRepository.getMe();
-            debugPrint('[LoginScreen] /me result: ${user.toJson()}');
-          } catch (e, st) {
-            debugPrint('[LoginScreen] /me failed: $e');
-            debugPrint('[LoginScreen] /me stacktrace: $st');
-
-            user = ref.read(authNotifierProvider).user;
-            debugPrint('[LoginScreen] fallback user from auth state: ${user?.toJson()}');
-          }
+          // Gunakan user dari response login agar transisi ke home tidak tertahan /me redundan.
+          final user = ref.read(authNotifierProvider).user;
 
           if (user == null) {
             setState(() {
@@ -99,38 +106,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               context.go(redirectTarget);
             } else {
               debugPrint('[LoginScreen] ignore non-internal redirect target: $redirectTarget');
-              final targetRoute = user.role == UserRole.pic
-                  ? RouteNames.picHome
-                  : user.role == UserRole.hseSupervisor
-                      ? RouteNames.supervisorHome
-                      : RouteNames.petugasHome;
+              final targetRoute = resolveHomeRouteName(user.role);
               context.goNamed(targetRoute);
             }
           } else {
             // Navigate based on role default
-            final targetRoute = user.role == UserRole.pic
-                ? RouteNames.picHome
-                : user.role == UserRole.hseSupervisor
-                    ? RouteNames.supervisorHome
-                    : RouteNames.petugasHome;
-                    
+            final targetRoute = resolveHomeRouteName(user.role);
+                     
             debugPrint('[LoginScreen] redirecting to home -> go $targetRoute');
             context.goNamed(targetRoute);
           }
           
         } else {
           final errorState = ref.read(authNotifierProvider);
+          final friendlyMessage = _mapLoginErrorMessage(
+            errorState.error ?? 'unknown login error',
+          );
+
+          debugPrint(
+            '[LoginScreen] mapped login failure message: $friendlyMessage | raw: ${errorState.error}',
+          );
+
+          AppToast.error(context, message: friendlyMessage);
+
           setState(() {
-            _errorMessage = errorState.error ?? 'Login gagal. Periksa email dan password backend Anda.';
+            _errorMessage = friendlyMessage;
           });
         }
       }
     } catch (e, st) {
       debugPrint('[LoginScreen] login error: $e');
       debugPrint('[LoginScreen] login stacktrace: $st');
+
+      final friendlyMessage = _mapLoginErrorMessage(e);
+      debugPrint('[LoginScreen] mapped catch message: $friendlyMessage');
+
       if (mounted) {
+        AppToast.error(context, message: friendlyMessage);
         setState(() {
-          _errorMessage = 'Terjadi kesalahan: ${e.toString()}';
+          _errorMessage = friendlyMessage;
         });
       }
     }

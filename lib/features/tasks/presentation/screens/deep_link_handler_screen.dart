@@ -6,8 +6,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../shared/enums/user_role.dart';
 import '../providers/task_provider.dart';
-import '../../data/models/hse_task_model.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../areas/presentation/providers/area_provider.dart';
 
@@ -138,7 +138,16 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
           '[DeepLinkHandler] fetch classification => unauthorized: $fetchLooksUnauthorized, notFound: $fetchLooksNotFound',
         );
 
-        if (fetchLooksUnauthorized) {
+        if (isPicScopedRole(currentUser.role)) {
+          foundTask = await _findAccessiblePicScopedTask(currentUser);
+          if (foundTask != null) {
+            debugPrint(
+              '[DeepLinkHandler] recovered task for PIC-scoped role from local accessible provider => id=${foundTask['id']}',
+            );
+          }
+        }
+
+        if (fetchLooksUnauthorized && foundTask == null) {
           _navigateBasedOnRoleWithCustomMessage(
             currentUser.role,
             'Laporan valid, namun di luar tanggung jawab area Anda.',
@@ -146,7 +155,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
           return;
         }
 
-        if (fetchLooksNotFound) {
+        if (fetchLooksNotFound && foundTask == null) {
           _navigateBasedOnRoleWithCustomMessage(
             currentUser.role,
             'Laporan tidak ditemukan, sudah dihapus, atau link tidak valid.',
@@ -157,7 +166,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
       if (foundTask == null) {
         final isPicAreaAccessCase =
-            currentUser.role == UserRole.pic && fetchLooksUnauthorized;
+            isPicScopedRole(currentUser.role) && fetchLooksUnauthorized;
 
         debugPrint(
           '[DeepLinkHandler] foundTask null => role: ${currentUser.role}, isPicAreaAccessCase: $isPicAreaAccessCase',
@@ -176,7 +185,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       bool roleAllowed = _isRoleAllowedForTask(currentUser, foundTask);
       
       // Jika PIC ditolak oleh currentUser, coba verifikasi dengan menarik data area nya langsung.
-      if (!roleAllowed && currentUser.role == UserRole.pic) {
+      if (!roleAllowed && isPicScopedRole(currentUser.role)) {
         try {
           debugPrint('[DeepLinkHandler] PIC role detected but initial check failed. Fetching areas from API...');
           final picAreas = await ref.read(areaByUserProvider.future);
@@ -207,7 +216,10 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
             debugPrint('[DeepLinkHandler] Checking areaName "$areaName": $hasAreaByName');
           }
 
-          roleAllowed = hasAreaById || hasAreaByName;
+          final areaAllowed = hasAreaById || hasAreaByName;
+          final toDepartment = _toInt(foundTask['to_department'] ?? foundTask['toDepartment']) ?? 0;
+          final engineerAllowed = !isPicEngineerRole(currentUser.role) || toDepartment == 2;
+          roleAllowed = areaAllowed && engineerAllowed;
           debugPrint('[DeepLinkHandler] Final PIC roleAllowed: $roleAllowed (byId: $hasAreaById, byName: $hasAreaByName)');
         } catch (e) {
           debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
@@ -248,6 +260,31 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     }
   }
 
+  Future<Map<String, dynamic>?> _findAccessiblePicScopedTask(
+    UserModel currentUser,
+  ) async {
+    if (!isPicScopedRole(currentUser.role)) {
+      return null;
+    }
+
+    final accessibleTasks = await ref.read(picAccessibleTaskMapsProvider.future);
+    final token = widget.token.trim();
+
+    final matched = accessibleTasks.where((task) {
+      final taskId = task['id']?.toString().trim();
+      final picToken = task['picToken']?.toString().trim() ??
+          task['pic_token']?.toString().trim();
+
+      return taskId == token || picToken == token;
+    }).toList();
+
+    if (matched.isEmpty) {
+      return null;
+    }
+
+    return matched.first;
+  }
+
   bool _isRoleAllowedForTask(UserModel currentUser, Map<String, dynamic> taskMap) {
     final role = currentUser.role;
     final authorId = _toInt(
@@ -279,7 +316,7 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       return true;
     }
 
-    if (role == UserRole.pic) {
+    if (isPicScopedRole(role)) {
       // PERBAIKAN: currentUser.areaAccess mungkin kosong atau tidak terpopulate dengan benar
       // Jadi kita return false agar trigger fallback logic ke areaByUserProvider
       if (currentUser.areaAccess.isEmpty) {
@@ -292,87 +329,29 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
 
       debugPrint('[DeepLinkHandler] PIC areaAccess check => byId: $hasAreaById, byName: $hasAreaByName');
 
-      return hasAreaById || hasAreaByName;
-    }
-
-    return false;
-  }
-
-  Future<String?> _resolveTaskIdFromExistingData(
-    UserModel currentUser,
-    Map<String, dynamic> validation,
-    Map<String, dynamic>? resolvedTask,
-  ) async {
-    final explicitTaskId = _pickTaskId(validation) ?? _pickTaskId(resolvedTask);
-
-    final allTaskMaps = await ref.read(petugasTaskMapsProvider.future);
-    debugPrint('[DeepLinkHandler] existing app tasks count: ${allTaskMaps.length}');
-
-    final areaIdFromValidation = validation['areaId']?.toString();
-    final role = currentUser.role;
-
-    var candidates = allTaskMaps.where((task) {
-      final taskAreaId = task['areaId']?.toString();
-      final taskAuthor = _toInt(task['authorId'] ?? task['createdBy'] ?? task['created_by'] ?? task['userId'] ?? task['user_id']);
-
-      if (areaIdFromValidation != null && areaIdFromValidation.isNotEmpty && taskAreaId != areaIdFromValidation) {
+      final areaAllowed = hasAreaById || hasAreaByName;
+      if (!areaAllowed) {
         return false;
       }
 
-      if (role == UserRole.petugasHse) {
-        return taskAuthor == _toInt(currentUser.id);
+      int toDepartment = _toInt(taskMap['to_department'] ?? taskMap['toDepartment']) ?? 0;
+
+      if (isPicEngineerRole(role)) {
+        final engineerAllowed = toDepartment == 2;
+        debugPrint('[DeepLinkHandler] PIC Engineer validation => areaAllowed: $areaAllowed, engineerAllowed: $engineerAllowed, to_department: $toDepartment');
+        return engineerAllowed;
       }
 
-      if (role == UserRole.pic) {
-        final areaName = task['area']?.toString();
-        final areaAllowedById = taskAreaId != null && currentUser.areaAccess.contains(taskAreaId);
-        final areaAllowedByName = areaName != null && currentUser.areaAccess.contains(areaName);
-        return areaAllowedById || areaAllowedByName;
+      if (isPicHrgaRole(role)) {
+        final hrgaAllowed = toDepartment == 1;
+        debugPrint('[DeepLinkHandler] PIC HRGA validation => areaAllowed: $areaAllowed, hrgaAllowed: $hrgaAllowed, to_department: $toDepartment');
+        return hrgaAllowed;
       }
 
-      // Supervisor melihat semua.
       return true;
-    }).toList();
-
-    debugPrint(
-      '[DeepLinkHandler] fallback candidates => role: $role, areaFilter: $areaIdFromValidation, count: ${candidates.length}, explicitTaskId: $explicitTaskId',
-    );
-
-    if (explicitTaskId != null && explicitTaskId.isNotEmpty) {
-      final found = candidates.firstWhere(
-        (task) => task['id']?.toString() == explicitTaskId,
-        orElse: () => <String, dynamic>{},
-      );
-
-      if (found.isNotEmpty) {
-        return explicitTaskId;
-      }
     }
 
-    if (candidates.length == 1) {
-      return candidates.first['id']?.toString();
-    }
-
-    return null;
-  }
-
-  String? _pickTaskId(Map<String, dynamic>? map) {
-    if (map == null) return null;
-    final values = [
-      map['taskId'],
-      map['task_id'],
-      map['reportId'],
-      map['report_id'],
-      map['id'],
-    ];
-
-    for (final value in values) {
-      final text = value?.toString();
-      if (text != null && text.trim().isNotEmpty) {
-        return text.trim();
-      }
-    }
-    return null;
+    return false;
   }
 
   bool? _asBool(dynamic value) {
@@ -398,6 +377,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       UserRole.petugasHse => '/petugas/home',
       UserRole.hseSupervisor => '/supervisor/home',
       UserRole.pic => '/pic/home',
+      UserRole.picEngineer => '/pic/home',
+      UserRole.picHrga => '/pic/home',
     };
 
     debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
@@ -416,6 +397,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       UserRole.petugasHse => '/petugas/home',
       UserRole.hseSupervisor => '/supervisor/home',
       UserRole.pic => '/pic/home',
+      UserRole.picEngineer => '/pic/home',
+      UserRole.picHrga => '/pic/home',
     };
 
     debugPrint('[DeepLinkHandler] navigate to home -> $homeRoute');
@@ -470,21 +453,6 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     }
   }
 
-  void _navigateToHome(String routeName, String message) {
-    if (!mounted || _hasNavigated) return;
-    _hasNavigated = true;
-
-    debugPrint('[DeepLinkHandler] navigate to home -> $routeName');
-    context.go(routeName);
-
-    _showToastAfterNavigation(() {
-      AppToast.error(
-        context,
-        message: message,
-      );
-    });
-  }
-
   void _navigateBasedOnRoleWithError(UserRole role, bool isNotFoundError) {
     if (!mounted || _hasNavigated) return;
     _hasNavigated = true;
@@ -500,6 +468,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       UserRole.petugasHse => '/petugas/home',
       UserRole.hseSupervisor => '/supervisor/home',
       UserRole.pic => '/pic/home',
+      UserRole.picEngineer => '/pic/home',
+      UserRole.picHrga => '/pic/home',
     };
 
     debugPrint('[DeepLinkHandler] navigate to home with error -> $homeRoute');
@@ -527,39 +497,11 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     context.go(location);
   }
 
-  void _goOnceNamed(
-    String routeName, {
-    Map<String, String> pathParameters = const {},
-    Map<String, String> queryParameters = const {},
-  }) {
-    if (!mounted || _hasNavigated) return;
-    _hasNavigated = true;
-    debugPrint(
-      '[DeepLinkHandler] navigate named -> $routeName, pathParameters: $pathParameters, queryParameters: $queryParameters',
-    );
-    context.goNamed(
-      routeName,
-      pathParameters: pathParameters,
-      queryParameters: queryParameters,
-    );
-  }
-
   int? _toInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
-  }
-
-  UserRole _resolveRole(String role) {
-    final normalized = role.trim().toLowerCase();
-    if (normalized == 'supervisor' || normalized == 'hse_supervisor') {
-      return UserRole.hseSupervisor;
-    }
-    if (normalized == 'pic' || normalized == 'pic_area') {
-      return UserRole.pic;
-    }
-    return UserRole.petugasHse;
   }
 
   Future<Map<int, String>> _buildAreaNameByIdMap(WidgetRef ref) async {
@@ -587,6 +529,9 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     final title = task is Map ? task['title'] ?? task['name'] : task.name ?? 'Inspeksi $areaName';
     final status = task is Map ? task['status'] : task.status;
     final picToken = task is Map ? task['pic_token'] ?? task['picToken'] : task.picToken;
+    final toDepartment = task is Map
+        ? (_toInt(task['to_department'] ?? task['toDepartment']) ?? 0)
+        : task.toDepartment;
 
     return <String, dynamic>{
       'id': id.toString(),
@@ -599,6 +544,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
       'notes': task is Map ? task['notes'] : task.notes,
       'riskLevel': task is Map ? task['risk_level'] ?? task['riskLevel'] : task.riskLevel,
       'status': status,
+      'to_department': toDepartment,
+      'toDepartment': toDepartment,
       'date': task is Map ? task['date'] ?? task['created_at'] : task.date,
       'authorId': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,
       'userId': task is Map ? task['user_id'] ?? task['created_by'] : task.userId,

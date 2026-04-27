@@ -18,15 +18,17 @@ class PetugasHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final reportsAsync = ref.watch(petugasOwnTaskMapsProvider);
 
     Future<void> onRefresh() async {
       debugPrint('[PetugasHomeScreen] pull-to-refresh triggered');
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(currentUserTaskMapsProvider);
+      ref.invalidate(petugasOwnTaskMapsProvider);
       final results = await Future.wait([
         ref.read(tasksFutureProvider.future),
-        ref.read(petugasTaskMapsProvider.future),
+        ref.read(petugasOwnTaskMapsProvider.future),
       ]);
 
       final totalTasks = (results[0] as List).length;
@@ -66,16 +68,8 @@ class PetugasHomeScreen extends ConsumerWidget {
       );
     }
 
-    // Filter task milik petugas sendiri
-    final allReports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
-    final myReports = allReports.where((report) {
-      final reportOwnerId = report['userId']?.toString() ??
-                           report['created_by']?.toString() ??
-                           report['user_id']?.toString();
-      return reportOwnerId == user.id.toString();
-    }).toList();
-
-    final reports = [...myReports]
+    final ownReports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
+    final reports = [...ownReports]
       ..sort((a, b) => _tryParseDate(b['date']?.toString())
           .compareTo(_tryParseDate(a['date']?.toString())));
 
@@ -225,6 +219,7 @@ class PetugasHomeScreen extends ConsumerWidget {
                       context,
                       index: index,
                       title: _getReportTitle(rpt),
+                      locationLabel: _getLocationLabel(rpt),
                       dateString: rpt['date']?.toString(),
                       rawStatus: actualStatus,
                       tag: _getStatusTag(actualStatus),
@@ -277,6 +272,7 @@ class PetugasHomeScreen extends ConsumerWidget {
     BuildContext context, {
     required int index,
     required String title,
+    required String locationLabel,
     required String? dateString,
     required String rawStatus,
     String? tag,
@@ -292,12 +288,12 @@ class PetugasHomeScreen extends ConsumerWidget {
 
     return InkWell(
       onTap: () => context.pushNamed(RouteNames.taskDetail, pathParameters: {'id': reportId}),
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFF1E1E1E), width: 1.5),
         ),
         clipBehavior: Clip.antiAlias,
@@ -311,7 +307,7 @@ class PetugasHomeScreen extends ConsumerWidget {
             ),
             // Layer Konten
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -323,7 +319,9 @@ class PetugasHomeScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           title,
-                          style: AppTypography.h2.copyWith(color: textColor, fontSize: 18, fontWeight: FontWeight.w600, height: 1.2),
+                          style: AppTypography.h2.copyWith(color: textColor, fontSize: 16, fontWeight: FontWeight.w600, height: 1.2),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (tag != null) ...[
@@ -334,15 +332,39 @@ class PetugasHomeScreen extends ConsumerWidget {
                             color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(tag, style: AppTypography.caption.copyWith(
-                            color: isDark ? Colors.white : const Color(0xFF6B6E94), 
-                            fontWeight: FontWeight.w600
-                          )),
-                        )
-                      ]
+                           child: Text(tag, style: AppTypography.caption.copyWith(
+                             color: isDark ? Colors.white : const Color(0xFF6B6E94), 
+                             fontWeight: FontWeight.w600,
+                             fontSize: 11,
+                           )),
+                         )
+                       ]
+                     ],
+                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                        size: 14,
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          locationLabel,
+                          style: AppTypography.body1.copyWith(
+                            color: textColor.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -353,7 +375,7 @@ class PetugasHomeScreen extends ConsumerWidget {
                             Expanded(
                               child: Text(
                                 _formatIndonesianDate(dateString),
-                                style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
+                                style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 12),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -368,7 +390,7 @@ class PetugasHomeScreen extends ConsumerWidget {
                           const SizedBox(width: 6),
                           Text(
                             _formatTime(dateString),
-                            style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13),
+                            style: AppTypography.body1.copyWith(color: textColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 12),
                           ),
                         ],
                       ),
@@ -417,6 +439,25 @@ class PetugasHomeScreen extends ConsumerWidget {
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  String _getLocationLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return 'Lokasi tidak tersedia';
   }
 
   String? _getStatusTag(String? status) {

@@ -24,7 +24,7 @@ abstract class TaskRemoteDataSource {
       CreateHseTaskRequest request, List<File>? photos);
   Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request,
       {List<File>? photos, String? mode});
-  Future<HseTaskModel> cancelTask(int id, String canceledBy);
+  Future<HseTaskModel> cancelTask(int id, String canceledBy, String cancelNotes);
   Future<List<HseStaffModel>> fetchStaffs();
   Future<List<HseStaffModel>> fetchPicUsers();
 }
@@ -448,7 +448,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       final status = e.response?.statusCode ?? 0;
       final responseData = e.response?.data;
       final payload = responseData is Map
-          ? Map<String, dynamic>.from(responseData as Map)
+          ? Map<String, dynamic>.from(responseData)
           : <String, dynamic>{};
 
       final redirectTo = payload['redirect_to']?.toString();
@@ -496,7 +496,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       if (request.title.trim().isEmpty) {
         throw Exception('Judul tidak boleh kosong');
       }
-      if (request.areaId == null || request.areaId! <= 0) {
+      if (request.areaId <= 0) {
         throw Exception('Area ID tidak valid');
       }
       if (request.riskLevel.trim().isEmpty) {
@@ -513,6 +513,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'title': request.title.trim(),
         'area_id': request.areaId,
         'risk_level': request.riskLevel,
+        'to_department': request.toDepartment,
       }, tag: 'TaskRemoteDataSource');
 
       final formData = FormData.fromMap({
@@ -521,6 +522,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'risk_level': request.riskLevel.trim(),
         'root_cause': request.rootCause.trim(),
         'notes': request.notes.trim(),
+        'to_department': request.toDepartment,
       });
 
       // Upload photos with proper format
@@ -635,7 +637,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   }
 
   @override
-  Future<HseTaskModel> cancelTask(int id, String canceledBy) async {
+  Future<HseTaskModel> cancelTask(int id, String canceledBy, String cancelNotes) async {
     try {
       log.info('Canceling task', data: {'id': id, 'canceled_by': canceledBy}, tag: 'TaskRemoteDataSource');
 
@@ -644,12 +646,57 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         data: {
           'mode': 'cancel',
           'cancelled_by': canceledBy,
+          'cancel_notes': cancelNotes,
         },
       );
 
-      final data = response.data is Map<String, dynamic>
-          ? response.data['data']
-          : response.data['data'];
+      final responseBody = response.data;
+      Map<String, dynamic>? data;
+
+      if (responseBody is Map<String, dynamic>) {
+        final nestedData = responseBody['data'];
+        if (nestedData is Map<String, dynamic>) {
+          data = nestedData;
+        } else if (nestedData is Map) {
+          data = Map<String, dynamic>.from(nestedData);
+        }
+      } else if (responseBody is Map) {
+        final mapBody = Map<String, dynamic>.from(responseBody);
+        final nestedData = mapBody['data'];
+        if (nestedData is Map<String, dynamic>) {
+          data = nestedData;
+        } else if (nestedData is Map) {
+          data = Map<String, dynamic>.from(nestedData);
+        }
+      }
+
+      if (data == null) {
+        log.info(
+          'Cancel response succeeded without data payload, returning optimistic canceled task snapshot',
+          data: {'id': id, 'response': responseBody},
+          tag: 'TaskRemoteDataSource',
+        );
+
+        return HseTaskModel(
+          id: id,
+          code: '',
+          userId: 0,
+          areaId: 0,
+          name: null,
+          riskLevel: '',
+          rootCause: '',
+          notes: '',
+          status: 'cancelled',
+          toDepartment: 0,
+          picToken: null,
+          photos: const <String>[],
+          followUps: const <Map<String, dynamic>>[],
+          date: null,
+          userName: canceledBy,
+          cancelledBy: canceledBy,
+          cancelledAt: DateTime.now().toIso8601String(),
+        );
+      }
 
       log.info('Task canceled successfully', data: {'id': id, 'canceled_by': canceledBy}, tag: 'TaskRemoteDataSource');
 
@@ -720,8 +767,40 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         : json['name']?.toString().trim();
 
     final parsedPhotos = _parsePhotos(json['photos']);
+    final resolvedFollowUps = _mergeFollowUps(
+      json['follow_ups'],
+      json['followUps'],
+    );
+    final normalizedStatus = (json['status']?.toString() ?? '').trim().toLowerCase();
+    final shouldAddSyntheticCancelLog =
+        (normalizedStatus == 'cancelled' || normalizedStatus == 'canceled') &&
+            !resolvedFollowUps.any((item) {
+              final action = (item['action'] ?? item['status'])
+                  ?.toString()
+                  .trim()
+                  .toLowerCase();
+              return action == 'cancelled' || action == 'canceled';
+            });
 
-      return HseTaskModel(
+    if (shouldAddSyntheticCancelLog) {
+      resolvedFollowUps.add({
+        'action': 'canceled',
+        'status': 'canceled',
+        'date': json['cancelled_at'] ??
+            json['canceled_at'] ??
+            json['updated_at'] ??
+            json['created_at'],
+        'created_by': json['cancelled_by'] ??
+            json['canceled_by'] ??
+            json['created_by'],
+        'notes': json['cancel_notes'] ??
+            json['cancelNotes'] ??
+            json['cancel_reason'] ??
+            json['cancelReason'],
+      });
+    }
+
+    return HseTaskModel(
       id: _toInt(json['id']),
       code: json['code']?.toString() ?? '',
       userId: _toInt(json['user_id'] ??
@@ -740,17 +819,82 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
           json['root_cause']?.toString() ?? json['rootCause']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
+      toDepartment: _toInt(json['to_department'] ?? json['toDepartment']),
       picToken: json['pic_token']?.toString() ?? json['picToken']?.toString(),
       photos: parsedPhotos,
-      followUps: _parseFollowUps(json['follow_ups'])
-          .followedBy(_parseFollowUps(json['followUps']))
-          .toList(),
+      followUps: resolvedFollowUps,
       date: json['date']?.toString() ?? json['created_at']?.toString(),
-      userName: json['user']?.toString() ??
-          json['created_by']?.toString() ??
-          json['user_name']?.toString() ??
-          json['username']?.toString(),
+      userName: _resolveUserName(json),
     );
+  }
+
+  String? _resolveUserName(Map<String, dynamic> json) {
+    final user = json['user'];
+    if (user is String) {
+      final directName = user.trim();
+      if (directName.isNotEmpty) {
+        return directName;
+      }
+    }
+    if (user is Map<String, dynamic>) {
+      final nestedName = user['name']?.toString().trim();
+      if (nestedName != null && nestedName.isNotEmpty) {
+        return nestedName;
+      }
+    }
+    if (user is Map) {
+      final nestedName = user['name']?.toString().trim();
+      if (nestedName != null && nestedName.isNotEmpty) {
+        return nestedName;
+      }
+    }
+
+    final candidates = [
+      json['created_by'],
+      json['createdBy'],
+      json['user_name'],
+      json['username'],
+      json['staff_name'],
+      json['staffName'],
+      json['creator_name'],
+      json['created_by_name'],
+      json['createdByName'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  List<Map<String, dynamic>> _mergeFollowUps(dynamic snakeCase, dynamic camelCase) {
+    final primary = _parseFollowUps(snakeCase);
+    final secondary = _parseFollowUps(camelCase);
+
+    if (primary.isEmpty) return secondary;
+    if (secondary.isEmpty) return primary;
+
+    final merged = <Map<String, dynamic>>[];
+    final seenKeys = <String>{};
+
+    for (final item in [...primary, ...secondary]) {
+      final dedupeKey = [
+        item['id']?.toString() ?? '',
+        item['date']?.toString() ?? item['created_at']?.toString() ?? '',
+        item['status']?.toString() ?? '',
+        item['action']?.toString() ?? '',
+      ].join('|');
+
+      if (seenKeys.add(dedupeKey)) {
+        merged.add(item);
+      }
+    }
+
+    return merged;
   }
 
   int _toInt(dynamic value) {

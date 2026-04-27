@@ -101,19 +101,47 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       _log('login() DioException', e);
       _log('login() DioException response', e.response?.data);
 
-      if (e.response?.statusCode == 401) {
-        throw Exception('Email atau password salah.');
-      }
-
       final backendMessage = _extractErrorMessage(e.response?.data);
 
+      if (e.response?.statusCode == 401 ||
+          backendMessage?.toLowerCase() == 'unauthorized') {
+        throw Exception(
+          'Email atau password salah, atau akun Anda belum terdaftar.',
+        );
+      }
+
+      final rawMessage = '${e.message} ${e.error}'.toLowerCase();
+
+      if (rawMessage.contains('socketexception') ||
+          rawMessage.contains('failed host lookup')) {
+        throw Exception('Koneksi gagal. Silakan periksa paket data atau Wi‑Fi Anda.');
+      }
+
+      if (rawMessage.contains('timeout')) {
+        throw Exception('Waktu koneksi habis. Coba lagi dalam beberapa saat.');
+      }
+
       throw Exception(
-        'Gagal melakukan login: ${backendMessage ?? e.message ?? 'Terjadi kesalahan pada server'}',
+        backendMessage?.isNotEmpty == true
+            ? backendMessage!
+            : 'Terjadi kendala pada server. Mohon hubungi tim IT.',
       );
     } catch (e, st) {
       _log('login() unexpected error', e);
       _log('login() stacktrace', st);
-      throw Exception('Gagal melakukan login: $e');
+
+      final rawMessage = e.toString().toLowerCase();
+
+      if (rawMessage.contains('socketexception') ||
+          rawMessage.contains('failed host lookup')) {
+        throw Exception('Koneksi gagal. Silakan periksa paket data atau Wi‑Fi Anda.');
+      }
+
+      if (rawMessage.contains('timeout')) {
+        throw Exception('Waktu koneksi habis. Coba lagi dalam beberapa saat.');
+      }
+
+      throw Exception('Terjadi kendala pada server. Mohon hubungi tim IT.');
     }
   }
 

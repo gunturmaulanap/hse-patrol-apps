@@ -9,9 +9,9 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_toast.dart';
-import '../../../../app/router/route_names.dart';
 import '../../../../core/utils/share_helper.dart';
 import '../../../../shared/enums/user_role.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/create_task_form_provider.dart';
 
@@ -25,14 +25,6 @@ class CreateTaskReviewScreen extends ConsumerStatefulWidget {
 class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen> {
   bool _isSubmitting = false;
 
-  String _locationTypeLabel(String? buildingType) {
-    final value = (buildingType ?? '').toLowerCase().trim();
-    if (value.isEmpty) return '-';
-    if (value.contains('non') && value.contains('produksi')) return 'Non Produksi';
-    if (value.contains('produksi')) return 'Produksi';
-    return '-';
-  }
-
   String _safeText(String? value, {String fallback = '-'}) {
     final text = value?.trim() ?? '';
     return text.isEmpty ? fallback : text;
@@ -41,7 +33,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
   String _riskLevelLabel(String? level) {
     switch (level?.trim()) {
       case '1':
-        return 'Kurang dari 1 jam';
+        return 'Kurang dari 2 jam';
       case '2':
         return 'Kurang dari 24 jam';
       case '3':
@@ -53,46 +45,51 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
     }
   }
 
-  String? _normalizePicToken(String? raw) {
-    if (raw == null) return null;
-    final value = raw.trim();
-    if (value.isEmpty) return null;
+  String _departmentLabel(int toDepartment) {
+    switch (toDepartment) {
+      case CreateTaskDraft.hrgaDepartment:
+        return 'HRGA';
+      case CreateTaskDraft.engineeringDepartment:
+        return 'Engineering';
+      // case CreateTaskDraft.bothDepartments:
+      //   return 'HRGA & Engineering';
+      default:
+        return 'Tidak';
+    }
+  }
 
-    // Kasus 1: token polos
-    if (!value.contains('://') && !value.contains('/')) {
-      return value;
+  List<DropdownMenuItem<int>> _buildDepartmentOptions(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppColors.textPrimary,
+          overflow: TextOverflow.ellipsis,
+        );
+
+    DropdownMenuItem<int> item(int value, String text) {
+      return DropdownMenuItem<int>(
+        value: value,
+        child: SizedBox(
+          width: double.infinity,
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textStyle,
+          ),
+        ),
+      );
     }
 
-    // Kasus 2: URL API legacy atau URL publik
-    final uri = Uri.tryParse(value);
-    if (uri != null) {
-      final segments = uri.pathSegments;
-      if (segments.length >= 2 && segments[0] == 'share' && segments[1] == 'report') {
-        return segments.isNotEmpty ? segments.last : null;
-      }
-
-      if (segments.length >= 4 && segments[0] == 'api' && segments[1] == 'hse' && segments[2] == 'reports' && segments[3] == 'pic') {
-        return segments.isNotEmpty ? segments.last : null;
-      }
-    }
-
-    // Fallback aman: ambil segmen terakhir non-kosong
-    final parts = value.split('/').where((e) => e.trim().isNotEmpty).toList();
-    if (parts.isEmpty) return null;
-    return parts.last.trim();
+    return [
+      item(CreateTaskDraft.hrgaDepartment, 'Human Resources General Affairs (HRGA)'),
+      item(CreateTaskDraft.engineeringDepartment, 'Engineering'),
+      // item(CreateTaskDraft.bothDepartments, 'Keduanya'),
+    ];
   }
 
   void _goToHomeByRole(BuildContext context) {
     final user = ref.read(currentUserProvider);
     final role = user?.role;
-
-    if (role == UserRole.hseSupervisor) {
-      context.goNamed(RouteNames.supervisorHome);
-    } else if (role == UserRole.pic) {
-      context.goNamed(RouteNames.picHome);
-    } else {
-      context.goNamed(RouteNames.petugasHome);
-    }
+    context.goNamed(resolveHomeRouteName(role ?? UserRole.petugasHse));
   }
 
   void _submitData() async {
@@ -111,7 +108,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 
       if (createdTask != null && createdTask is! bool && mounted) {
         // Gunakan report ID untuk deep link (bukan picToken)
-        final reportId = createdTask.id?.toString() ?? '';
+        final reportId = createdTask.id.toString();
         final deepLinkUrl = reportId.isNotEmpty
             ? 'https://mes.aksamala.co.id/share/report/$reportId'
             : 'Link belum tersedia';
@@ -120,6 +117,12 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
         
         // Format Teks Caption WA
         final areaLabel = _safeText(draft.area);
+        final supportLabel = draft.toDepartment == 1
+            ? 'Butuh Support HRGA'
+            : draft.toDepartment == 2
+                ? 'Butuh Support Engineer'
+                : 'Tidak Membutuhkan Support dari Department lain';
+
         final waText = ''' *LAPORAN TEMUAN HSE*
 
 👤 *Pelapor:* $reporterName
@@ -127,6 +130,7 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
 ⚠️ *Tingkat Risiko:* ${_riskLevelLabel(draft.riskLevel)}
 📝 *Akar Masalah:* ${draft.rootCause}
 💬 *Keterangan:* ${draft.notes}
+🛠️ *Dukungan:* $supportLabel
 
 Untuk proses tindak lanjut, silakan klik link berikut:
 🔗 Buka Aplikasi: $deepLinkUrl''';
@@ -192,7 +196,9 @@ Untuk proses tindak lanjut, silakan klik link berikut:
                           );
                         } else {
                           // Fallback jika anehnya tidak ada foto
-                          await Share.share(waText);
+                          await SharePlus.instance.share(
+                            ShareParams(text: waText),
+                          );
                         }
 
                         // Setelah share system tray tertutup, kembalikan user ke home
@@ -290,6 +296,108 @@ Untuk proses tindak lanjut, silakan klik link berikut:
                   _buildRow('Total Foto', '${draft.photos.length} Foto'),
                   _buildRow('Keterangan', draft.notes ?? '-'),
                   _buildRow('Akar Masalah', draft.rootCause ?? '-'),
+                  _buildRow(
+                    'Butuh Support Department Lain',
+                    _departmentLabel(draft.toDepartment),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+                    value: draft.needsOtherDepartmentSupport,
+                    onChanged: _isSubmitting
+                        ? null
+                        : (value) {
+                            ref
+                                .read(createTaskFormProvider.notifier)
+                                .setNeedsOtherDepartmentSupport(value ?? false);
+                          },
+                    title: const Text('Butuh support department lain?'),
+                    subtitle: const Text(
+                      'Centang box ini jika memerlukan support dari department lain',
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  if (draft.needsOtherDepartmentSupport) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Pilih Department',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        initialValue: draft.toDepartment == CreateTaskDraft.noDepartmentSupport
+                            ? CreateTaskDraft.hrgaDepartment
+                            : draft.toDepartment,
+                        items: _buildDepartmentOptions(context),
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                ref
+                                    .read(createTaskFormProvider.notifier)
+                                    .setToDepartment(value);
+                              },
+                        selectedItemBuilder: (context) {
+                          return _buildDepartmentOptions(context).map((item) {
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _departmentLabel(item.value!),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: AppColors.textPrimary),
+                              ),
+                            );
+                          }).toList();
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.primary),
+                          ),
+                          disabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: AppColors.surface,
+                        menuMaxHeight: 240,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

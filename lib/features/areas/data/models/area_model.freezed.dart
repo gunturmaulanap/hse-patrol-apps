@@ -25,6 +25,7 @@ mixin _$AreaModel {
   String get name => throw _privateConstructorUsedError;
   @JsonKey(name: 'building_type')
   String get buildingType => throw _privateConstructorUsedError;
+  String get description => throw _privateConstructorUsedError;
 
   /// Serializes this AreaModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -45,7 +46,8 @@ abstract class $AreaModelCopyWith<$Res> {
       {int id,
       String code,
       String name,
-      @JsonKey(name: 'building_type') String buildingType});
+      @JsonKey(name: 'building_type') String buildingType,
+      String description});
 }
 
 /// @nodoc
@@ -67,6 +69,7 @@ class _$AreaModelCopyWithImpl<$Res, $Val extends AreaModel>
     Object? code = null,
     Object? name = null,
     Object? buildingType = null,
+    Object? description = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -85,6 +88,10 @@ class _$AreaModelCopyWithImpl<$Res, $Val extends AreaModel>
           ? _value.buildingType
           : buildingType // ignore: cast_nullable_to_non_nullable
               as String,
+      description: null == description
+          ? _value.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -101,7 +108,8 @@ abstract class _$$AreaModelImplCopyWith<$Res>
       {int id,
       String code,
       String name,
-      @JsonKey(name: 'building_type') String buildingType});
+      @JsonKey(name: 'building_type') String buildingType,
+      String description});
 }
 
 /// @nodoc
@@ -121,6 +129,7 @@ class __$$AreaModelImplCopyWithImpl<$Res>
     Object? code = null,
     Object? name = null,
     Object? buildingType = null,
+    Object? description = null,
   }) {
     return _then(_$AreaModelImpl(
       id: null == id
@@ -139,6 +148,10 @@ class __$$AreaModelImplCopyWithImpl<$Res>
           ? _value.buildingType
           : buildingType // ignore: cast_nullable_to_non_nullable
               as String,
+      description: null == description
+          ? _value.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -150,7 +163,8 @@ class _$AreaModelImpl implements _AreaModel {
       {required this.id,
       required this.code,
       required this.name,
-      @JsonKey(name: 'building_type') required this.buildingType});
+      @JsonKey(name: 'building_type') required this.buildingType,
+      this.description = ''});
 
   factory _$AreaModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$AreaModelImplFromJson(json);
@@ -164,10 +178,13 @@ class _$AreaModelImpl implements _AreaModel {
   @override
   @JsonKey(name: 'building_type')
   final String buildingType;
+  @override
+  @JsonKey()
+  final String description;
 
   @override
   String toString() {
-    return 'AreaModel(id: $id, code: $code, name: $name, buildingType: $buildingType)';
+    return 'AreaModel(id: $id, code: $code, name: $name, buildingType: $buildingType, description: $description)';
   }
 
   @override
@@ -179,12 +196,15 @@ class _$AreaModelImpl implements _AreaModel {
             (identical(other.code, code) || other.code == code) &&
             (identical(other.name, name) || other.name == name) &&
             (identical(other.buildingType, buildingType) ||
-                other.buildingType == buildingType));
+                other.buildingType == buildingType) &&
+            (identical(other.description, description) ||
+                other.description == description));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, code, name, buildingType);
+  int get hashCode =>
+      Object.hash(runtimeType, id, code, name, buildingType, description);
 
   /// Create a copy of AreaModel
   /// with the given fields replaced by the non-null parameter values.
@@ -207,7 +227,8 @@ abstract class _AreaModel implements AreaModel {
           {required final int id,
           required final String code,
           required final String name,
-          @JsonKey(name: 'building_type') required final String buildingType}) =
+          @JsonKey(name: 'building_type') required final String buildingType,
+          final String description}) =
       _$AreaModelImpl;
 
   factory _AreaModel.fromJson(Map<String, dynamic> json) =
@@ -222,6 +243,8 @@ abstract class _AreaModel implements AreaModel {
   @override
   @JsonKey(name: 'building_type')
   String get buildingType;
+  @override
+  String get description;
 
   /// Create a copy of AreaModel
   /// with the given fields replaced by the non-null parameter values.

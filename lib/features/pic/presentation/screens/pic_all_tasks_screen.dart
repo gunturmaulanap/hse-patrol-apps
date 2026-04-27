@@ -10,8 +10,8 @@ import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/shimmer/base_shimmer.dart';
 import '../../../../core/widgets/shimmer/shimmer_box.dart';
 import '../../../../core/utils/progressive_pagination.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../areas/presentation/providers/area_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
 class PicAllTasksScreen extends ConsumerStatefulWidget {
@@ -36,10 +36,9 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       if (!mounted) return;
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
-      ref.invalidate(areaByUserProvider);
+      ref.invalidate(picAccessibleTaskMapsProvider);
       ref.read(tasksFutureProvider.future);
-      ref.read(petugasTaskMapsProvider.future);
-      ref.read(areaByUserProvider.future);
+      ref.read(picAccessibleTaskMapsProvider.future);
     });
   }
 
@@ -53,18 +52,16 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     debugPrint('[PicAllTasksScreen] pull-to-refresh triggered');
     ref.invalidate(tasksFutureProvider);
     ref.invalidate(petugasTaskMapsProvider);
-    ref.invalidate(areaByUserProvider);
+    ref.invalidate(picAccessibleTaskMapsProvider);
     final results = await Future.wait([
       ref.read(tasksFutureProvider.future),
-      ref.read(petugasTaskMapsProvider.future),
-      ref.read(areaByUserProvider.future),
+      ref.read(picAccessibleTaskMapsProvider.future),
     ]);
 
     final totalTasks = (results[0] as List).length;
     final totalTaskMaps = (results[1] as List).length;
-    final totalAreas = (results[2] as List).length;
     debugPrint(
-      '[PicAllTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps areas=$totalAreas',
+      '[PicAllTasksScreen] refresh complete -> tasks=$totalTasks maps=$totalTaskMaps',
     );
   }
 
@@ -76,8 +73,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
-    final areasAsync = ref.watch(areaByUserProvider);
+    final reportsAsync = ref.watch(picAccessibleTaskMapsProvider);
 
     // FIX: Redirect ke login jika user null
     if (user == null) {
@@ -94,9 +90,20 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       );
     }
 
-    final areaAccess = (areasAsync.valueOrNull ?? const [])
-        .map((a) => a.name)
-        .toSet();
+    if (!isPicScopedRole(user.role)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     final filterSignature =
@@ -106,20 +113,20 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
       _resetPagination();
     }
 
-    // Filter base data: Hanya ambil task yang areanya diizinkan untuk PIC ini
-    // Dan hilangkan yang statusnya Canceled (Dihapus dari pandangan PIC)
+    // Data reports di sini SUDAH difilter oleh [`picAccessibleTaskMapsProvider`](lib/features/tasks/presentation/providers/task_provider.dart:78)
+    // berdasarkan role_id 5 / 24 / 25 dan area akses. Di screen ini cukup
+    // hilangkan yang statusnya Canceled agar sinkron dengan Home/Pending.
     final picReports = reports.where((r) {
-      return areaAccess.contains(r['area']) && _getActualStatus(r) != 'Canceled';
+      return _getActualStatus(r) != 'Canceled';
     }).toList();
 
     debugPrint(
-      '[PicAllTasksScreen] accessibleAreas=${areaAccess.length} reports=${picReports.length} '
+      '[PicAllTasksScreen] reports=${picReports.length} '
       'dateBuckets=${_buildDateBuckets(picReports)}',
     );
 
     final isInitialLoading =
-        (reportsAsync.isLoading && !reportsAsync.hasValue) ||
-        (areasAsync.isLoading && !areasAsync.hasValue);
+        (reportsAsync.isLoading && !reportsAsync.hasValue);
 
     if (isInitialLoading) {
       return const Scaffold(
@@ -364,7 +371,7 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((r) {
         final title = _getReportTitle(r).toLowerCase();
-        final area = (r['area']?.toString() ?? '').toLowerCase();
+        final area = _resolveTaskAreaLabel(r).toLowerCase();
         final query = _searchQuery.toLowerCase();
         return title.contains(query) || area.contains(query);
       }).toList();
@@ -416,7 +423,9 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     // Grouping by Area
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (var rpt in filtered) {
-      final area = rpt['area']?.toString() ?? 'Unknown Area';
+      final area = _resolveTaskAreaLabel(rpt).isNotEmpty
+          ? _resolveTaskAreaLabel(rpt)
+          : 'Unknown Area';
       if (!grouped.containsKey(area)) { grouped[area] = []; }
       grouped[area]!.add(rpt);
     }
@@ -464,7 +473,6 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
         // 3. Load More / Divider
         if (hasMore) {
           final nextCount = ProgressivePagination.getNextVisibleCount(visibleCount);
-          final toShow = (nextCount - visibleCount).clamp(0, tasks.length - visibleCount);
           listItems.add(
             Container(
               width: double.infinity,
@@ -628,6 +636,25 @@ class _PicAllTasksScreenState extends ConsumerState<PicAllTasksScreen> {
     final area = report['area']?.toString() ?? '-';
     final cause = report['rootCause']?.toString() ?? '-';
     return 'Inspeksi $area - Masalah: $cause';
+  }
+
+  String _resolveTaskAreaLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
   }
 
   Map<String, int> _buildDateBuckets(List<Map<String, dynamic>> reports,

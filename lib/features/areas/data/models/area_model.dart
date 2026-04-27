@@ -9,7 +9,8 @@ class AreaModel with _$AreaModel {
     required int id,
     required String code,
     required String name,
-    @JsonKey(name: 'building_type') required String buildingType,
+    required String buildingType,
+    @Default('') String description,
   }) = _AreaModel;
 
   factory AreaModel.fromJson(Map<String, dynamic> json) => _$AreaModelFromJson(json);

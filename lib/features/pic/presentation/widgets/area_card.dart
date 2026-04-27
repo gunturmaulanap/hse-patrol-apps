@@ -4,6 +4,7 @@ import '../../../../app/theme/app_typography.dart';
 
 class AreaCard extends StatelessWidget {
   final String areaName;
+  final String? areaDescription;
   final int pendingCount;
   final int waitingResponseCount;
   final int totalTasks;
@@ -13,6 +14,7 @@ class AreaCard extends StatelessWidget {
   const AreaCard({
     super.key,
     required this.areaName,
+    this.areaDescription,
     required this.pendingCount,
     required this.waitingResponseCount,
     required this.totalTasks,
@@ -36,7 +38,7 @@ class AreaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = _getColorByIndex(index);
-    final stripeColor = Colors.black.withOpacity(0.05);
+    final stripeColor = Colors.black.withValues(alpha: 0.05);
     final textColor = const Color(0xFF1E1E1E);
 
     return InkWell(
@@ -68,19 +70,21 @@ class AreaCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(PhosphorIcons.buildings(PhosphorIconsStyle.fill), size: 20, color: textColor),
                       ),
-                      Icon(PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold), size: 20, color: textColor.withOpacity(0.5)),
+                        Icon(PhosphorIcons.arrowUpRight(PhosphorIconsStyle.bold), size: 20, color: textColor.withValues(alpha: 0.5)),
                     ],
                   ),
                   
                   const Spacer(),
                   
                   Text(
-                    areaName,
+                    areaDescription != null && areaDescription!.trim().isNotEmpty
+                        ? areaDescription!.trim()
+                        : areaName,
                     style: AppTypography.h2.copyWith(
                       color: textColor,
                       fontSize: 16,
@@ -94,7 +98,7 @@ class AreaCard extends StatelessWidget {
                   Text(
                     '$totalTasks Total Inspections',
                     style: AppTypography.caption.copyWith(
-                      color: textColor.withOpacity(0.7),
+                      color: textColor.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
                     ),
@@ -126,7 +130,7 @@ class AreaCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -162,7 +166,7 @@ class AreaCard extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 6),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -191,7 +195,7 @@ class AreaCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

@@ -9,7 +9,7 @@ abstract class TaskRepository {
   Future<HseTaskModel> getTaskByPicToken(String picToken);
   Future<HseTaskModel> createTask(CreateHseTaskRequest request, List<File>? photos);
   Future<HseTaskModel> updateTask(int id, CreateHseTaskRequest request, {List<File>? photos, String? mode});
-  Future<HseTaskModel> cancelTask(int id, String canceledBy);
+  Future<HseTaskModel> cancelTask(int id, String canceledBy, String cancelNotes);
   Future<List<HseStaffModel>> getStaffs();
   Future<List<HseStaffModel>> getPicUsers();
 }

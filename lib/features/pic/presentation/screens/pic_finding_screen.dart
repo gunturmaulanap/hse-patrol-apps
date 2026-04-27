@@ -7,6 +7,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../auth/domain/auth_role_helper.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/active_area_filter_provider.dart';
 import '../../../tasks/presentation/providers/task_provider.dart';
 
@@ -24,10 +26,11 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
     debugPrint('[PicFindingScreen] pull-to-refresh triggered');
     ref.invalidate(tasksFutureProvider);
     ref.invalidate(petugasTaskMapsProvider);
+    ref.invalidate(picAccessibleTaskMapsProvider);
 
     final results = await Future.wait([
       ref.read(tasksFutureProvider.future),
-      ref.read(petugasTaskMapsProvider.future),
+      ref.read(picAccessibleTaskMapsProvider.future),
     ]);
 
     final totalTasks = (results[0] as List).length;
@@ -44,8 +47,9 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
       if (!mounted) return;
       ref.invalidate(tasksFutureProvider);
       ref.invalidate(petugasTaskMapsProvider);
+      ref.invalidate(picAccessibleTaskMapsProvider);
       ref.read(tasksFutureProvider.future);
-      ref.read(petugasTaskMapsProvider.future);
+      ref.read(picAccessibleTaskMapsProvider.future);
       debugPrint('[PicFindingScreen] init refresh petugasTaskMapsProvider');
     });
   }
@@ -53,13 +57,28 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
   @override
   Widget build(BuildContext context) {
     final activeArea = ref.watch(activeAreaFilterProvider);
-    final reportsAsync = ref.watch(petugasTaskMapsProvider);
+    final user = ref.watch(currentUserProvider);
+    final reportsAsync = ref.watch(picAccessibleTaskMapsProvider);
+
+    if (user == null || !isPicScopedRole(user.role)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Ambil data task khusus untuk area yang dipilih.
     // Sembunyikan task yang sudah di Canceled oleh petugas.
     final tasksInArea = reports.where((r) {
-      final isAreaMatch = (r['area']?.toString() ?? '') == activeArea;
+      final resolvedArea = _resolveTaskAreaLabel(r);
+      final isAreaMatch = resolvedArea == activeArea;
       final isNotCanceled = _getPicStatusTag(r) != 'Canceled';
       return isAreaMatch && isNotCanceled;
     }).toList()
@@ -322,6 +341,25 @@ class _PicFindingScreenState extends ConsumerState<PicFindingScreen> {
     }
 
     return actualStatus; // Pending
+  }
+
+  String _resolveTaskAreaLabel(Map<String, dynamic> report) {
+    final candidates = [
+      report['area_name'],
+      report['areaName'],
+      report['area_description'],
+      report['areaDescription'],
+      report['area'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
   }
 
   Widget _buildExactTaskCard(

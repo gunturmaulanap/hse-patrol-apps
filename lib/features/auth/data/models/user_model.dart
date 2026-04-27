@@ -1,4 +1,5 @@
 import '../../../../shared/enums/user_role.dart';
+import '../../domain/auth_role_helper.dart';
 
 class UserModel {
   final int id;
@@ -98,59 +99,11 @@ UserRole _parseUserRole({
   String? roleRaw,
   int? roleId,
 }) {
-  if (roleId == 12) {
-    return UserRole.pic;
-  }
-
-  if (roleId == 22) {
-    return UserRole.petugasHse;
-  }
-
-  final source = (roleName != null && roleName.trim().isNotEmpty)
-      ? roleName
-      : roleRaw;
-
-  if (source == null) return UserRole.petugasHse;
-
-  final normalized = source.toLowerCase().trim();
-
-  if (normalized == 'pic_area') {
-    return UserRole.pic;
-  }
-
-  if (normalized == 'hse_staff') {
-    return UserRole.petugasHse;
-  }
-
-  if (normalized == 'hse_supervisor') {
-    return UserRole.hseSupervisor;
-  }
-
-  if (normalized == 'pic area') {
-    return UserRole.pic;
-  }
-
-  if (normalized == 'hse supervisor') {
-    return UserRole.hseSupervisor;
-  }
-
-  if (normalized == 'hse') {
-    return UserRole.petugasHse;
-  }
-
-  if (normalized == 'pic' || normalized.contains('pic')) {
-    return UserRole.pic;
-  }
-
-  if (normalized.contains('petugas') || normalized.contains('hse')) {
-    if (normalized.contains('supervisor')) {
-      return UserRole.hseSupervisor;
-    }
-
-    return UserRole.petugasHse;
-  }
-
-  return UserRole.petugasHse;
+  return resolveUserRoleFromBackend(
+    roleId: roleId ?? 0,
+    roleName: roleName,
+    roleRaw: roleRaw,
+  );
 }
 
 int _toInt(dynamic value) {

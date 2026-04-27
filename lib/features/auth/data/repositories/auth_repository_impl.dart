@@ -19,7 +19,9 @@ class AuthRepositoryImpl implements AuthRepository {
       LoginRequest(emailOrUsername: emailOrUsername, password: password),
     );
 
-    debugPrint('[AuthRepository] parsed login response: ${response.toJson()}');
+    debugPrint(
+      '[AuthRepository] parsed login response: user=${response.user.email} role=${response.user.role.name}',
+    );
     debugPrint('[AuthRepository] before save token');
     await _sessionManager.saveToken(response.token);
 
