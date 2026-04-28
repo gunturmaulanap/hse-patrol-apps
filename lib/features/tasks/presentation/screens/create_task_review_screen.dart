@@ -51,8 +51,6 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
         return 'HRGA';
       case CreateTaskDraft.engineeringDepartment:
         return 'Engineering';
-      // case CreateTaskDraft.bothDepartments:
-      //   return 'HRGA & Engineering';
       default:
         return 'Tidak';
     }
@@ -82,7 +80,6 @@ class _CreateTaskReviewScreenState extends ConsumerState<CreateTaskReviewScreen>
     return [
       item(CreateTaskDraft.hrgaDepartment, 'Human Resources General Affairs (HRGA)'),
       item(CreateTaskDraft.engineeringDepartment, 'Engineering'),
-      // item(CreateTaskDraft.bothDepartments, 'Keduanya'),
     ];
   }
 

@@ -32,7 +32,7 @@ class AppPhotoSlot extends StatelessWidget {
         Row(
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            if (isRequired) const Text(' *', style: const TextStyle(color: Colors.red)),
+            if (isRequired) const Text(' *', style: TextStyle(color: Colors.red)),
           ],
         ),
         const SizedBox(height: 8),

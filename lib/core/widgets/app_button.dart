@@ -60,10 +60,10 @@ class AppButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.textInverse,
-            disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
-            disabledForegroundColor: AppColors.textInverse.withOpacity(0.7),
+            disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+            disabledForegroundColor: AppColors.textInverse.withValues(alpha: 0.7),
             elevation: 2,
-            shadowColor: AppColors.primary.withOpacity(0.3),
+            shadowColor: AppColors.primary.withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
@@ -71,13 +71,13 @@ class AppButton extends StatelessWidget {
           ).copyWith(
             overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
               if (states.contains(WidgetState.pressed)) {
-                return AppColors.primaryDark.withOpacity(0.8);
+                return AppColors.primaryDark.withValues(alpha: 0.8);
               }
               if (states.contains(WidgetState.hovered)) {
-                return AppColors.primaryLight.withOpacity(0.5);
+                return AppColors.primaryLight.withValues(alpha: 0.5);
               }
               if (states.contains(WidgetState.focused)) {
-                return AppColors.primaryLight.withOpacity(0.3);
+                return AppColors.primaryLight.withValues(alpha: 0.3);
               }
               return null;
             }),
@@ -91,10 +91,10 @@ class AppButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary,
             foregroundColor: AppColors.textInverse,
-            disabledBackgroundColor: AppColors.secondary.withOpacity(0.6),
-            disabledForegroundColor: AppColors.textInverse.withOpacity(0.7),
+            disabledBackgroundColor: AppColors.secondary.withValues(alpha: 0.6),
+            disabledForegroundColor: AppColors.textInverse.withValues(alpha: 0.7),
             elevation: 2,
-            shadowColor: AppColors.secondary.withOpacity(0.3),
+            shadowColor: AppColors.secondary.withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
@@ -102,13 +102,13 @@ class AppButton extends StatelessWidget {
           ).copyWith(
             overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
               if (states.contains(WidgetState.pressed)) {
-                return AppColors.secondaryDark.withOpacity(0.8);
+                return AppColors.secondaryDark.withValues(alpha: 0.8);
               }
               if (states.contains(WidgetState.hovered)) {
-                return AppColors.secondary.withOpacity(0.8);
+                return AppColors.secondary.withValues(alpha: 0.8);
               }
               if (states.contains(WidgetState.focused)) {
-                return AppColors.secondary.withOpacity(0.85);
+                return AppColors.secondary.withValues(alpha: 0.85);
               }
               return null;
             }),
@@ -122,7 +122,7 @@ class AppButton extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primary,
             side: BorderSide(color: AppColors.primary, width: 2),
-            disabledForegroundColor: AppColors.primary.withOpacity(0.5),
+            disabledForegroundColor: AppColors.primary.withValues(alpha: 0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
@@ -130,16 +130,16 @@ class AppButton extends StatelessWidget {
           ).copyWith(
             side: WidgetStateProperty.resolveWith<BorderSide?>((states) {
               if (states.contains(WidgetState.disabled)) {
-                return BorderSide(color: AppColors.primary.withOpacity(0.3), width: 2);
+                return BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 2);
               }
               return BorderSide(color: AppColors.primary, width: 2);
             }),
             overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
               if (states.contains(WidgetState.pressed)) {
-                return AppColors.primary.withOpacity(0.1);
+                return AppColors.primary.withValues(alpha: 0.1);
               }
               if (states.contains(WidgetState.hovered)) {
-                return AppColors.primary.withOpacity(0.05);
+                return AppColors.primary.withValues(alpha: 0.05);
               }
               return null;
             }),
@@ -152,7 +152,7 @@ class AppButton extends StatelessWidget {
         button = TextButton(
           style: TextButton.styleFrom(
             foregroundColor: AppColors.primary,
-            disabledForegroundColor: AppColors.primary.withOpacity(0.5),
+            disabledForegroundColor: AppColors.primary.withValues(alpha: 0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
@@ -160,10 +160,10 @@ class AppButton extends StatelessWidget {
           ).copyWith(
             overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
               if (states.contains(WidgetState.pressed)) {
-                return AppColors.primary.withOpacity(0.1);
+                return AppColors.primary.withValues(alpha: 0.1);
               }
               if (states.contains(WidgetState.hovered)) {
-                return AppColors.primary.withOpacity(0.05);
+                return AppColors.primary.withValues(alpha: 0.05);
               }
               return null;
             }),

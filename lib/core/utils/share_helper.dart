@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -14,7 +13,12 @@ class ShareHelper {
     try {
       final xFile = XFile(imagePath);
       // Membagikan file fisik dengan teks sebagai caption
-      await Share.shareXFiles([xFile], text: caption);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [xFile],
+          text: caption,
+        ),
+      );
     } catch (e) {
       debugPrint('Gagal share gambar lokal: $e');
     }
@@ -52,7 +56,12 @@ class ShareHelper {
 
       // 4. Share gambar yang sudah diunduh + Caption
       final xFile = XFile(file.path);
-      await Share.shareXFiles([xFile], text: caption);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [xFile],
+          text: caption,
+        ),
+      );
 
     } catch (e) {
       if (context.mounted) Navigator.pop(context); // Tutup loading jika error

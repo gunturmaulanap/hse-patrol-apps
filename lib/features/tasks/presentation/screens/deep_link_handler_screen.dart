@@ -201,7 +201,8 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
             debugPrint('[DeepLinkHandler] Available areas: ${picAreas.map((a) => '${a.id}:${a.name}').join(', ')}');
           }
 
-          // Perbaiki: Cek areaId dan areaName dengan lebih robust
+          // Samakan dengan logika provider: support role tidak wajib match area,
+          // role PIC area biasa tetap wajib area match.
           bool hasAreaById = false;
           bool hasAreaByName = false;
 
@@ -216,10 +217,17 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
             debugPrint('[DeepLinkHandler] Checking areaName "$areaName": $hasAreaByName');
           }
 
-          final areaAllowed = hasAreaById || hasAreaByName;
+          final isSupportRole =
+              isPicEngineerRole(currentUser.role) || isPicHrgaRole(currentUser.role);
+          final areaAllowed = isSupportRole || hasAreaById || hasAreaByName;
           final toDepartment = _toInt(foundTask['to_department'] ?? foundTask['toDepartment']) ?? 0;
-          final engineerAllowed = !isPicEngineerRole(currentUser.role) || toDepartment == 2;
-          roleAllowed = areaAllowed && engineerAllowed;
+          final engineerAllowed =
+              !isPicEngineerRole(currentUser.role) ||
+              toDepartment == 2;
+          final hrgaAllowed =
+              !isPicHrgaRole(currentUser.role) ||
+              toDepartment == 1;
+          roleAllowed = areaAllowed && engineerAllowed && hrgaAllowed;
           debugPrint('[DeepLinkHandler] Final PIC roleAllowed: $roleAllowed (byId: $hasAreaById, byName: $hasAreaByName)');
         } catch (e) {
           debugPrint('[DeepLinkHandler] Failed to fetch picAreas provider: $e');
@@ -324,12 +332,17 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
         return false;
       }
 
-      final hasAreaById = areaId != null && currentUser.areaAccess.contains(areaId);
-      final hasAreaByName = areaName != null && currentUser.areaAccess.contains(areaName);
+      final normalizedAreaAccess = currentUser.areaAccess
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toSet();
+      final hasAreaById = areaId != null && normalizedAreaAccess.contains(areaId.trim().toLowerCase());
+      final hasAreaByName = areaName != null && normalizedAreaAccess.contains(areaName.trim().toLowerCase());
 
       debugPrint('[DeepLinkHandler] PIC areaAccess check => byId: $hasAreaById, byName: $hasAreaByName');
 
-      final areaAllowed = hasAreaById || hasAreaByName;
+      final isSupportRole = isPicEngineerRole(role) || isPicHrgaRole(role);
+      final areaAllowed = isSupportRole || hasAreaById || hasAreaByName;
       if (!areaAllowed) {
         return false;
       }
@@ -352,20 +365,6 @@ class _DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen> {
     }
 
     return false;
-  }
-
-  bool? _asBool(dynamic value) {
-    if (value is bool) return value;
-    if (value is num) return value != 0;
-    final normalized = value?.toString().trim().toLowerCase();
-    if (normalized == null || normalized.isEmpty) return null;
-    if (normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'valid' || normalized == 'authorized') {
-      return true;
-    }
-    if (normalized == 'false' || normalized == '0' || normalized == 'no' || normalized == 'invalid' || normalized == 'unauthorized') {
-      return false;
-    }
-    return null;
   }
 
   void _navigateToRelevantList(UserRole role, String message) {

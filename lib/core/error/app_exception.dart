@@ -17,14 +17,10 @@ abstract class AppException implements Exception {
 /// Network-related exceptions
 class NetworkException extends AppException {
   const NetworkException({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   factory NetworkException.requestTimeout({dynamic originalError}) {
     return NetworkException(
@@ -86,14 +82,10 @@ class NetworkException extends AppException {
 /// Authentication-related exceptions
 class AuthException extends AppException {
   const AuthException({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   factory AuthException.invalidCredentials({dynamic originalError}) {
     return AuthException(
@@ -133,15 +125,11 @@ class ValidationException extends AppException {
   final Map<String, List<String>>? fieldErrors;
 
   const ValidationException({
-    required String message,
-    String? code,
+    required super.message,
+    super.code,
     this.fieldErrors,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    super.originalError,
+  });
 
   factory ValidationException.invalidInput({
     String message = 'Data yang Anda masukkan tidak valid.',
@@ -182,14 +170,10 @@ class ValidationException extends AppException {
 /// Business logic exceptions
 class BusinessException extends AppException {
   const BusinessException({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   factory BusinessException.taskNotFound({dynamic originalError}) {
     return const BusinessException(
@@ -220,14 +204,10 @@ class BusinessException extends AppException {
 /// Storage exceptions
 class StorageException extends AppException {
   const StorageException({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   factory StorageException.readFailed({dynamic originalError}) {
     return const StorageException(

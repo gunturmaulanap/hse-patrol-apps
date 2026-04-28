@@ -52,7 +52,7 @@ class PetugasPatrolHistoryPage extends ConsumerWidget {
                         backgroundColor: Colors.teal.shade700,
                         foregroundColor: Colors.white,
                         elevation: 4,
-                        shadowColor: Colors.teal.withOpacity(0.5),
+                        shadowColor: Colors.teal.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: () {

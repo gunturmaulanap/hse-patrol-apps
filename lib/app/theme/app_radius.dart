@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class AppRadius {
   // Main radius values
   static const double small = 12.0;

@@ -30,7 +30,7 @@ class LuxuryBackground extends StatelessWidget {
               height: 350,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -43,7 +43,7 @@ class LuxuryBackground extends StatelessWidget {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.secondary.withOpacity(0.05),
+                color: AppColors.secondary.withValues(alpha: 0.05),
               ),
             ),
           ),

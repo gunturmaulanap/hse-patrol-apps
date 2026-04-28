@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_typography.dart';
+import '../../../auth/domain/auth_role_helper.dart';
 import '../../../auth/data/models/user_model.dart';
 
 class TaskTimelineSection extends StatelessWidget {
@@ -55,13 +56,12 @@ class TaskTimelineSection extends StatelessWidget {
 
         // Coba ambil nama dari picUserMap jika userId ada
         String? resolvedName;
-        int? roleId;
-
-        if (log['role_id'] != null) {
-          roleId = int.tryParse(log['role_id'].toString());
-        } else if (log['roleId'] != null) {
-          roleId = int.tryParse(log['roleId'].toString());
-        }
+        final roleName = _firstNonEmptyString([
+          log['role_name'],
+          log['roleName'],
+          log['user_role_name'],
+          log['userRoleName'],
+        ]);
 
         if (userIdRaw != null) {
           final userId = int.tryParse(userIdRaw.toString());
@@ -263,7 +263,8 @@ class TaskTimelineSection extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            if (roleId == 24 || roleId == 25)
+                            if (isEngineerRoleName(roleName) ||
+                                isHrgaRoleName(roleName))
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 6),
@@ -275,13 +276,17 @@ class TaskTimelineSection extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      roleId == 24 ? Icons.engineering_rounded : Icons.people_alt_rounded,
+                                      isEngineerRoleName(roleName)
+                                          ? Icons.engineering_rounded
+                                          : Icons.people_alt_rounded,
                                       size: 12,
                                       color: AppColors.primary,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      roleId == 24 ? 'Support Engineer' : 'Support HRGA',
+                                      isEngineerRoleName(roleName)
+                                          ? 'Support Engineer'
+                                          : 'Support HRGA',
                                       style: AppTypography.caption.copyWith(
                                         color: AppColors.primary,
                                         fontWeight: FontWeight.w600,

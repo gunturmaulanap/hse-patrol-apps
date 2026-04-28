@@ -5,7 +5,6 @@ class UserModel {
   final int id;
   final String name;
   final String email;
-  final int roleId;
   final String roleName;
   final UserRole role;
   final String? phone;
@@ -16,7 +15,6 @@ class UserModel {
     this.id = 0,
     this.name = '',
     this.email = '',
-    this.roleId = 0,
     this.roleName = '',
     this.role = UserRole.petugasHse,
     this.phone,
@@ -35,12 +33,10 @@ class UserModel {
       id: _toInt(map['id']),
       name: _toSafeString(map['name']),
       email: _toSafeString(map['email']),
-      roleId: _toInt(map['role_id'] ?? map['roleId']),
       roleName: _toSafeString(map['role_name'] ?? map['roleName']),
       role: _parseUserRole(
         roleName: map['role_name']?.toString() ?? map['roleName']?.toString(),
         roleRaw: map['role']?.toString(),
-        roleId: _toInt(map['role_id'] ?? map['roleId']),
       ),
       phone: _toNullableString(map['phone']),
       isActive: _toBool(
@@ -58,7 +54,6 @@ class UserModel {
       'id': id,
       'name': name,
       'email': email,
-      'role_id': roleId,
       'role_name': roleName,
       'role': role.name,
       'phone': phone,
@@ -71,7 +66,6 @@ class UserModel {
     int? id,
     String? name,
     String? email,
-    int? roleId,
     String? roleName,
     UserRole? role,
     String? phone,
@@ -82,7 +76,6 @@ class UserModel {
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      roleId: roleId ?? this.roleId,
       roleName: roleName ?? this.roleName,
       role: role ?? this.role,
       phone: phone ?? this.phone,
@@ -97,10 +90,8 @@ class UserModel {
 UserRole _parseUserRole({
   String? roleName,
   String? roleRaw,
-  int? roleId,
 }) {
   return resolveUserRoleFromBackend(
-    roleId: roleId ?? 0,
     roleName: roleName,
     roleRaw: roleRaw,
   );

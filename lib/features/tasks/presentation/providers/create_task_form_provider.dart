@@ -11,7 +11,6 @@ class CreateTaskDraft {
   static const int noDepartmentSupport = 0;
   static const int hrgaDepartment = 1;
   static const int engineeringDepartment = 2;
-  // static const int bothDepartments = 3;
 
   final String? buildingType;
   final String? area;

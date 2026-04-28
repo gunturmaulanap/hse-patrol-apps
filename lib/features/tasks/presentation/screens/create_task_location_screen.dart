@@ -94,7 +94,7 @@ class _CreateTaskLocationScreenState extends ConsumerState<CreateTaskLocationScr
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  value: effectiveSelectedArea,
+                  initialValue: effectiveSelectedArea,
                   items: filteredAreas.map((area) {
                     return DropdownMenuItem(
                       value: area,

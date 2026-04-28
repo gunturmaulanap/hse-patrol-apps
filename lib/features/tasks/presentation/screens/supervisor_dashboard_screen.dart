@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/app_radius.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../shared/enums/user_role.dart';
@@ -71,6 +70,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     final pendingRejectedTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'pending rejected').length;
     final completedTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'completed').length;
     final followUpDoneTasks = filteredTasks.where((t) => _getActualStatus(t).toLowerCase() == 'follow up done').length;
+    final averageTasksPerDay = totalTasks > 0 ? (totalTasks / 7).toStringAsFixed(1) : '0';
 
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
@@ -118,7 +118,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                   const SizedBox(width: 12),
                   Expanded(child: _statCard('Follow Up Done', '$followUpDoneTasks', const Color(0xFFFAFF9F))),
                   const SizedBox(width: 12),
-                  Expanded(child: _statCard('Avg per Day', '${totalTasks > 0 ? (totalTasks / 7).toStringAsFixed(1) : '0'}', AppColors.secondary)),
+                  Expanded(child: _statCard('Avg per Day', averageTasksPerDay, AppColors.secondary)),
                 ],
               ),
             ),
@@ -192,7 +192,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 firstDate: DateTime(2020),
                 lastDate: DateTime(2100),
               );
-              if (picked == null) return;
+              if (picked == null || !context.mounted) return;
 
               final newFrom = DateTime(picked.year, picked.month, picked.day);
               // Max 7 days constraint
@@ -202,9 +202,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 debugPrint('[SupervisorDashboard][DateFrom] newFrom=$newFrom normalizedTo=$normalizedTo dayDiff=$dayDiff');
 
                 if (dayDiff > 6) {
-                  if (mounted) {
-                    AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
-                  }
+                  AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
                   return;
                 }
               }
@@ -227,7 +225,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 firstDate: DateTime(2020),
                 lastDate: DateTime(2100),
               );
-              if (picked == null) return;
+              if (picked == null || !context.mounted) return;
 
               final newTo = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
               // Max 7 days constraint
@@ -238,9 +236,7 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
                 debugPrint('[SupervisorDashboard][DateTo] normalizedFrom=$normalizedFrom newTo=$newTo normalizedTo=$normalizedTo dayDiff=$dayDiff');
 
                 if (dayDiff > 6) {
-                  if (mounted) {
-                    AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
-                  }
+                  AppToast.warning(context, message: 'Maksimal filter adalah 7 hari');
                   return;
                 }
               }
@@ -572,9 +568,4 @@ class _SupervisorDashboardScreenState extends ConsumerState<SupervisorDashboardS
     return parsed.toLocal();
   }
 
-  String _formatDate(String? raw) {
-    final dt = DateTime.tryParse(raw ?? '');
-    if (dt == null) return '-';
-    return DateFormat('dd MMM yyyy, HH:mm').format(dt);
-  }
 }

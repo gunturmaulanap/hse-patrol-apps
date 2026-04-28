@@ -62,9 +62,9 @@ class _CreateTaskBuildingTypeScreenState extends ConsumerState<CreateTaskBuildin
             Container(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
               child: Text(
                 'ℹ️ Informasi: Pilihan jenis bangunan diambil dari server dan akan digunakan untuk memfilter daftar area pada langkah berikutnya.',
@@ -149,7 +149,7 @@ class _BuildingTypeCard extends StatelessWidget {
           color: isSelected ? AppColors.secondary : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.large),
           border: Border.all(
-            color: isSelected ? AppColors.secondary : Colors.white.withOpacity(0.05),
+            color: isSelected ? AppColors.secondary : Colors.white.withValues(alpha: 0.05),
             width: 1,
           ),
         ),
@@ -176,7 +176,7 @@ class _BuildingTypeCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: isSelected
-                          ? AppColors.textInverted.withOpacity(0.8)
+                          ? AppColors.textInverted.withValues(alpha: 0.8)
                           : AppColors.textSecondary,
                     ),
               ),

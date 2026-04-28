@@ -96,8 +96,8 @@ class _PicPendingTasksScreenState extends ConsumerState<PicPendingTasksScreen> {
     final reports = reportsAsync.valueOrNull ?? <Map<String, dynamic>>[];
 
     // Filter Task:
-    // Data reports di sini SUDAH difilter oleh [`picAccessibleTaskMapsProvider`](lib/features/tasks/presentation/providers/task_provider.dart:78)
-    // berdasarkan role_id 5 / 24 / 25 dan area akses. Jadi screen ini cukup
+    // Data reports di sini SUDAH difilter oleh [`picAccessibleTaskMapsProvider`](lib/features/tasks/presentation/providers/task_provider.dart:88)
+    // berdasarkan role_name dan area akses. Jadi screen ini cukup
     // memakai kriteria yang sama seperti badge action-needed di Home:
     // Pending + Pending Rejected.
     final pendingTasks = reports.where((r) {

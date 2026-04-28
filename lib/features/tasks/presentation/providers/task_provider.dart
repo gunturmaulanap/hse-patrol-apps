@@ -124,11 +124,11 @@ final picAccessibleTaskMapsProvider =
         _toDepartment(report['to_department'] ?? report['toDepartment']);
 
     if (isPicEngineerRole(currentUser.role)) {
-      return toDepartment == 2 || toDepartment == 3;
+      return toDepartment == 2;
     }
 
     if (isPicHrgaRole(currentUser.role)) {
-      return toDepartment == 1 || toDepartment == 3;
+      return toDepartment == 1;
     }
 
     return true;

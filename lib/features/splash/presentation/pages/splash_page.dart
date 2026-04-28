@@ -50,6 +50,8 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
     try {
       final sessionManager = ref.read(sessionManagerProvider);
+      final authRepository = ref.read(authRepositoryProvider);
+      final authNotifier = ref.read(authNotifierProvider.notifier);
 
       // DEBUG: Tampilkan token untuk verifikasi
       final token = await sessionManager.getToken();
@@ -69,11 +71,11 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       }
 
       debugPrint('[Splash] before call /me');
-      final authRepository = ref.read(authRepositoryProvider);
       final me = await authRepository.getMe();
       debugPrint('[Splash] /me result: ${me.toJson()}');
 
-      ref.read(authNotifierProvider.notifier).setHydratedUser(me);
+      if (!mounted) return;
+      authNotifier.setHydratedUser(me);
 
       final route = resolveHomeRouteName(me.role);
       debugPrint('[Splash] before redirect/router decision -> go $route');

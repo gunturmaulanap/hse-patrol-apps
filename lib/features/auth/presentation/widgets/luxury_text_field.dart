@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
@@ -57,7 +56,7 @@ class _LuxuryTextFieldState extends State<LuxuryTextField> {
         Text(
           widget.label,
           style: AppTypography.caption.copyWith(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
           ),
@@ -66,18 +65,18 @@ class _LuxuryTextFieldState extends State<LuxuryTextField> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: _isFocused
-                  ? AppColors.primary.withOpacity(0.6)
-                  : Colors.white.withOpacity(0.1),
+                  ? AppColors.primary.withValues(alpha: 0.6)
+                  : Colors.white.withValues(alpha: 0.1),
               width: _isFocused ? 1.5 : 1,
             ),
             boxShadow: [
               if (_isFocused)
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.15),
+                  color: AppColors.primary.withValues(alpha: 0.15),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -96,20 +95,20 @@ class _LuxuryTextFieldState extends State<LuxuryTextField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: AppTypography.body1.copyWith(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 fontWeight: FontWeight.w400,
               ),
               prefixIcon: (widget.isUsernameField || widget.isPasswordField)
                   ? Icon(
                       widget.isUsernameField ? PhosphorIcons.user(PhosphorIconsStyle.regular) : PhosphorIcons.lock(PhosphorIconsStyle.regular),
-                      color: _isFocused ? AppColors.primary : Colors.white.withOpacity(0.4),
+                      color: _isFocused ? AppColors.primary : Colors.white.withValues(alpha: 0.4),
                       size: 20,
                     )
                   : null,
               suffixIcon: widget.obscureText
                   ? Icon(
                       PhosphorIcons.eye(PhosphorIconsStyle.regular),
-                      color: Colors.white.withOpacity(0.4),
+                      color: Colors.white.withValues(alpha: 0.4),
                       size: 20,
                     )
                   : null,

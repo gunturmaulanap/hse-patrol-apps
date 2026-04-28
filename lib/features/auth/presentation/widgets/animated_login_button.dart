@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_radius.dart';
-import '../../../../app/theme/app_spacing.dart';
 import '../../../../app/theme/app_typography.dart';
 
 enum ButtonState {
@@ -76,16 +74,6 @@ class _AnimatedLoginButtonState extends State<AnimatedLoginButton>
     _animationController.forward();
   }
 
-  void _resetToInitial() {
-    _animationController.reverse().then((_) {
-      if (mounted) {
-        setState(() {
-          _buttonState = ButtonState.initial;
-        });
-      }
-    });
-  }
-
   @override
   void dispose() {
     _animationController.dispose();
@@ -100,11 +88,7 @@ class _AnimatedLoginButtonState extends State<AnimatedLoginButton>
     return GestureDetector(
       onTap: widget.isLoading || _buttonState == ButtonState.loading
           ? null
-          : () {
-              if (widget.onPressed != null) {
-                widget.onPressed();
-              }
-            },
+          : widget.onPressed,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         width: double.infinity,
@@ -122,7 +106,7 @@ class _AnimatedLoginButtonState extends State<AnimatedLoginButton>
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.4),
+              color: AppColors.primary.withValues(alpha: 0.4),
               blurRadius: isShrunk ? 0 : 20,
               offset: isShrunk ? Offset.zero : const Offset(0, 8),
               spreadRadius: isShrunk ? 0 : 0,
@@ -168,7 +152,7 @@ class _AnimatedLoginButtonState extends State<AnimatedLoginButton>
             height: 24,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF1E1E1E).withOpacity(0.3),
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.3),
             ),
           ),
           // Rotating white arc
