@@ -516,14 +516,32 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         'to_department': request.toDepartment,
       }, tag: 'TaskRemoteDataSource');
 
-      final formData = FormData.fromMap({
-        'title': request.title.trim(),
-        'area_id': request.areaId,
-        'risk_level': request.riskLevel.trim(),
-        'root_cause': request.rootCause.trim(),
-        'notes': request.notes.trim(),
-        'to_department': request.toDepartment,
-      });
+      final requestTitle = request.title.trim();
+      final requestRiskLevel = request.riskLevel.trim();
+      final requestRootCause = request.rootCause.trim();
+      final requestNotes = request.notes.trim();
+
+      final formData = FormData();
+      formData.fields.addAll([
+        MapEntry('title', requestTitle),
+        MapEntry('area_id', request.areaId.toString()),
+        MapEntry('risk_level', requestRiskLevel),
+        MapEntry('root_cause', requestRootCause),
+        MapEntry('notes', requestNotes),
+        MapEntry('to_department', request.toDepartment.toString()),
+      ]);
+
+      log.info(
+        'Create task multipart fields prepared',
+        data: {
+          'title_length': requestTitle.length,
+          'root_cause_length': requestRootCause.length,
+          'notes_length': requestNotes.length,
+          'title': requestTitle,
+          'root_cause': requestRootCause,
+        },
+        tag: 'TaskRemoteDataSource',
+      );
 
       // Upload photos with proper format
       if (photos != null && photos.isNotEmpty) {
@@ -532,13 +550,19 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
             photos[i].path,
             filename: 'photo_${i + 1}.jpg',
           );
-          formData.files.add(MapEntry('photos[$i]', file));
+          formData.files.add(MapEntry('photos[]', file));
         }
       }
 
       final response = await _dio.post(
         '/hse-reports',
         data: formData,
+        options: Options(
+          contentType: 'multipart/form-data; charset=utf-8',
+          headers: {
+            'Accept': 'application/json',
+          },
+        ),
       );
 
       final data = response.data is Map
@@ -547,6 +571,51 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
 
       if (data == null) {
         throw Exception('Failed to create report: ${response.data}');
+      }
+
+      final responseTitle = data['title']?.toString().trim() ?? '';
+      final responseRootCause = data['root_cause']?.toString().trim() ??
+          data['rootCause']?.toString().trim() ??
+          '';
+
+      final isTitleTruncated = _isLikelyTruncatedValue(
+        requestValue: requestTitle,
+        responseValue: responseTitle,
+      );
+      final isRootCauseTruncated = _isLikelyTruncatedValue(
+        requestValue: requestRootCause,
+        responseValue: responseRootCause,
+      );
+
+      log.info(
+        'Create task response comparison',
+        data: {
+          'request_title_length': requestTitle.length,
+          'response_title_length': responseTitle.length,
+          'request_root_cause_length': requestRootCause.length,
+          'response_root_cause_length': responseRootCause.length,
+          'is_title_truncated': isTitleTruncated,
+          'is_root_cause_truncated': isRootCauseTruncated,
+        },
+        tag: 'TaskRemoteDataSource',
+      );
+
+      if (isTitleTruncated || isRootCauseTruncated) {
+        log.error(
+          'Create task response appears truncated',
+          error: {
+            'request_title': requestTitle,
+            'response_title': responseTitle,
+            'request_root_cause': requestRootCause,
+            'response_root_cause': responseRootCause,
+          },
+          tag: 'TaskRemoteDataSource',
+        );
+
+        throw Exception(
+          'Data laporan yang diterima dari server terdeteksi terpotong. '
+          'Title/root cause yang tersimpan tidak sama dengan data yang dikirim.',
+        );
       }
 
       log.info('Task created successfully', data: {'id': data['id']}, tag: 'TaskRemoteDataSource');
@@ -826,6 +895,25 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       date: json['date']?.toString() ?? json['created_at']?.toString(),
       userName: _resolveUserName(json),
     );
+  }
+
+  bool _isLikelyTruncatedValue({
+    required String requestValue,
+    required String responseValue,
+  }) {
+    final normalizedRequest = requestValue.trim();
+    final normalizedResponse = responseValue.trim();
+
+    if (normalizedRequest.isEmpty || normalizedResponse.isEmpty) {
+      return false;
+    }
+
+    if (normalizedRequest == normalizedResponse) {
+      return false;
+    }
+
+    return normalizedRequest.length > normalizedResponse.length &&
+        normalizedRequest.startsWith(normalizedResponse);
   }
 
   String? _resolveUserName(Map<String, dynamic> json) {

@@ -73,15 +73,19 @@ class _CreateTaskRootCauseScreenState extends ConsumerState<CreateTaskRootCauseS
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: AppButton(
-                    text: 'Review',
-                    onPressed: () {
-                      if (_rootCauseController.text.trim().isNotEmpty) {
-                        ref.read(createTaskFormProvider.notifier).setRootCause(_rootCauseController.text.trim());
-                        context.pushNamed(RouteNames.petugasCreateTaskReview);
-                      }
-                    },
-                  ),
+                   child: AppButton(
+                     text: 'Review',
+                     onPressed: () {
+                       if (_rootCauseController.text.trim().isNotEmpty) {
+                         final trimmedRootCause = _rootCauseController.text.trim();
+                         debugPrint(
+                           '🔎 [CreateTaskRootCauseScreen] Review tapped rootCause(length=${trimmedRootCause.length}): "$trimmedRootCause"',
+                         );
+                         ref.read(createTaskFormProvider.notifier).setRootCause(trimmedRootCause);
+                         context.pushNamed(RouteNames.petugasCreateTaskReview);
+                       }
+                     },
+                   ),
                 ),
               ],
             )

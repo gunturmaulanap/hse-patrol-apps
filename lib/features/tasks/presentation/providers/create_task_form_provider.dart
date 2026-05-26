@@ -83,7 +83,15 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
   }
 
   void setNotes(String value) => state = state.copyWith(notes: value);
-  void setRootCause(String value) => state = state.copyWith(rootCause: value);
+  void setRootCause(String value) {
+    debugPrint(
+      '🔎 [CreateTaskFormNotifier] setRootCause input(length=${value.length}): "$value"',
+    );
+    state = state.copyWith(rootCause: value);
+    debugPrint(
+      '🔎 [CreateTaskFormNotifier] state.rootCause saved(length=${state.rootCause?.length ?? 0}): "${state.rootCause}"',
+    );
+  }
   void setAreaId(int? id) => state = state.copyWith(areaId: id);
   void setNeedsOtherDepartmentSupport(bool value) {
     state = state.copyWith(
@@ -109,6 +117,16 @@ class CreateTaskFormNotifier extends StateNotifier<CreateTaskDraft> {
       final rootCause = state.rootCause ?? '-';
 
       final title = 'Area $areaName Masalah $rootCause';
+
+      debugPrint(
+        '🔎 [CreateTaskFormNotifier] submitTask area(length=${areaName.length}): "$areaName"',
+      );
+      debugPrint(
+        '🔎 [CreateTaskFormNotifier] submitTask rootCause(length=${rootCause.length}): "$rootCause"',
+      );
+      debugPrint(
+        '🔎 [CreateTaskFormNotifier] submitTask title(length=${title.length}): "$title"',
+      );
 
       final request = CreateHseTaskRequest(
         title: title,
